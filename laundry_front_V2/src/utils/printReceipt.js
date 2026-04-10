@@ -1,18 +1,18 @@
 import logoUrl from '../assets/logo.png';
 
-const COMPANY_INFO = "Casablanca, Maroc • Tel: 0522-12-34-56";
+const COMPANY_INFO = "Rabat, Maroc • Tel: 0522-12-34-56";
 
 const buildReceiptHTML = (order, paymentTypeLabel) => {
   const items = order.commandeTapis || [];
-  
+
   const itemsRows = items.map((item, idx) => {
     // Support both new fields (Feature B) and legacy fields
     const nom = item.nom || item.tapis?.nom || item.name || `Article ${idx + 1}`;
-    
+
     const largeur = item.largeur ?? item.tapis?.largeur ?? null;
     const hauteur = item.hauteur ?? item.tapis?.hauteur ?? null;
     const dimensions = (largeur && hauteur) ? `${largeur}m × ${hauteur}m` : '—';
-    
+
     const prixCalcule = item.prixCalcule ?? item.tapis?.prixCalcule ?? null;
     const prixFinal = item.prixFinal ?? item.prixUnitaire ?? item.tapis?.prixUnitaire ?? null;
     const hasDiscount = prixCalcule && prixFinal && parseFloat(prixFinal) < parseFloat(prixCalcule);
@@ -31,21 +31,21 @@ const buildReceiptHTML = (order, paymentTypeLabel) => {
   }).join('');
 
   // Total: use montantTotal from order (authoritative), fallback to sum of prixFinal
-  const total = order.montantTotal 
+  const total = order.montantTotal
     ?? items.reduce((sum, item) => sum + parseFloat(item.prixFinal ?? item.prixUnitaire ?? 0), 0);
 
   const clientName = order.client?.nom || order.client?.name || order.client?.fullName || 'Client';
   const clientPhone = order.client?.phones?.[0]?.phoneNumber || '—';
   const orderNum = order.numeroCommande || order.id;
-  const dateStr = order.dateCreation 
-    ? new Date(order.dateCreation).toLocaleDateString('fr-FR', { 
-        day:'2-digit', month:'2-digit', year:'numeric',
-        hour:'2-digit', minute:'2-digit' 
-      })
+  const dateStr = order.dateCreation
+    ? new Date(order.dateCreation).toLocaleDateString('fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
     : new Date().toLocaleString('fr-FR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
 
   return `
     <!DOCTYPE html>

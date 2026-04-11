@@ -52,32 +52,37 @@ const buildReceiptHTML = (order, paymentTypeLabel) => {
     <html lang="fr">
     <head>
       <meta charset="UTF-8">
-      <title>Reçu #${orderNum}</title>
+      <title>${orderNum}</title>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; color: #1a1a1a; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header img { max-height: 60px; margin-bottom: 10px; }
-        .header h1 { margin: 0; color: #F97316; font-size: 24px; }
-        .header p { margin: 2px 0; color: #666; font-size: 14px; }
-        .header .contact { font-size: 12px; color: #888; margin-top: 5px; }
-        .divider { border-top: 2px dashed #eee; margin: 20px 0; }
-        .info-block { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .info-col { width: 48%; }
-        .info-col p { margin: 5px 0; font-size: 14px; }
+        .container { width: 100%; max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header img { max-height: 50px; margin-bottom: 8px; }
+        .header h1 { margin: 0; color: #F97316; font-size: 22px; }
+        .header p { margin: 1px 0; color: #666; font-size: 13px; }
+        .header .contact { font-size: 11px; color: #888; margin-top: 4px; }
+        .divider { border-top: 2px dashed #eee; margin: 15px 0; }
+        .info-block { display: flex; flex-wrap: wrap; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
+        .info-col { flex: 1; min-width: 140px; }
+        .info-col p { margin: 4px 0; font-size: 13px; }
         .info-col strong { color: #555; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+        th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #1a1a1a; color: white; border: none; }
         tr:nth-child(even) { background-color: #fafafa; }
-        .total-block { text-align: right; margin-bottom: 40px; }
-        .total-block h2 { font-size: 24px; color: #F97316; margin: 0; }
-        .footer { text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
-        .footer p { margin: 5px 0; font-size: 14px; color: #1a1a1a; }
-        .footer small { color: #999; font-size: 11px; }
+        .total-block { text-align: right; margin-bottom: 30px; }
+        .total-block h2 { font-size: 20px; color: #F97316; margin: 0; }
+        .footer { text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+        .footer p { margin: 4px 0; font-size: 13px; color: #1a1a1a; }
+        .footer small { color: #999; font-size: 10px; }
+
         @media print {
-          body { padding: 0; }
-          .no-print { display: none !important; }
+          body { padding: 0; margin: 0; }
+          .container { max-width: 100% !important; }
+          /* Optimized for 80mm thermal paper */
+          @page { margin: 10mm; }
+          .header h1 { color: black !important; }
+          .total-block h2 { color: black !important; }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       </style>
@@ -134,9 +139,15 @@ const buildReceiptHTML = (order, paymentTypeLabel) => {
 };
 
 export const printReceipt = (order, paymentTypeLabel) => {
+  const orderNum = order.numeroCommande || order.id;
   const html = buildReceiptHTML(order, paymentTypeLabel);
 
-  // Create a hidden iframe in the current document
+  // Store original title to restore it later
+  const originalTitle = document.title;
+  // Set main document title to order number (this pre-fills the filename in the print dialog)
+  document.title = orderNum;
+
+  // Create a hidden iframe
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;';
   document.body.appendChild(iframe);
@@ -146,28 +157,26 @@ export const printReceipt = (order, paymentTypeLabel) => {
   doc.write(html);
   doc.close();
 
-  // Wait for content and images to load, then print
-  iframe.contentWindow.onload = () => {
+  let isPrinting = false;
+  const doPrint = () => {
+    if (isPrinting) return;
+    isPrinting = true;
+    
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
-    // Remove iframe after print dialog closes
+    
+    // Restore the original website title after a short delay
     setTimeout(() => {
-      document.body.removeChild(iframe);
+      document.title = originalTitle;
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
     }, 1000);
   };
 
-  // Fallback: if onload doesn't fire (no images), print after short delay
-  setTimeout(() => {
-    if (document.body.contains(iframe)) {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }
-  }, 500);
+  // Wait for content to load
+  iframe.contentWindow.onload = doPrint;
+  setTimeout(doPrint, 2000);
 };
 
 export const downloadReceiptPDF = (order, paymentTypeLabel) => {

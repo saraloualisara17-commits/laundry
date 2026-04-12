@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Truck, Users, Package, Wrench, XCircle, Shield, RefreshCw, ClipboardList } from 'lucide-react';
+import { Home, Truck, Users, Package, Wrench, XCircle, Shield, RefreshCw, ClipboardList, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const BottomNav = ({ user }) => {
@@ -14,6 +14,7 @@ const BottomNav = ({ user }) => {
     { name: t('nav.users'), path: '/admin/users-management', icon: Shield },
     { name: t('nav.orders'), path: '/admin/commandes', icon: ClipboardList },
     { name: t('nav.clients'), path: '/admin/clients', icon: Users },
+    { name: t('nav.carpet_types'), path: '/admin/carpet-types', icon: Layers },
   ];
 
   const livreurLinks = [

@@ -25,7 +25,7 @@ import {
 const StatCard = ({ label, count, icon: Icon, colorClass, iconBgClass, iconColorClass, barColorClass, t, onClick }) => (
   <button 
     onClick={onClick}
-    className={`w-full bg-white rounded-2xl shadow-card p-6 border-t-4 ${colorClass} transition-all hover:shadow-card-hover hover:-translate-y-1 text-start group`}
+    className={`w-full bg-surface rounded-2xl shadow-card p-6 border-t-4 ${colorClass} transition-all hover:shadow-card-hover hover:-translate-y-1 text-start group`}
   >
     <div className="flex justify-between items-start">
       <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider leading-tight max-w-[120px] group-hover:text-text-primary transition-colors">
@@ -42,7 +42,7 @@ const StatCard = ({ label, count, icon: Icon, colorClass, iconBgClass, iconColor
       <span className={`text-[11px] font-semibold uppercase tracking-wide ${iconColorClass}`}>
         {label === t('driver.dashboard.stats.ready_delivery') ? t('driver.dashboard.stats.deliveries') : label === t('driver.dashboard.stats.collect_workshop') ? t('driver.dashboard.stats.collections') : t('driver.dashboard.stats.to_return')}
       </span>
-      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
         <div className={`h-full ${barColorClass} transition-all duration-500`} style={{ width: count > 0 ? '70%' : '0%' }}></div>
       </div>
     </div>
@@ -66,13 +66,13 @@ const MissionTableRow = ({ mission, onNavigate, t }) => {
   const initials = getInitials(displayName);
 
   return (
-    <tr className="border-b border-border last:border-0 hover:bg-gray-50/80 transition-colors">
+    <tr className="border-b border-border last:border-0 hover:bg-background/50 transition-colors">
       <td className="px-8 py-5 text-start">
         <span className="text-sm font-semibold text-text-primary">#{mission.numeroCommande}</span>
       </td>
       <td className="px-8 py-5 text-start">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gray-100 text-text-secondary font-semibold text-xs flex items-center justify-center shrink-0 border border-gray-200">
+          <div className="w-9 h-9 rounded-full bg-background text-text-secondary font-semibold text-xs flex items-center justify-center shrink-0 border border-border">
             {initials}
           </div>
           <div className="flex flex-col min-w-0">
@@ -84,15 +84,15 @@ const MissionTableRow = ({ mission, onNavigate, t }) => {
       <td className="px-8 py-5 text-start">
         <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[11px] font-bold uppercase border tracking-wide
           ${isDelivery 
-            ? 'bg-teal-50 text-teal-700 border-teal-200' 
-            : 'bg-primary-50 text-primary-600 border-primary-200'}`}>
+            ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' 
+            : 'bg-primary-500/10 text-primary-600 border-primary-500/20'}`}>
           {isDelivery ? t('driver.dashboard.missions.badges.delivery') : t('driver.dashboard.missions.badges.collect')}
         </span>
       </td>
       <td className="px-8 py-5 text-end">
         <button 
           onClick={() => onNavigate(mission.id)}
-          className="w-9 h-9 rounded-lg bg-gray-100 text-text-muted flex items-center justify-center hover:bg-primary-500 hover:text-white transition-all border border-transparent ms-auto"
+          className="w-9 h-9 rounded-lg bg-background text-text-muted flex items-center justify-center hover:bg-primary-500 hover:text-white transition-all border border-transparent ms-auto"
         >
           <Navigation2 size={16} className="rtl:rotate-180" />
         </button>
@@ -107,7 +107,7 @@ const MissionMobileCard = ({ mission, onNavigate, t }) => {
   const initials = getInitials(displayName);
 
   return (
-    <div className="bg-white rounded-2xl shadow-card p-5 mb-4 border border-border/60 animate-in slide-in-from-bottom duration-300 text-start">
+    <div className="bg-surface rounded-2xl shadow-card p-5 mb-4 border border-border/60 animate-in slide-in-from-bottom duration-300 text-start">
       <div className="flex justify-between items-center mb-4">
         <div className="flex flex-col">
           <span className="text-xs font-medium text-text-muted uppercase tracking-wider mb-0.5">{t('workshop.detail.labels.order')}</span>
@@ -115,14 +115,14 @@ const MissionMobileCard = ({ mission, onNavigate, t }) => {
         </div>
         <span className={`px-3 py-1 rounded-lg text-[11px] font-bold uppercase border tracking-wide
           ${isDelivery 
-            ? 'bg-teal-50 text-teal-700 border-teal-200' 
-            : 'bg-primary-50 text-primary-600 border-primary-200'}`}>
+            ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' 
+            : 'bg-primary-500/10 text-primary-600 border-primary-500/20'}`}>
           {isDelivery ? t('driver.dashboard.missions.badges.delivery') : t('driver.dashboard.missions.badges.collect')}
         </span>
       </div>
 
-      <div className="flex items-center gap-4 bg-gray-50/80 p-3.5 rounded-xl mb-4 border border-gray-100/50">
-        <div className="w-11 h-11 rounded-full bg-white text-primary-600 font-bold text-sm flex items-center justify-center shadow-sm border border-primary-100 shrink-0">
+      <div className="flex items-center gap-4 bg-background/50 p-3.5 rounded-xl mb-4 border border-border/50">
+        <div className="w-11 h-11 rounded-full bg-surface text-primary-600 font-bold text-sm flex items-center justify-center shadow-sm border border-primary-500/20 shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
@@ -220,7 +220,7 @@ export default function LivreurDashboard() {
   };
 
   return (
-    <div className="animate-fade-in space-y-8 pb-10 max-w-7xl mx-auto">
+    <div className="animate-fade-in space-y-8 pb-10 max-w-7xl mx-auto relative">
       
       {/* STAT CARDS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -229,7 +229,7 @@ export default function LivreurDashboard() {
           count={stats.commandesPretesCount}
           icon={Truck}
           colorClass="border-teal-500"
-          iconBgClass="bg-teal-50"
+          iconBgClass="bg-teal-500/10"
           iconColorClass="text-teal-600"
           barColorClass="bg-teal-500"
           t={t}
@@ -240,7 +240,7 @@ export default function LivreurDashboard() {
           count={stats.commandesARecupererCount}
           icon={Archive}
           colorClass="border-primary-500"
-          iconBgClass="bg-primary-50"
+          iconBgClass="bg-primary-500/10"
           iconColorClass="text-primary-600"
           barColorClass="bg-primary-500"
           t={t}
@@ -251,7 +251,7 @@ export default function LivreurDashboard() {
           count={stats.commandesAnnuleesCount}
           icon={RotateCcw}
           colorClass="border-orange-500"
-          iconBgClass="bg-orange-50"
+          iconBgClass="bg-orange-500/10"
           iconColorClass="text-orange-600"
           barColorClass="bg-orange-500"
           t={t}
@@ -272,16 +272,16 @@ export default function LivreurDashboard() {
             <p className="text-sm text-text-secondary mt-0.5 font-medium">{t('driver.dashboard.missions.subtitle')}</p>
           </div>
           
-          <div className="bg-gray-100 p-1 rounded-xl flex w-full sm:w-auto border border-gray-200/50">
+          <div className="bg-background border border-border/60 p-1 rounded-xl flex w-full sm:w-auto">
             <button 
               onClick={() => setActiveTab('deliveries')}
-              className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'deliveries' ? 'bg-white text-primary-600 shadow-sm border border-gray-100' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'deliveries' ? 'bg-surface text-primary-600 shadow-sm border border-border/40' : 'text-text-secondary hover:text-text-primary'}`}
             >
               {t('driver.dashboard.missions.badges.delivery')} ({readyForDelivery.length})
             </button>
             <button 
               onClick={() => setActiveTab('collections')}
-              className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'collections' ? 'bg-white text-primary-600 shadow-sm border border-gray-100' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === 'collections' ? 'bg-surface text-primary-600 shadow-sm border border-border/40' : 'text-text-secondary hover:text-text-primary'}`}
             >
               {t('driver.dashboard.missions.badges.collect')} ({readyOrders.length})
             </button>
@@ -300,9 +300,9 @@ export default function LivreurDashboard() {
               />
             ))
           ) : (
-            <div className="bg-white rounded-2xl shadow-card p-12 text-center border border-border/60">
+            <div className="bg-surface rounded-2xl shadow-card p-12 text-center border border-border/60">
                <div className="flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                  <div className="w-14 h-14 bg-background rounded-full flex items-center justify-center mb-4">
                     <LayoutDashboard size={28} className="text-text-muted opacity-30" />
                   </div>
                   <p className="text-sm font-bold text-text-primary uppercase tracking-tight">{t('driver.dashboard.missions.empty_title')}</p>
@@ -313,10 +313,10 @@ export default function LivreurDashboard() {
         </div>
 
         {/* Desktop Missions Table */}
-        <div className="hidden md:block bg-white rounded-2xl shadow-card overflow-hidden border border-border/60">
+        <div className="hidden md:block bg-surface rounded-2xl shadow-card overflow-hidden border border-border/60">
           <div className="overflow-x-auto min-w-full">
             <table className="w-full text-start">
-              <thead className="bg-gray-50/80 border-b border-border">
+              <thead className="bg-background/50 border-b border-border">
                 <tr>
                   <th className="px-8 py-4 text-start text-[11px] font-bold text-text-secondary uppercase tracking-wider">{t('workshop.detail.labels.order')}</th>
                   <th className="px-8 py-4 text-start text-[11px] font-bold text-text-secondary uppercase tracking-wider">{t('driver.dashboard.missions.headers.client')}</th>
@@ -338,7 +338,7 @@ export default function LivreurDashboard() {
                   <tr>
                     <td colSpan="4" className="py-24 text-center">
                       <div className="flex flex-col items-center justify-center">
-                        <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <div className="w-14 h-14 bg-background rounded-full flex items-center justify-center mb-4">
                           <LayoutDashboard size={28} className="text-text-muted opacity-30" />
                         </div>
                         <p className="text-sm font-bold text-text-primary uppercase tracking-tight">{t('driver.dashboard.missions.empty_title')}</p>

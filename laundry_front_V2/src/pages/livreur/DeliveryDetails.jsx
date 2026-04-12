@@ -82,7 +82,7 @@ export default function DeliveryDetails() {
   if (!order) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center px-6 animate-fade-in">
-        <div className="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mb-6 shadow-sm border border-gray-100">
+        <div className="w-20 h-20 rounded-2xl bg-background flex items-center justify-center mb-6 shadow-sm border border-border">
           <Package size={32} className="text-text-muted opacity-30" />
         </div>
         <h3 className="text-xl font-bold text-text-primary tracking-tight mb-2">{t('driver.delivery_details.not_found.title')}</h3>
@@ -114,7 +114,7 @@ export default function DeliveryDetails() {
             <h1 className="text-2xl font-bold text-text-primary tracking-tight">
                {t('driver.delivery_details.title')}
             </h1>
-            <div className="bg-teal-50 text-teal-700 px-3 py-1 rounded-full flex items-center gap-2 self-start sm:self-center border border-teal-100/50 shadow-sm">
+            <div className="bg-teal-500/10 text-teal-700 dark:text-teal-500 px-3 py-1 rounded-full flex items-center gap-2 self-start sm:self-center border border-teal-500/20 shadow-sm">
                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
                <span className="text-[11px] font-bold uppercase tracking-wider">{t('driver.delivery_details.ready_badge')}</span>
             </div>
@@ -126,8 +126,8 @@ export default function DeliveryDetails() {
         {/* LEFT COLUMN: ORDER INFO */}
         <div className="lg:col-span-3 space-y-6">
             {/* MAIN INFO CARD */}
-            <div className="bg-white rounded-2xl shadow-card border border-border/60 overflow-hidden">
-                <div className="bg-gray-50/50 p-6 sm:p-8 border-b border-border/50 flex flex-col sm:flex-row justify-between items-start gap-4 text-start">
+            <div className="bg-surface rounded-2xl shadow-card border border-border/60 overflow-hidden">
+                <div className="bg-background/50 p-6 sm:p-8 border-b border-border/50 flex flex-col sm:flex-row justify-between items-start gap-4 text-start">
                    <div>
                       <div className="flex items-center gap-2 text-text-secondary font-bold text-[11px] uppercase tracking-wider mb-1">
                          <Hash size={13} strokeWidth={2.5} /> {t('driver.delivery_details.order_number')}
@@ -143,27 +143,27 @@ export default function DeliveryDetails() {
                 </div>
 
                 <div className="p-6 sm:p-8 space-y-6 text-start">
-                   <div className="flex items-start gap-4 p-4 rounded-xl bg-primary-50/40 border border-primary-100/50">
-                      <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-primary-600 shadow-sm border border-primary-100 shrink-0">
+                   <div className="flex items-start gap-4 p-4 rounded-xl bg-primary-500/10 border border-primary-500/20">
+                      <div className="w-11 h-11 bg-surface rounded-xl flex items-center justify-center text-primary-600 dark:text-primary-500 shadow-sm border border-border shrink-0">
                          <User size={20} />
                       </div>
                       <div className="min-w-0">
-                         <p className="text-[11px] font-bold text-primary-600 uppercase tracking-wider mb-1">{t('driver.delivery_details.recipient')}</p>
+                         <p className="text-[11px] font-bold text-primary-600 dark:text-primary-500 uppercase tracking-wider mb-1">{t('driver.delivery_details.recipient')}</p>
                          <h3 className="text-base font-bold text-text-primary">{order.client?.nom || order.client?.name}</h3>
                          <div className="flex flex-wrap gap-4 mt-2">
-                            <a href={`tel:${order.client?.phones?.[0]?.phoneNumber || order.client?.telephone}`} className="text-xs font-semibold text-primary-600 flex items-center gap-1.5 hover:underline">
+                            <a href={`tel:${order.client?.phones?.[0]?.phoneNumber || order.client?.telephone}`} className="text-xs font-semibold text-primary-600 dark:text-primary-500 flex items-center gap-1.5 hover:underline">
                                <Phone size={13} className="text-primary-500" /> {order.client?.phones?.[0]?.phoneNumber || order.client?.telephone || '—'}
                             </a>
                          </div>
                       </div>
                    </div>
  
-                   <div className="flex items-start gap-4 p-4 rounded-xl bg-teal-50/30 border border-teal-100/50">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-teal-600 shadow-sm border border-teal-100 shrink-0">
+                   <div className="flex items-start gap-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                      <div className="w-10 h-10 bg-surface rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-500 shadow-sm border border-border shrink-0">
                          <MapPin size={18} />
                       </div>
                       <div className="min-w-0">
-                         <p className="text-[11px] font-bold text-teal-600 uppercase tracking-wider mb-1">{t('driver.delivery_details.address')}</p>
+                         <p className="text-[11px] font-bold text-teal-600 dark:text-teal-500 uppercase tracking-wider mb-1">{t('driver.delivery_details.address')}</p>
                          <p className="text-sm font-medium text-text-primary leading-snug">{order.client?.addresses?.[0]?.address || t('driver.delivery_details.no_address')}</p>
                          <button 
                            onClick={() => {
@@ -172,7 +172,7 @@ export default function DeliveryDetails() {
                              if (lat && lng) window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
                              else window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.client?.addresses?.[0]?.address || '')}`, '_blank');
                            }}
-                           className="flex items-center gap-1.5 mt-3 text-xs font-bold text-teal-700 hover:text-teal-800 transition-colors uppercase tracking-wide"
+                           className="flex items-center gap-1.5 mt-3 text-xs font-bold text-teal-700 dark:text-teal-500 hover:opacity-80 transition-opacity uppercase tracking-wide"
                          >
                             {t('driver.delivery_details.directions', 'Itinéraire')} <MapIcon size={13} strokeWidth={2.5} className="rtl:rotate-180" />
                          </button>
@@ -182,15 +182,15 @@ export default function DeliveryDetails() {
             </div>
 
             {/* ARTICULES LIST */}
-            <div className="bg-white rounded-2xl shadow-card border border-border/60 p-6 sm:p-8 space-y-6 text-start">
+            <div className="bg-surface rounded-2xl shadow-card border border-border/60 p-6 sm:p-8 space-y-6 text-start">
                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-text-primary border border-gray-100">
+                  <div className="w-10 h-10 bg-background rounded-xl flex items-center justify-center text-text-primary border border-border">
                      <Package size={18} />
                   </div>
                   <h3 className="text-lg font-bold text-text-primary tracking-tight">{t('driver.delivery_details.package_items')}</h3>
                </div>
 
-               <div className="divide-y divide-gray-100/80">
+               <div className="divide-y divide-border/50">
                   {order.commandeTapis?.map((item, idx) => {
                     const photo = item.tapis?.imageUrls?.[0] || item.tapis?.imageUrl;
                     const fullPhotoUrl = photo ? (photo.startsWith('http') ? photo : `${baseUrl}${photo}`) : null;
@@ -198,7 +198,7 @@ export default function DeliveryDetails() {
                     return (
                       <div key={idx} className="py-4 flex items-center justify-between group">
                         <div className="flex items-center gap-4">
-                           <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden border border-border/60 group-hover:border-primary-200 transition-colors shrink-0 shadow-sm">
+                           <div className="w-14 h-14 rounded-xl bg-background flex items-center justify-center overflow-hidden border border-border/60 group-hover:border-primary-200 transition-colors shrink-0 shadow-sm">
                               {fullPhotoUrl ? (
                                 <img src={fullPhotoUrl} alt={item.tapis?.nom} className="w-full h-full object-cover" />
                               ) : (
@@ -232,20 +232,20 @@ export default function DeliveryDetails() {
                <button 
                  onClick={() => handleCancel('absent')}
                  disabled={isCancelling}
-                 className="bg-amber-50/50 hover:bg-amber-50 text-amber-700 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition-all border border-amber-100/50 group"
+                 className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition-all border border-amber-500/20 group"
                >
-                  <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform border border-amber-100/30">
-                     <UserX size={20} className="text-amber-600" />
+                  <div className="w-11 h-11 bg-surface rounded-xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform border border-border">
+                     <UserX size={20} className="text-amber-600 dark:text-amber-500" />
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider">{t('driver.ready_delivery.card.absent', 'Client Absent')}</span>
                </button>
                <button 
                  onClick={() => handleCancel('cancelled')}
                  disabled={isCancelling}
-                 className="bg-red-50/50 hover:bg-red-50 text-red-700 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition-all border border-red-100/50 group"
+                 className="bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition-all border border-red-500/20 group"
                >
-                  <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform border border-red-100/30">
-                     <XCircle size={20} className="text-red-600" />
+                  <div className="w-11 h-11 bg-surface rounded-xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform border border-border">
+                     <XCircle size={20} className="text-red-600 dark:text-red-500" />
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider">{t('driver.ready_delivery.actions.cancel', 'Annuler Livraison')}</span>
                </button>
@@ -255,15 +255,15 @@ export default function DeliveryDetails() {
         {/* RIGHT COLUMN: ACTION / PAYMENT */}
         <div className="lg:col-span-2 space-y-6">
             
-            <div className="bg-white rounded-2xl shadow-xl border-2 border-primary-500 overflow-hidden sticky top-24">
+            <div className="bg-surface rounded-2xl shadow-xl border-2 border-primary-500 overflow-hidden sticky top-24">
                 <div className="bg-primary-500 p-6 sm:p-8 text-white relative">
                    <div className="absolute top-0 end-0 p-4 opacity-15">
                       <Wallet size={70} strokeWidth={1} />
                    </div>
-                   <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                   <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 text-white">
                       <CreditCard size={16} strokeWidth={2.5} /> {t('driver.delivery_details.payment_summary')}
                    </h3>
-                   <div className="flex items-baseline gap-1">
+                   <div className="flex items-baseline gap-1 text-white">
                       <span className="text-4xl font-bold tracking-tight">{order.montantTotal.toFixed(0)}</span>
                       <span className="text-base font-semibold opacity-80">DH</span>
                    </div>
@@ -281,18 +281,18 @@ export default function DeliveryDetails() {
                                 onClick={() => setPaymentMethod(opt.id)}
                                 className={`flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all group ${
                                   paymentMethod === opt.id
-                                    ? 'bg-primary-50/50 border-primary-500 shadow-sm'
-                                    : 'bg-gray-50 border-transparent hover:border-border'
+                                    ? 'bg-primary-500/10 border-primary-500 shadow-sm'
+                                    : 'bg-background border-transparent hover:border-border'
                                 }`}
                               >
                                  <div className="flex items-center gap-3">
                                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                      paymentMethod === opt.id ? 'border-primary-500 bg-white' : 'border-gray-300 bg-gray-100'
+                                      paymentMethod === opt.id ? 'border-primary-500 bg-surface' : 'border-border bg-background'
                                     }`}>
                                        {paymentMethod === opt.id && <div className="w-2 h-2 rounded-full bg-primary-500" />}
                                     </div>
                                     <span className={`text-sm font-bold transition-colors ${
-                                      paymentMethod === opt.id ? 'text-primary-700' : 'text-text-muted group-hover:text-text-primary'
+                                      paymentMethod === opt.id ? 'text-primary-700 dark:text-primary-500' : 'text-text-muted group-hover:text-text-primary'
                                     }`}>{opt.label}</span>
                                  </div>
                                  {opt.code === 'especes' || opt.label?.toLowerCase().includes('esp') ? <Banknote size={18} className={paymentMethod === opt.id ? 'text-primary-500' : 'text-text-muted'} /> : 
@@ -301,7 +301,7 @@ export default function DeliveryDetails() {
                               </button>
                            ))
                          ) : (
-                           <div className="py-4 px-6 bg-red-50 text-red-600 rounded-xl text-xs font-bold text-center">
+                           <div className="py-4 px-6 bg-red-500/10 text-red-600 rounded-xl text-xs font-bold text-center">
                               {t('driver.delivery_details.payment_unavailable')}
                            </div>
                          )}

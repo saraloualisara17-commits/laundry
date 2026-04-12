@@ -47,21 +47,21 @@ const HorizontalCanceledCard = ({ order, onReturn, isProcessing }) => {
   const mainImage = useMemo(() => getMainImage(order), [order]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-all border border-border/60 overflow-hidden flex flex-col md:flex-row group mb-3 md:mb-0 animate-in slide-in-from-bottom duration-300">
+    <div className="bg-surface rounded-2xl shadow-card hover:shadow-card-hover transition-all border border-border/60 overflow-hidden flex flex-col md:flex-row group mb-3 md:mb-0 animate-in slide-in-from-bottom duration-300">
 
       {/* MOBILE HEADER */}
-      <div className="md:hidden bg-red-50/50 px-4 py-3 flex items-center justify-between border-b border-red-100">
-        <span className="text-xs font-bold text-red-700">
+      <div className="md:hidden bg-red-500/5 px-4 py-3 flex items-center justify-between border-b border-border/50">
+        <span className="text-xs font-bold text-red-700 dark:text-red-500">
           #{order.numeroCommande || order.id}
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-600 dark:text-red-500 uppercase tracking-wider">
           <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
           {t('driver.canceled_deliveries.card.canceled_by_client')}
         </span>
       </div>
 
       {/* TABLET+ IMAGE SECTION */}
-      <div className="hidden md:block w-32 md:w-44 relative overflow-hidden shrink-0 bg-red-50">
+      <div className="hidden md:block w-32 md:w-44 relative overflow-hidden shrink-0 bg-red-500/5">
         {mainImage ? (
           <img
             src={mainImage}
@@ -69,7 +69,7 @@ const HorizontalCanceledCard = ({ order, onReturn, isProcessing }) => {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-50">
+          <div className="w-full h-full flex items-center justify-center bg-background/50">
             <XCircle className="w-10 h-10 text-text-muted opacity-20" />
           </div>
         )}
@@ -86,15 +86,15 @@ const HorizontalCanceledCard = ({ order, onReturn, isProcessing }) => {
               {order.client?.nom || order.client?.name || t('driver.canceled_deliveries.card.client_unknown')}
             </h3>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider bg-red-50 px-2.5 py-0.5 rounded-lg border border-red-100">
+              <span className="text-[10px] font-bold text-red-700 dark:text-red-500 uppercase tracking-wider bg-red-500/10 px-2.5 py-0.5 rounded-lg border border-red-500/20">
                 {t('driver.canceled_deliveries.card.canceled_by_client')}
               </span>
             </div>
           </div>
           <div className="hidden sm:flex flex-col items-end shrink-0">
             <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">{t('driver.canceled_deliveries.card.current_status')}</span>
-            <div className="bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
-              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">{t('driver.canceled_deliveries.card.to_return')}</span>
+            <div className="bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-500 uppercase tracking-wider">{t('driver.canceled_deliveries.card.to_return')}</span>
             </div>
           </div>
         </div>
@@ -112,8 +112,8 @@ const HorizontalCanceledCard = ({ order, onReturn, isProcessing }) => {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
-          <div className="flex items-center gap-2 text-text-secondary px-2.5 py-1 bg-gray-50 rounded-lg border border-gray-100">
+        <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+          <div className="flex items-center gap-2 text-text-secondary px-2.5 py-1 bg-background rounded-lg border border-border">
             <Calendar size={14} />
             <span className="text-xs font-bold">{new Date(order.dateCreation || order.createdAt).toLocaleDateString(t('common.date_locale', 'fr-FR'))}</span>
           </div>
@@ -143,14 +143,14 @@ const HorizontalCanceledCard = ({ order, onReturn, isProcessing }) => {
                 </span>
               </div>
             </div>
-            <div className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-200">
+            <div className="bg-background px-2 py-1 rounded-lg border border-border">
               <span className="text-[10px] font-bold text-text-secondary uppercase">
                 {t('driver.canceled_deliveries.card.carpets_count', { count: order.commandeTapis?.length || 0 })}
               </span>
             </div>
           </div>
 
-          <div className="bg-gray-50/80 p-3.5 rounded-xl mb-5 border border-gray-100">
+          <div className="bg-background/80 p-3.5 rounded-xl mb-5 border border-border">
             <div className="flex items-start gap-2.5 text-text-secondary">
               <MapPin size={15} className="mt-0.5 shrink-0 text-primary-500" />
               <span className="text-sm font-medium leading-snug">
@@ -223,7 +223,7 @@ export default function CanceledDeliveries() {
           <h1 className="text-2xl font-bold text-text-primary tracking-tight flex items-center gap-3">
             {t('driver.canceled_deliveries.title')}
             {orders.length > 0 && (
-              <span className="bg-red-50 text-red-600 px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-100 shadow-sm">
+              <span className="bg-red-500/10 text-red-600 dark:text-red-500 px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-500/20 shadow-sm">
                 {orders.length}
               </span>
             )}
@@ -232,19 +232,19 @@ export default function CanceledDeliveries() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative group w-full sm:w-72 bg-white rounded-xl border border-border/60 p-1 flex items-center shadow-sm focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-50/50 transition-all">
+          <div className="relative group w-full sm:w-72 bg-surface rounded-xl border border-border/60 p-1 flex items-center shadow-sm focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-50/50 transition-all">
             <Search className="text-text-muted group-focus-within:text-primary-500 ms-3 transition-colors" size={18} strokeWidth={2.5} />
             <input
               type="text"
               placeholder={t('driver.canceled_deliveries.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-none py-2 px-3 text-sm font-semibold outline-none placeholder:font-medium placeholder:text-text-muted"
+              className="w-full bg-transparent border-none py-2 px-3 text-sm font-semibold outline-none placeholder:font-medium placeholder:text-text-muted text-text-primary"
             />
           </div>
           <button
             onClick={fetchOrders}
-            className="p-2.5 bg-white border border-border/60 rounded-xl hover:bg-gray-50 transition-colors shadow-sm active:scale-95 flex items-center justify-center shrink-0"
+            className="p-2.5 bg-surface border border-border/60 rounded-xl hover:bg-background transition-colors shadow-sm active:scale-95 flex items-center justify-center shrink-0"
           >
             <Loader2 size={20} strokeWidth={2.5} className={loading.canceledDeliveries ? 'animate-spin text-primary-500' : 'text-text-muted'} />
           </button>
@@ -252,13 +252,13 @@ export default function CanceledDeliveries() {
       </div>
 
       {/* WARNING BANNER */}
-      <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm text-start">
-        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-amber-600 shadow-sm border border-amber-100 shrink-0">
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm text-start">
+        <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-amber-600 dark:text-amber-500 shadow-sm border border-border shrink-0">
           <AlertCircle size={20} />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">{t('driver.canceled_deliveries.required_action')}</p>
-          <p className="text-xs text-amber-700 font-medium mt-0.5">
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-500 uppercase tracking-wider">{t('driver.canceled_deliveries.required_action')}</p>
+          <p className="text-xs text-amber-700 dark:text-amber-600 font-medium mt-0.5">
             {t('driver.canceled_deliveries.warning_note')}
           </p>
         </div>
@@ -268,7 +268,7 @@ export default function CanceledDeliveries() {
       <div className="space-y-4">
         {loading.canceledDeliveries && orders.length === 0 ? (
           [1, 2, 3].map(i => (
-            <div key={i} className="h-40 bg-gray-50 rounded-2xl animate-pulse border border-border/60"></div>
+            <div key={i} className="h-40 bg-surface/50 rounded-2xl animate-pulse border border-border/60"></div>
           ))
         ) : filteredOrders.length > 0 ? (
           filteredOrders.map(order => (
@@ -280,12 +280,12 @@ export default function CanceledDeliveries() {
             />
           ))
         ) : (
-          <div className="py-20 flex flex-col items-center justify-center bg-white rounded-2xl border-2 border-dashed border-border/40">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-5 shadow-inner">
+          <div className="py-20 flex flex-col items-center justify-center bg-surface rounded-2xl border-2 border-dashed border-border/40">
+            <div className="w-16 h-16 bg-background rounded-full flex items-center justify-center mb-5 shadow-inner border border-border/50">
               <XCircle size={32} className="text-text-muted opacity-25" />
             </div>
-            <h3 className="text-lg font-bold text-text-primary tracking-tight">{t('driver.canceled_deliveries.empty.title')}</h3>
-            <p className="text-sm font-medium text-text-muted mt-2 text-center px-8">{t('driver.canceled_deliveries.empty.desc')}</p>
+            <h3 className="text-lg font-bold text-text-primary tracking-tight">{t('driver.canceled_deliveries.empty_title')}</h3>
+            <p className="text-sm font-medium text-text-muted mt-2 text-center px-8">{t('driver.canceled_deliveries.empty_desc')}</p>
           </div>
         )}
       </div>

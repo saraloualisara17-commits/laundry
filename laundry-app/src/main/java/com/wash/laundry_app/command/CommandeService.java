@@ -11,6 +11,8 @@ import com.wash.laundry_app.tapis.TapisRepository;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.employe.CommandDetails;
 import com.wash.laundry_app.users.lvreur.LivreurDashboardStatsDTO;
+import com.wash.laundry_app.notifications.NotificationService;
+import com.wash.laundry_app.users.Role;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,7 @@ public class CommandeService {
     private final AuthService authService;
     private final CommandeTapisMapper commandeTapisMapper;
     private final HistoriqueStatutMapper historiqueStatutMapper;
+    private final NotificationService notificationService;
 
     // Create commande
 
@@ -115,6 +118,14 @@ public class CommandeService {
 
         // 5. Record status history
         recordStatusChange(commande, null, CommandeStatus.en_attente.name(), livreur, "Commande créée");
+
+        // 🚀 NOTIFY ADMINS & EMPLOYEES
+        notificationService.notifyRole(Role.admin, "Nouvelle Commande",
+                "Commande #" + commande.getNumeroCommande() + " créée par " + livreur.getName(),
+                "NEW_ORDER", commande.getId().toString());
+        notificationService.notifyRole(Role.employe, "Nouvelle Commande",
+                "Une nouvelle commande #" + commande.getNumeroCommande() + " attend d'être traitée.",
+                "NEW_ORDER", commande.getId().toString());
 
         return commandeMapper.toDto(commande);
     }
@@ -201,6 +212,23 @@ public class CommandeService {
         // Record status change
         recordStatusChange(commande, oldStatus, request.getNewStatus().name(), currentUser, request.getCommentaire());
 
+        // 🚀 TARGETED NOTIFICATIONS
+        String orderNum = commande.getNumeroCommande();
+        String orderId = commande.getId().toString();
+
+        if (request.getNewStatus() == CommandeStatus.prete) {
+            notificationService.notifyRole(Role.admin, "Commande Prête", "Commande #" + orderNum + " est prête.", "ORDER_READY", orderId);
+            if (commande.getLivreur() != null) {
+                notificationService.createNotification(commande.getLivreur(), "Commande Prête", "La commande #" + orderNum + " est prête pour livraison.", "ORDER_READY", orderId);
+            }
+        } else if (request.getNewStatus() == CommandeStatus.livree) {
+            notificationService.notifyRole(Role.admin, "Commande en Livraison", "Commande #" + orderNum + " est en cours de livraison.", "ORDER_DELIVERING", orderId);
+        } else if (request.getNewStatus() == CommandeStatus.annulee) {
+            notificationService.notifyRole(Role.admin, "Livraison Annulée", "Commande #" + orderNum + " a été annulée.", "ORDER_CANCELLED", orderId);
+        } else if (request.getNewStatus() == CommandeStatus.retournee) {
+            notificationService.notifyRole(Role.admin, "Commande Retournée", "Commande #" + orderNum + " est de retour à l'atelier.", "ORDER_RETURNED", orderId);
+        }
+
         return commandeMapper.toDto(commande);
     }
 
@@ -229,11 +257,11 @@ public class CommandeService {
 
         // CRIT-2: verify ownership — only the assigned livreur can record payment
         if (commande.getLivreur() == null || !commande.getLivreur().getId().equals(currentUser.getId())) {
-            throw new ForbiddenOperationException("Vous n'\u00eates pas autoris\u00e9 \u00e0 encaisser cette commande.");
+            throw new ForbiddenOperationException("Vous n'êtes pas autorisé à encaisser cette commande.");
         }
 
         if (commande.getStatus() != CommandeStatus.livree) {
-            throw new ForbiddenOperationException("Seules les commandes livr\u00e9es peuvent \u00eatre pay\u00e9es.");
+            throw new ForbiddenOperationException("Seules les commandes livrées peuvent être payées.");
         }
 
         String oldStatus = commande.getStatus().name();
@@ -249,7 +277,12 @@ public class CommandeService {
         commande = commandeRepository.save(commande);
 
         // Record status change
-        recordStatusChange(commande, oldStatus, CommandeStatus.payee.name(), currentUser, "Paiement enregistr\u00e9");
+        recordStatusChange(commande, oldStatus, CommandeStatus.payee.name(), currentUser, "Paiement enregistré");
+
+        // 🚀 NOTIFY ADMIN (Payment confirmed)
+        notificationService.notifyRole(Role.admin, "Commande Payée",
+                "La commande #" + commande.getNumeroCommande() + " a été payée (" + commande.getMontantTotal() + " DH).",
+                "PAYMENT_RECEIVED", commande.getId().toString());
 
         return commandeMapper.toDto(commande);
     }
@@ -263,19 +296,24 @@ public class CommandeService {
 
         // CRIT-2: verify ownership
         if (commande.getLivreur() == null || !commande.getLivreur().getId().equals(currentUser.getId())) {
-            throw new ForbiddenOperationException("Vous n'\u00eates pas autoris\u00e9 \u00e0 annuler cette commande.");
+            throw new ForbiddenOperationException("Vous n'êtes pas autorisé à annuler cette commande.");
         }
 
         String oldStatus = commande.getStatus().name();
         commande.setStatus(CommandeStatus.annulee);
         commande = commandeRepository.save(commande);
 
-        recordStatusChange(commande, oldStatus, CommandeStatus.annulee.name(), currentUser, "Livraison annul\u00e9e par le livreur");
+        recordStatusChange(commande, oldStatus, CommandeStatus.annulee.name(), currentUser, "Livraison annulée par le livreur");
+
+        // 🚀 NOTIFY ADMIN
+        notificationService.notifyRole(Role.admin, "Livraison Annulée",
+                "La commande #" + commande.getNumeroCommande() + " a été annulée par " + currentUser.getName(),
+                "ORDER_CANCELLED", commande.getId().toString());
 
         return commandeMapper.toDto(commande);
     }
 
-    // Take order (prete -> sorti)
+    // Take order (prete -> sorti/livree)
     @Transactional
     public CommandeDTO takeOrder(Long commandeId) {
         User currentUser = authService.currentUser();
@@ -285,11 +323,11 @@ public class CommandeService {
 
         // CRIT-2: verify ownership — only the assigned livreur can take the order
         if (commande.getLivreur() == null || !commande.getLivreur().getId().equals(currentUser.getId())) {
-            throw new ForbiddenOperationException("Vous n'\u00eates pas autoris\u00e9 \u00e0 prendre en charge cette commande.");
+            throw new ForbiddenOperationException("Vous n'êtes pas autorisé à prendre en charge cette commande.");
         }
 
         if (commande.getStatus() != CommandeStatus.prete) {
-            throw new ForbiddenOperationException("Seules les commandes 'pr\u00eates' peuvent \u00eatre prises en charge.");
+            throw new ForbiddenOperationException("Seules les commandes 'prêtes' peuvent être prises en charge.");
         }
 
         String oldStatus = commande.getStatus().name();
@@ -297,6 +335,11 @@ public class CommandeService {
         commande = commandeRepository.save(commande);
 
         recordStatusChange(commande, oldStatus, CommandeStatus.livree.name(), currentUser, "Commande prise en charge par le livreur");
+
+        // 🚀 NOTIFY ADMIN (Handed over / Livree)
+        notificationService.notifyRole(Role.admin, "Commande en Livraison",
+                "La commande #" + commande.getNumeroCommande() + " est maintenant en cours de livraison.",
+                "ORDER_DELIVERING", commande.getId().toString());
 
         return commandeMapper.toDto(commande);
     }
@@ -311,11 +354,11 @@ public class CommandeService {
 
         // CRIT-2: verify ownership
         if (commande.getLivreur() == null || !commande.getLivreur().getId().equals(currentUser.getId())) {
-            throw new ForbiddenOperationException("Vous n'\u00eates pas autoris\u00e9 \u00e0 modifier cette commande.");
+            throw new ForbiddenOperationException("Vous n'êtes pas autorisé à modifier cette commande.");
         }
 
         if (commande.getStatus() != CommandeStatus.annulee) {
-            throw new ForbiddenOperationException("Seules les commandes annul\u00e9es peuvent \u00eatre retourn\u00e9es \u00e0 l'atelier.");
+            throw new ForbiddenOperationException("Seules les commandes annulées peuvent être retournées à l'atelier.");
         }
 
         String oldStatus = commande.getStatus().name();
@@ -323,7 +366,12 @@ public class CommandeService {
         commande.setStatus(CommandeStatus.retournee);
         commande = commandeRepository.save(commande);
 
-        recordStatusChange(commande, oldStatus, CommandeStatus.retournee.name(), currentUser, "Retourn\u00e9e \u00e0 l'atelier par le livreur");
+        recordStatusChange(commande, oldStatus, CommandeStatus.retournee.name(), currentUser, "Retournée à l'atelier par le livreur");
+
+        // 🚀 NOTIFY ADMIN
+        notificationService.notifyRole(Role.admin, "Commande Retournée",
+                "La commande #" + commande.getNumeroCommande() + " a été retournée à l'atelier.",
+                "ORDER_RETURNED", commande.getId().toString());
 
         return commandeMapper.toDto(commande);
     }
@@ -348,6 +396,17 @@ public class CommandeService {
             if (commande.getStatus() == CommandeStatus.en_attente || commande.getStatus() == CommandeStatus.en_traitement  ) {
                 commande.setStatus(CommandeStatus.prete);
                 commandeRepository.save(commande);
+
+                // 🚀 NOTIFY ADMIN & LIVREUR
+                notificationService.notifyRole(Role.admin, "Commande Prête",
+                        "La commande #" + commande.getNumeroCommande() + " est prête.",
+                        "ORDER_READY", commande.getId().toString());
+
+                if (commande.getLivreur() != null) {
+                    notificationService.createNotification(commande.getLivreur(), "Commande Prête",
+                            "La commande #" + commande.getNumeroCommande() + " est prête pour livraison.",
+                            "ORDER_READY", commande.getId().toString());
+                }
             }
         }
     }

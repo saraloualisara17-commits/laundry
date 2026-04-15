@@ -243,8 +243,8 @@ export default function CreateOrder() {
         if (!article.photos.length) return { ...article, uploadedUrls: [] };
         const filesToUpload = article.photos.map(p => p.file);
         const uploadResults = await dispatch(uploadImages(filesToUpload)).unwrap();
-        const urls = Array.isArray(uploadResults) 
-          ? uploadResults.map(r => typeof r === 'string' ? r : r.imageUrl) 
+        const urls = Array.isArray(uploadResults)
+          ? uploadResults.map(r => typeof r === 'string' ? r : r.imageUrl)
           : [];
         return { ...article, uploadedUrls: urls };
       }));
@@ -375,11 +375,10 @@ export default function CreateOrder() {
                 <button
                   type="button"
                   onClick={() => handlePricingModeChange(index, 'SIZE_BASED')}
-                  className={`flex items-center justify-center gap-2.5 py-3 rounded-xl text-xs font-bold border transition-all ${
-                    article.pricingMode === 'SIZE_BASED'
+                  className={`flex items-center justify-center gap-2.5 py-3 rounded-xl text-xs font-bold border transition-all ${article.pricingMode === 'SIZE_BASED'
                       ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/10'
                       : 'bg-background text-text-secondary border-border hover:border-primary-200'
-                  }`}
+                    }`}
                 >
                   <Ruler size={14} />
                   {t('driver.create_order.articles.by_size')}
@@ -387,11 +386,10 @@ export default function CreateOrder() {
                 <button
                   type="button"
                   onClick={() => handlePricingModeChange(index, 'MANUAL')}
-                  className={`flex items-center justify-center gap-2.5 py-3 rounded-xl text-xs font-bold border transition-all ${
-                    article.pricingMode === 'MANUAL'
+                  className={`flex items-center justify-center gap-2.5 py-3 rounded-xl text-xs font-bold border transition-all ${article.pricingMode === 'MANUAL'
                       ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/10'
                       : 'bg-background text-text-secondary border-border hover:border-primary-200'
-                  }`}
+                    }`}
                 >
                   <DollarSign size={14} />
                   {t('driver.create_order.articles.manual')}
@@ -633,8 +631,8 @@ export default function CreateOrder() {
                 <Loader2 className="animate-spin" size={18} />
                 <span className="tracking-wide text-xs">
                   {finalizeStatus === 'compressing' ? t('driver.create_order.status.compressing') :
-                   finalizeStatus === 'uploading' ? t('driver.create_order.status.uploading') :
-                   t('driver.create_order.status.creating')}
+                    finalizeStatus === 'uploading' ? t('driver.create_order.status.uploading') :
+                      t('driver.create_order.status.creating')}
                 </span>
               </>
             ) : (

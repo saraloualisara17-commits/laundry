@@ -64,7 +64,7 @@ public class SecurityConfig {
                                 .requestMatchers("/admin/**", "/api/admin/**").hasAnyRole("admin", "ADMIN")
                                 .requestMatchers("/livreur/**", "/api/livreur/**").hasAnyRole("livreur", "LIVREUR", "admin", "ADMIN")
                                 .requestMatchers("/employe/**", "/api/employe/**").hasAnyRole("employe", "EMPLOYE", "admin", "ADMIN")
-                                .requestMatchers("/api/payment-types").authenticated()
+                                .requestMatchers("/api/notifications/**").authenticated()
 
                                 .requestMatchers(HttpMethod.POST,"/auth/login").permitAll()
                                 .requestMatchers(HttpMethod.POST,"/auth/logout").permitAll()

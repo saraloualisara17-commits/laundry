@@ -126,7 +126,7 @@ public class GlobalExceptionHandler {
         error.put("timestamp", LocalDateTime.now());
         error.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         error.put("error", "Internal Server Error");
-        error.put("message", "Une erreur interne est survenue. Veuillez r\u00e9essayer.");
+        error.put("message", "Une erreur interne est survenue. Veuillez réessayer.");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(error);
     }
 

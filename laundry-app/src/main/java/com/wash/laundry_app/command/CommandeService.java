@@ -17,14 +17,15 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.stream.Collectors;
-
-
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
@@ -414,20 +415,15 @@ public class CommandeService {
     @Transactional(readOnly = true)
     public List<CommandeDTO> getReadyForDeliveryByLivreur() {
         var user = authService.currentUser();
-        // Fetch livree (Sorti) orders — handed over by employee to livreur
-        return commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.livree)
-                .stream()
-                .map(this::enrichCommandeDTO)
-                .toList();
+        List<Commande> commandes = commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.livree);
+        return enrichCommandeDTOs(commandes);
     }
 
     @Transactional(readOnly = true)
     public List<CommandeDTO> getReadyOrdersForLivreur() {
         var user = authService.currentUser();
-        return commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.prete)
-                .stream()
-                .map(this::enrichCommandeDTO)
-                .toList();
+        List<Commande> commandes = commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.prete);
+        return enrichCommandeDTOs(commandes);
     }
 
     // Get count of prete orders (for notification badge)
@@ -440,22 +436,41 @@ public class CommandeService {
     @Transactional(readOnly = true)
     public List<CommandeDTO> getCanceledDeliveriesByLivreur() {
         var user = authService.currentUser();
-        return commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.annulee)
-                .stream()
-                .map(this::enrichCommandeDTO)
-                .toList();
+        List<Commande> commandes = commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.annulee);
+        return enrichCommandeDTOs(commandes);
     }
 
+    // Batch enrichment: fetches all "prete" history for the list in 1 query instead of N
+    private List<CommandeDTO> enrichCommandeDTOs(List<Commande> commandes) {
+        if (commandes.isEmpty()) return List.of();
+        List<Long> ids = commandes.stream().map(Commande::getId).toList();
+        // One query for all history records, grouped by commandeId
+        Map<Long, HistoriqueStatut> preteHistoryByCommandeId = historiqueStatutRepository
+                .findPreteHistoryForCommandes(ids)
+                .stream()
+                .collect(Collectors.toMap(
+                        h -> h.getCommande().getId(),
+                        h -> h,
+                        (existing, replacement) -> existing  // keep the most recent (query is DESC)
+                ));
+        return commandes.stream().map(commande -> {
+            CommandeDTO dto = commandeMapper.toDto(commande);
+            HistoriqueStatut h = preteHistoryByCommandeId.get(commande.getId());
+            if (h != null) {
+                dto.setPreparateurName(h.getUser().getName());
+            }
+            return dto;
+        }).toList();
+    }
+
+    // Single-order enrichment — kept for any future per-order callers
     private CommandeDTO enrichCommandeDTO(Commande commande) {
         CommandeDTO dto = commandeMapper.toDto(commande);
-
-        // Find the employee who marked the command as "prete" (ready)
         historiqueStatutRepository.findByCommandeIdOrderByCreatedAtDesc(commande.getId())
                 .stream()
                 .filter(h -> CommandeStatus.prete.name().equalsIgnoreCase(h.getNouveauStatut()))
                 .findFirst()
                 .ifPresent(h -> dto.setPreparateurName(h.getUser().getName()));
-
         return dto;
     }
 

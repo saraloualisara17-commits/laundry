@@ -5,6 +5,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,20 +36,46 @@ public class FileStorageService {
         if (contentType == null || !ALLOWED_TYPES.contains(contentType)) {
             throw new FileStorageException("Type de fichier non autorisé. Seules les images sont acceptées.");
         }
-        String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
-        String fileName = UUID.randomUUID().toString() + "_" + originalFileName;
+        
+        try (BufferedInputStream bis = new BufferedInputStream(file.getInputStream())) {
+            bis.mark(16);
+            byte[] header = new byte[12];
+            bis.read(header);
+            
+            if (!isValidImageHeader(header)) {
+                throw new FileStorageException("Contenu du fichier non valide. L'extension ou le type MIME semble falsifié.");
+            }
+            bis.reset(); // Rewind the stream after validation
 
-        try {
+            String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
+            String fileName = UUID.randomUUID().toString() + "_" + originalFileName;
+
             if (fileName.contains("..")) {
                 throw new RuntimeException("Sorry! Filename contains invalid path sequence " + fileName);
             }
 
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(bis, targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
             return fileName;
         } catch (IOException ex) {
-            throw new FileStorageException("Could not store file " + fileName + ". Please try again!");
+            throw new FileStorageException("Could not store file " + file.getOriginalFilename() + ". Please try again!");
         }
+    }
+
+    private boolean isValidImageHeader(byte[] header) {
+        if (header.length < 12) return false;
+        
+        // JPEG (FF D8 FF)
+        if ((header[0] & 0xFF) == 0xFF && (header[1] & 0xFF) == 0xD8 && (header[2] & 0xFF) == 0xFF) return true;
+        // PNG (89 50 4E 47)
+        if ((header[0] & 0xFF) == 0x89 && (header[1] & 0xFF) == 0x50 && (header[2] & 0xFF) == 0x4E && (header[3] & 0xFF) == 0x47) return true;
+        // GIF (GIF8)
+        if (header[0] == 'G' && header[1] == 'I' && header[2] == 'F' && header[3] == '8') return true;
+        // WebP (RIFF .... WEBP)
+        if (header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' &&
+            header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P') return true;
+            
+        return false;
     }
 }

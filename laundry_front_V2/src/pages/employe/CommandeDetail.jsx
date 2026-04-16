@@ -22,7 +22,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 
 const TAPIS_IMAGE_TYPE = { BEFORE: 'BEFORE', AFTER: 'AFTER' };
 
-const BASE_URL = "http://localhost:8080"
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080"
 
 export default function CommandeDetail() {
   const { t, i18n } = useTranslation();

@@ -100,7 +100,7 @@ export default function DeliveryDetails() {
     );
   }
 
-  const baseUrl = "http://localhost:8080";
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20 px-4 md:px-0 text-start">
@@ -219,7 +219,7 @@ export default function DeliveryDetails() {
                       <div className="text-start">
                         <p className="text-sm font-black text-text-primary group-hover:text-primary-600 transition-colors tracking-tight leading-tight">{item.tapis?.nom}</p>
                         <p className="text-[10px] font-bold text-text-muted mt-1 uppercase tracking-widest">
-                          {item.quantite} Unités • {item.prixUnitaire.toFixed(0)} DH/U
+                          {t('driver.delivery_details.unit_price_format', { qty: item.quantite, price: item.prixUnitaire.toFixed(0) })}
                           {item.largeur && ` • ${item.largeur}x${item.hauteur}m`}
                         </p>
                       </div>

@@ -69,15 +69,16 @@ public class AdminController {
 
 //    get all commandes
     @GetMapping("/commandes")
-    public ResponseEntity<List<CommandeDTO>> allCommandes(
+    public ResponseEntity<AdminOrdersResponseDTO> allCommandes(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Integer limit,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sort) {
-        List<CommandeDTO> commandes = adminService.getFilteredCommands(status, dateDebut, dateFin, search, limit, sort);
-        return ResponseEntity.ok(commandes);
+        AdminOrdersResponseDTO response = adminService.getFilteredCommands(status, dateDebut, dateFin, search, page, size, sort);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/commandes/export-csv")

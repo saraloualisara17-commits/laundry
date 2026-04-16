@@ -12,8 +12,8 @@ import java.util.Arrays;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    @Value("${webSiteUrl}")
-    private String webSiteUrl;
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000}")
+    private String allowedOrigins;
 
     // =====================
     // CORS CONFIG
@@ -22,15 +22,8 @@ public class WebConfig implements WebMvcConfigurer {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         
-        String allowedOrigins = System.getenv("CORS_ALLOWED_ORIGINS");
-        
         if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
             config.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        } else {
-            config.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",
-                "http://localhost:3000"
-            ));
         }
         
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

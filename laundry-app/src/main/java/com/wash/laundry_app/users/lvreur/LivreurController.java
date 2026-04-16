@@ -130,31 +130,6 @@ public class LivreurController {
         return ResponseEntity.ok(commandeService.getLivreurDashboardStats());
     }
 
-    // GET /api/livreur/commandes/prete (Alias for ready orders)
-    @GetMapping("/commandes/prete-alias") // Avoiding conflict with existing /prete
-    public ResponseEntity<List<CommandeDTO>> getReadyOrdersAlias() {
-        return ResponseEntity.ok(commandeService.getReadyOrdersForLivreur());
-    }
-
-    // GET /api/livreur/commandes/annulees (Alias for canceled-deliveries)
-    @GetMapping("/commandes/annulees")
-    public ResponseEntity<List<CommandeDTO>> getAnnulees() {
-        return ResponseEntity.ok(commandeService.getCanceledDeliveriesByLivreur());
-    }
-
-    // PUT /api/livreur/commandes/{id}/retour-atelier (Alias for return)
-    @PutMapping("/commandes/{id}/retour-atelier")
-    public ResponseEntity<CommandeDTO> returnToAtelier(@PathVariable Long id) {
-        return ResponseEntity.ok(commandeService.returnToWorkplace(id));
-    }
-
-    // POST /api/livreur/commandes/{id}/confirmer-paiement (Alias for payment)
-    @PostMapping("/commandes/{id}/confirmer-paiement")
-    public ResponseEntity<CommandeDTO> confirmPayment(
-            @PathVariable Long id,
-            @Valid @RequestBody RecordPaymentRequest request) {
-        return ResponseEntity.ok(commandeService.recordPayment(id, request));
-    }
 
     // GET /api/payment-types (Note: mapped under /api/livreur here for simplicity, but we can use absolute path)
     @GetMapping("/payment-types")

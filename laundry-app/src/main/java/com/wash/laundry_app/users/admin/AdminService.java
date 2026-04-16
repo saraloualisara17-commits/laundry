@@ -17,6 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 
 @Service
 @AllArgsConstructor
@@ -91,16 +98,17 @@ public class AdminService {
         }
         userRepository.delete(user);
     }
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<CommandeDTO> getCommands(){
-        return commandeRepository.findAll().stream()
-                .sorted(java.util.Comparator.comparing(Commande::getDateCreation).reversed())
-                .map(commandeMapper::toDto).toList();
-    }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<CommandeDTO> getFilteredCommands(String status, java.time.LocalDate dateDebut, java.time.LocalDate dateFin, String search, Integer limit, String sortDirection) {
-        
+    public AdminOrdersResponseDTO getFilteredCommands(
+            String status,
+            java.time.LocalDate dateDebut,
+            java.time.LocalDate dateFin,
+            String search,
+            int page,
+            int size,
+            String sortDirection) {
+
         CommandeStatus statusEnum = null;
         if (status != null && !status.trim().isEmpty()) {
             try {
@@ -112,21 +120,29 @@ public class AdminService {
 
         java.time.LocalDateTime dateTimeDebut = dateDebut != null ? dateDebut.atStartOfDay() : null;
         java.time.LocalDateTime dateTimeFin = dateFin != null ? dateFin.atTime(23, 59, 59) : null;
-        
-        org.springframework.data.domain.Sort sort = org.springframework.data.domain.Sort.by("dateCreation");
-        if ("asc".equalsIgnoreCase(sortDirection)) {
-            sort = sort.ascending();
-        } else {
-            sort = sort.descending();
-        }
 
-        List<Commande> result = commandeRepository.findFiltered(statusEnum, dateTimeDebut, dateTimeFin, search, sort);
+        Sort sort = Sort.by("dateCreation");
+        sort = "asc".equalsIgnoreCase(sortDirection) ? sort.ascending() : sort.descending();
 
-        if (limit != null && limit > 0) {
-            result = result.stream().limit(limit).toList();
-        }
+        PageRequest pageable = PageRequest.of(page, size, sort);
+        Page<Commande> pageResult = commandeRepository.findFiltered(
+                statusEnum, dateTimeDebut, dateTimeFin, search, pageable);
 
-        return result.stream().map(commandeMapper::toDto).toList();
+        // Run the global summary stats for the entire filtered set (not just this page)
+        Double totalValue   = commandeRepository.findFilteredTotalValue(statusEnum, dateTimeDebut, dateTimeFin, search);
+        Long   totalVolumes = commandeRepository.findFilteredTotalVolume(statusEnum, dateTimeDebut, dateTimeFin, search);
+
+        return AdminOrdersResponseDTO.builder()
+                .content(pageResult.getContent().stream().map(commandeMapper::toDto).toList())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .currentPage(pageResult.getNumber())
+                .pageSize(pageResult.getSize())
+                .first(pageResult.isFirst())
+                .last(pageResult.isLast())
+                .totalValue(totalValue)
+                .totalVolumes(totalVolumes)
+                .build();
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -158,19 +174,10 @@ public class AdminService {
                 .orElseThrow(CommandeNotFoundException::new);
         return commandeMapper.toDto(commande);
     }
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<ClientDto> getClients(){
-        return clientRepository.findAll().stream()
-                .map(client -> {
-                    ClientDto dto = clientMapper.toDto(client);
-                    populateClientStats(client, dto);
-                    return dto;
-                }).toList();
-    }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ClientDto> getClientsFiltered(String search){
-        var list = clientRepository.findAll();
+        List<Client> list = clientRepository.findAll();
         if (search != null && !search.trim().isEmpty()) {
             String lowerSearch = search.toLowerCase();
             list = list.stream()
@@ -179,21 +186,30 @@ public class AdminService {
                              (c.getPhones() != null && c.getPhones().stream().anyMatch(p -> p.getPhoneNumber() != null && p.getPhoneNumber().contains(lowerSearch))))
                 .toList();
         }
+        // Single batch query for all client stats — eliminates N+1
+        Map<Long, Object[]> statsMap = buildClientStatsMap(list);
         return list.stream().map(client -> {
             ClientDto dto = clientMapper.toDto(client);
-            populateClientStats(client, dto);
+            applyClientStats(statsMap, client.getId(), dto);
             return dto;
         }).toList();
     }
 
-    private void populateClientStats(Client client, ClientDto dto) {
-        List<Commande> clientCommandes = commandeRepository.findByClientId(client.getId());
-        dto.setTotalCommandes((long) clientCommandes.size());
-        if (!clientCommandes.isEmpty()) {
-            dto.setLastOrderDate(clientCommandes.stream()
-                .map(Commande::getDateCreation)
-                .max(java.util.Comparator.naturalOrder())
-                .orElse(null));
+    private Map<Long, Object[]> buildClientStatsMap(List<Client> clients) {
+        if (clients.isEmpty()) return java.util.Collections.emptyMap();
+        List<Long> ids = clients.stream().map(Client::getId).toList();
+        return commandeRepository.findOrderStatsByClientIds(ids)
+                .stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> row));
+    }
+
+    private void applyClientStats(Map<Long, Object[]> statsMap, Long clientId, ClientDto dto) {
+        Object[] row = statsMap.get(clientId);
+        if (row != null) {
+            dto.setTotalCommandes((Long) row[1]);
+            dto.setLastOrderDate((LocalDateTime) row[2]);
+        } else {
+            dto.setTotalCommandes(0L);
         }
     }
 

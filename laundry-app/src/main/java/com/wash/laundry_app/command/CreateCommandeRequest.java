@@ -32,8 +32,12 @@ public class CreateCommandeRequest {
     public static class TapisItem {
 
         @NotNull(message = "Le nom du tapis est obligatoire")
+        @jakarta.validation.constraints.Size(max = 255, message = "Le nom ne doit pas dépasser 255 caractères")
+        @jakarta.validation.constraints.Pattern(regexp = "^[a-zA-ZÀ-ÿ0-9\\s\\-.,'()]+$", message = "Nom contient des caractères non valides")
         private String nom;
 
+        @jakarta.validation.constraints.Size(max = 1000, message = "La description ne doit pas dépasser 1000 caractères")
+        @jakarta.validation.constraints.Pattern(regexp = "^[a-zA-ZÀ-ÿ0-9\\s\\-.,'()!?+]*$", message = "Description contient des caractères non valides")
         private String description;
 
         @NotNull(message = "Le prix unitaire est obligatoire")

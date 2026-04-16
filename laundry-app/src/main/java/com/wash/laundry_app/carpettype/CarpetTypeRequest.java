@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 public class CarpetTypeRequest {
 
     @NotBlank(message = "Le nom du type de tapis est obligatoire")
+    @jakarta.validation.constraints.Size(max = 255, message = "Le nom ne doit pas dépasser 255 caractères")
+    @jakarta.validation.constraints.Pattern(regexp = "^[a-zA-ZÀ-ÿ0-9\\s\\-.,'()]+$", message = "Nom contient des caractères non valides")
     private String nom;
 
     @NotNull(message = "Le prix par m² est obligatoire")

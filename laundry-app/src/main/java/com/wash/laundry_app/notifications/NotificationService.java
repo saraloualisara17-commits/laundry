@@ -48,8 +48,11 @@ public class NotificationService {
     }
 
     @Transactional
-    public void markAsRead(Long notificationId) {
+    public void markAsRead(Long notificationId, Long userId) {
         notificationRepository.findById(notificationId).ifPresent(n -> {
+            if (n.getRecipient() != null && !n.getRecipient().getId().equals(userId)) {
+                throw new com.wash.laundry_app.command.ForbiddenOperationException("Vous n'êtes pas autorisé à modifier cette notification.");
+            }
             n.setRead(true);
             notificationRepository.save(n);
         });

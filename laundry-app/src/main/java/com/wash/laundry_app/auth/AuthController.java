@@ -35,18 +35,20 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<JwtResponse> Login(@Valid @RequestBody LoginRequest request , HttpServletResponse response){
 
-        var userOptional = userRepository.findByEmail(request.getEmail());
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            if (user.getIsActive() != null && !user.getIsActive()) {
-                throw new org.springframework.security.authentication.DisabledException("Compte désactivé. Contactez votre administrateur.");
-            }
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        } catch (org.springframework.security.authentication.BadCredentialsException |
+                 org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
         }
 
-         authenticationManager.authenticate(
-                 new UsernamePasswordAuthenticationToken(request.getEmail(),request.getPassword()));
+        var user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid credentials"));
 
-        var user = userOptional.orElseThrow();
+        if (user.getIsActive() != null && !user.getIsActive()) {
+            throw new org.springframework.security.authentication.DisabledException("Compte désactivé. Contactez votre administrateur.");
+        }
         var accessTocken = jwtService.generateAccessToken(user);
         var refreshToken = jwtService.generateRefreshToken(user);
         boolean isProd = "prod".equals(System.getenv("SPRING_PROFILES_ACTIVE"));
@@ -114,7 +116,7 @@ public class AuthController {
     }
 
     @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
-    public ResponseEntity<Void> handleBadCredentialException() {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    public ResponseEntity<Map<String, String>> handleBadCredentialException() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
     }
 }

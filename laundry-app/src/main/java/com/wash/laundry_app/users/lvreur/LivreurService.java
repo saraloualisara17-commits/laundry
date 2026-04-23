@@ -20,6 +20,7 @@ public class LivreurService {
     private final CommandeRepository commandeRepository;
 
     // Find pending client
+    @Transactional(readOnly = true)
     public Optional<ClientDto> getMyPendingClient() {
         var user = authService.currentUser();
         return clientRepository.findPendingClientByLivreur(user.getId())
@@ -64,6 +65,7 @@ public class LivreurService {
     }
 
     // Search by phone
+    @Transactional(readOnly = true)
     public Optional<ClientDto> findByPhone(String phone) {
         return clientRepository.findByPhone(phone)
                 .map(clientMapper::toDto);

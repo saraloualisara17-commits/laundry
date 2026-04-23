@@ -144,6 +144,7 @@ public class CommandeService {
 
 
     // Get commande by ID
+    @Transactional(readOnly = true)
     public CommandDetails getCommandeById(Long id) {
         Commande commande = commandeRepository.findById(id)
                 .orElseThrow(CommandeNotFoundException::new);
@@ -151,6 +152,7 @@ public class CommandeService {
     }
 
     // Get all commandes
+    @Transactional(readOnly = true)
     public List<CommandeDTO> getAllCommandes() {
         return commandeRepository.findAll()
                 .stream()
@@ -159,6 +161,7 @@ public class CommandeService {
     }
 
     // Get commandes by livreur
+    @Transactional(readOnly = true)
     public List<CommandeDTO> getCommandesByLivreur(Long livreurId) {
         return commandeRepository.findByLivreurId(livreurId)
                 .stream()
@@ -167,6 +170,7 @@ public class CommandeService {
     }
 
     // Get commandes ready for delivery
+    @Transactional(readOnly = true)
     public List<CommandeDTO> getReadyForDelivery() {
         var user = authService.currentUser();
         return commandeRepository.findReadyForDeliveryByLivreur(user.getId())
@@ -176,6 +180,7 @@ public class CommandeService {
     }
 
     // Get commandes by status
+    @Transactional(readOnly = true)
     public List<CommandeDTO> getCommandesByStatus(CommandeStatus status) {
         return commandeRepository.findByStatus(status)
                 .stream()
@@ -378,6 +383,7 @@ public class CommandeService {
     }
 
     // Get historique for commande
+    @Transactional(readOnly = true)
     public List<HistoriqueStatutDTO> getHistorique(Long commandeId) {
         return historiqueStatutRepository.findByCommandeIdOrderByCreatedAtDesc(commandeId)
                 .stream()

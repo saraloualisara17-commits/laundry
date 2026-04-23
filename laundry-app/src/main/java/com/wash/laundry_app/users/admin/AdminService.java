@@ -169,6 +169,7 @@ public class AdminService {
         return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
     // Get commande by ID
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public CommandeDTO getCommandeById(Long id) {
         Commande commande = commandeRepository.findById(id)
                 .orElseThrow(CommandeNotFoundException::new);

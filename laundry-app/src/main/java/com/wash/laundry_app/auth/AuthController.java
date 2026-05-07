@@ -5,9 +5,11 @@ import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserMapper;
 import com.wash.laundry_app.users.UserRepository;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
@@ -20,20 +22,23 @@ import java.time.Duration;
 import java.util.Map;
 
 @RestController
-@AllArgsConstructor
+@RequiredArgsConstructor
 @RequestMapping("/auth")
 public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final UserRepository userRepository;
-    private UserMapper userMapper;
+    private final UserMapper userMapper;
     private final JwtConfig jwtConfig;
     private final AuthService authService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @org.springframework.beans.factory.annotation.Value("${app.use-secure-cookies:true}")
+    private boolean useSecureCookies;
+
     @PostMapping("/login")
-    public ResponseEntity<JwtResponse> Login(@Valid @RequestBody LoginRequest request , HttpServletResponse response){
+    public ResponseEntity<JwtResponse> Login(@Valid @RequestBody LoginRequest request, HttpServletRequest req, HttpServletResponse response){
 
         try {
             authenticationManager.authenticate(
@@ -53,11 +58,24 @@ public class AuthController {
         var refreshToken = jwtService.generateRefreshToken(user);
         boolean isProd = "prod".equals(System.getenv("SPRING_PROFILES_ACTIVE"));
 
+        // ── Cookie Security Settings ──────────────────────────────────────────
+        // We always use Secure=true + SameSite=None when the app is accessed
+        // over HTTPS (production OR ngrok dev tunnels). This is required because:
+        // - Browsers block SameSite=Lax cookies on HTTPS pages if Secure=false
+        // - ngrok gives you HTTPS, so dev mode also needs Secure=true + None
+        // We detect HTTPS via the X-Forwarded-Proto header (set by ngrok/proxies).
+        // ── Detect HTTPS ───────────────────────────────────────────────────────
+        // X-Forwarded-Proto is a REQUEST header set by ngrok / reverse proxies.
+        // It must be read from HttpServletRequest, NOT HttpServletResponse.
+        // Reading it from the response always returns null → cookie missing Secure flag
+        // → browser on HTTPS silently drops it → /auth/refresh gets no cookie → 403.
+        boolean isHttps = "https".equalsIgnoreCase(req.getHeader("X-Forwarded-Proto")) || useSecureCookies;
+
         ResponseCookie cookie = ResponseCookie
                 .from("refreshToken", refreshToken.toString())
                 .httpOnly(true)
-                .secure(isProd)
-                .sameSite(isProd ? "None" : "Lax")
+                .secure(isHttps)
+                .sameSite(isHttps ? "None" : "Lax")
                 .path("/auth")
                 .maxAge(Duration.ofDays(7))
                 .build();
@@ -70,11 +88,19 @@ public class AuthController {
         rt.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(jwtConfig.getRefreshTokenExpiration()));
         refreshTokenRepository.save(rt);
 
-        return ResponseEntity.ok(new JwtResponse(accessTocken.toString()));
+        return ResponseEntity.ok(new JwtResponse(accessTocken.toString(), refreshToken.toString()));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<JwtResponse> refresh(@CookieValue(name = "refreshToken") String refreshToken) {
+    public ResponseEntity<JwtResponse> refresh(
+            @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
+            @RequestHeader(name = "X-Refresh-Token", required = false) String headerRefreshToken) {
+        
+        String refreshToken = cookieRefreshToken != null ? cookieRefreshToken : headerRefreshToken;
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         var jwt = jwtService.parseToken(refreshToken);
         if (jwt == null || jwt.isExpired()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -89,24 +115,33 @@ public class AuthController {
 
         var user = userRepository.findById(jwt.getUserId()).orElseThrow();
         var accessToken = jwtService.generateAccessToken(user);
-        return ResponseEntity.ok(new JwtResponse(accessToken.toString()));
+        return ResponseEntity.ok(new JwtResponse(accessToken.toString(), refreshToken));
     }
 
     @PostMapping("/logout")
     @org.springframework.transaction.annotation.Transactional
-    public ResponseEntity<Void> logout(@CookieValue(name = "refreshToken", required = false) String refreshToken, HttpServletResponse response) {
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
+            @RequestHeader(name = "X-Refresh-Token", required = false) String headerRefreshToken,
+            HttpServletRequest req, 
+            HttpServletResponse response) {
+        
+        String refreshToken = cookieRefreshToken != null ? cookieRefreshToken : headerRefreshToken;
         if (refreshToken != null) {
             // HIGH-4: Revoke token in DB
             refreshTokenRepository.deleteByTokenHash(jwtService.hashToken(refreshToken));
         }
 
         boolean isProd = "prod".equals(System.getenv("SPRING_PROFILES_ACTIVE"));
+        boolean isHttps = isProd
+                || "https".equalsIgnoreCase(req.getHeader("X-Forwarded-Proto"))
+                || useSecureCookies;
 
         ResponseCookie cookie = ResponseCookie
                 .from("refreshToken", "")
                 .httpOnly(true)
-                .secure(isProd)
-                .sameSite(isProd ? "None" : "Lax")
+                .secure(isHttps)
+                .sameSite(isHttps ? "None" : "Lax")
                 .path("/auth")
                 .maxAge(0)
                 .build();

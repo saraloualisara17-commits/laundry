@@ -6,6 +6,7 @@ import com.wash.laundry_app.command.ForbiddenOperationException;
 import com.wash.laundry_app.command.CommandeNotFoundException;
 import com.wash.laundry_app.clients.ClientNotFoundException;
 import com.wash.laundry_app.clients.ClientExistException;
+import com.wash.laundry_app.clients.PendingClientExistsException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -138,6 +139,17 @@ public class GlobalExceptionHandler {
         error.put("status", HttpStatus.CONFLICT.value());
         error.put("error", "Conflict");
         error.put("message", "Ce client existe d\u00e9j\u00e0.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // ✅ Client en attente déjà existant pour ce livreur
+    @ExceptionHandler(PendingClientExistsException.class)
+    public ResponseEntity<Map<String, Object>> handlePendingClientExists(PendingClientExistsException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", LocalDateTime.now());
+        error.put("status", HttpStatus.CONFLICT.value());
+        error.put("error", "Conflict");
+        error.put("message", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 

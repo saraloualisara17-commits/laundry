@@ -4,6 +4,7 @@ import com.wash.laundry_app.users.Role;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public Notification createNotification(User recipient, String title, String message, String type, String referenceId) {
@@ -26,7 +28,33 @@ public class NotificationService {
                 .referenceId(referenceId)
                 .read(false)
                 .build();
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        
+        // Push notification via WebSocket
+        pushNotification(saved);
+        
+        return saved;
+    }
+
+    private void pushNotification(Notification notification) {
+        if (notification.getRecipient() == null) return;
+        
+        NotificationDTO dto = NotificationDTO.builder()
+                .id(notification.getId())
+                .title(notification.getTitle())
+                .message(notification.getMessage())
+                .type(notification.getType())
+                .referenceId(notification.getReferenceId())
+                .read(notification.isRead())
+                .createdAt(notification.getCreatedAt())
+                .build();
+        
+        // Send to /user/{userId}/queue/notifications
+        messagingTemplate.convertAndSendToUser(
+            notification.getRecipient().getId().toString(), 
+            "/queue/notifications", 
+            dto
+        );
     }
 
     @Transactional

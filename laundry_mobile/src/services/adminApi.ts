@@ -4,6 +4,8 @@ export const adminApi = {
   // Dashboard
   getStats: () =>
     api.get('/admin/statistics/today'),
+  getStatusOverview: () =>
+    api.get('/api/admin/stats/status-overview'),
   getRecentOrders: () =>
     api.get('/admin/commandes?limit=5&sort=recent'),
 
@@ -44,6 +46,23 @@ export const adminApi = {
 
   createOrder: (data: any) =>
     api.post('/admin/commandes', data),
+
+  uploadFiles: (files: any[]) => {
+    const formData = new FormData();
+    files.forEach((file: any) => {
+      formData.append('files', {
+        uri: file.uri,
+        name: file.name || 'image.jpg',
+        type: file.type || 'image/jpeg',
+      } as any);
+    });
+    return api.post('/api/upload/multiple', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  addOrderImages: (id: number | string, imageUrls: string[], photoType: string) =>
+    api.post(`/api/commandes/${id}/images`, { imageUrls, photoType }),
 
   // Clients
   getClients: (params: {
@@ -109,4 +128,17 @@ export const adminApi = {
     api.put(`/admin/change-user-password/${id}`,
       { password }
     ),
+
+  // Unpaid
+  getUnpaidOverview: () =>
+    api.get('/api/admin/unpaid/overview'),
+
+  getClientDebtList: () =>
+    api.get('/api/admin/unpaid/clients'),
+
+  getClientDebtDetail: (clientId: number | string) =>
+    api.get(`/api/admin/unpaid/clients/${clientId}`),
+
+  getAllUnpaidOrders: () =>
+    api.get('/api/admin/unpaid/orders'),
 }

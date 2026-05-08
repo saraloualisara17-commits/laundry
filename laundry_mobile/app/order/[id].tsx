@@ -15,14 +15,17 @@ import {
   TextInput,
   Dimensions,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { adminApi } from '../../src/services/adminApi';
+import { BASE_URL } from '../../src/api/axios';
 import { Colors, Shadows, Typography, Radius, StatusColors } from '../../constants/theme';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -88,6 +91,9 @@ export default function OrderDetailsScreen() {
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [drivers, setDrivers] = useState<any[]>([]);
 
+  // Image Management State
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       const [orderRes, paymentsRes, historyRes, usersRes] = await Promise.all([
@@ -119,27 +125,89 @@ export default function OrderDetailsScreen() {
   };
 
   const handleUpdateStatus = async (nextStatus: string) => {
+    if (nextStatus === 'DELIVERED') {
+      Alert.alert(
+        'Confirmation de livraison',
+        'Voulez-vous prendre une photo de preuve de livraison ?',
+        [
+          { text: 'Non, livrer direct', onPress: () => performStatusUpdate(nextStatus) },
+          { text: 'Oui, prendre photo', onPress: () => takePODPhoto(nextStatus) }
+        ]
+      );
+      return;
+    }
+
     Alert.alert(
       'Changer le statut',
       `Voulez-vous passer la commande au statut ${nextStatus} ?`,
       [
         { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: async () => {
-            setUpdating(true);
-            try {
-              await adminApi.updateOrderStatus(id as string, nextStatus);
-              await fetchData();
-            } catch (error) {
-              Alert.alert('Erreur', 'Échec de la mise à jour du statut.');
-            } finally {
-              setUpdating(false);
-            }
-          }
-        }
+        { text: 'Confirmer', onPress: () => performStatusUpdate(nextStatus) }
       ]
     );
+  };
+
+  const performStatusUpdate = async (nextStatus: string) => {
+    setUpdating(true);
+    try {
+      await adminApi.updateOrderStatus(id as string, nextStatus);
+      await fetchData();
+    } catch (error) {
+      Alert.alert('Erreur', 'Échec de la mise à jour du statut.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const takePODPhoto = async (nextStatus: string) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permission requise');
+
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (result.canceled) return;
+
+    setUpdating(true);
+    try {
+      const uploadRes = await adminApi.uploadFiles([{
+        uri: result.assets[0].uri,
+        name: `pod_${id}.jpg`,
+        type: 'image/jpeg'
+      }]);
+      await adminApi.addOrderImages(id as string, uploadRes.data, 'livraison');
+      await adminApi.updateOrderStatus(id as string, nextStatus);
+      await fetchData();
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de sauvegarder la photo de livraison');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddPhotos = async (type: 'reception' | 'apres_traitement') => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7
+    });
+
+    if (result.canceled) return;
+
+    setUploadingImage(true);
+    try {
+      const localFiles = result.assets.map(a => ({
+        uri: a.uri,
+        name: `extra_${Date.now()}.jpg`,
+        type: 'image/jpeg'
+      }));
+      const uploadRes = await adminApi.uploadFiles(localFiles);
+      await adminApi.addOrderImages(id as string, uploadRes.data, type);
+      await fetchData();
+      Alert.alert('Succès', 'Photos ajoutées');
+    } catch (e) {
+      Alert.alert('Erreur', 'Échec de l\'upload');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleDeleteOrder = () => {
@@ -309,6 +377,25 @@ export default function OrderDetailsScreen() {
           </TouchableOpacity>
         )}
 
+        {/* SECTION: Order Images Gallery */}
+        {(order.images && order.images.length > 0) && (
+          <View style={styles.infoCard}>
+             <Text style={styles.sectionLabel}>PHOTOS DE LA COMMANDE</Text>
+             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {order.images.map((img: any, idx: number) => (
+                  <View key={idx}>
+                    <Image source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={styles.galleryImg} />
+                    <View style={styles.imgBadge}>
+                      <Text style={styles.imgBadgeText}>
+                        {img.photoType === 'reception' ? 'Récep.' : img.photoType === 'livraison' ? 'Livraison' : 'Labo'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+             </ScrollView>
+          </View>
+        )}
+
         {/* SECTION 3: Client Information */}
         <View style={styles.infoCard}>
           <Text style={styles.sectionLabel}>INFORMATIONS</Text>
@@ -446,12 +533,20 @@ export default function OrderDetailsScreen() {
                   <View style={styles.tagBadge}>
                     <Text style={styles.tagText}>TAG-{String(index + 1).padStart(3, '0')}</Text>
                   </View>
-                  <Text style={styles.itemName}>{item.tapis?.nom || 'Tapis'}</Text>
+                  <Text style={styles.itemName}>{item.productNom || 'Tapis'}</Text>
                 </View>
                 <Text style={styles.itemPrice}>{parseFloat(item.prixFinal || 0).toFixed(2)} DH</Text>
               </View>
 
-              {item.modeTarification === 'PER_M2' && (
+              {item.images && item.images.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 8 }}>
+                  {item.images.map((img: any, i: number) => (
+                    <Image key={i} source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={styles.itemGalleryImg} />
+                  ))}
+                </ScrollView>
+              )}
+
+              {item.productPricingMethod === 'PER_M2' && (
                 <View style={styles.chipsRow}>
                   <View style={styles.dimensionChip}>
                     <Text style={styles.chipLabel}>DIMENSIONS</Text>
@@ -466,7 +561,7 @@ export default function OrderDetailsScreen() {
                 </View>
               )}
 
-              {item.modeTarification === 'PER_UNIT' && (
+              {item.productPricingMethod === 'PER_UNIT' && (
                 <View style={[styles.dimensionChip, { marginTop: 12, alignSelf: 'flex-start' }]}>
                   <Text style={styles.chipLabel}>QUANTITÉ</Text>
                   <Text style={styles.chipValue}>{item.quantite}</Text>
@@ -480,7 +575,7 @@ export default function OrderDetailsScreen() {
               <View style={styles.itemStatusContainer}>
                 <View style={[styles.itemStatusBadge, { backgroundColor: item.etat === 'NETTOYE' ? Colors.successBg : Colors.primary100 }]}>
                   <Text style={[styles.itemStatusText, { color: item.etat === 'NETTOYE' ? Colors.success : Colors.primary }]}>
-                    {item.etat}
+                    {item.etat || 'PICKED_UP'}
                   </Text>
                 </View>
               </View>
@@ -536,14 +631,19 @@ export default function OrderDetailsScreen() {
           <View style={styles.gridRow}>
             <TouchableOpacity 
               style={[styles.gridBtn, { backgroundColor: 'rgba(59,130,246,0.1)' }]}
-              onPress={() => Alert.alert('Bientôt disponible', 'La modification des commandes sera activée prochainement.')}
+              onPress={() => handleAddPhotos('apres_traitement')}
+              disabled={uploadingImage}
             >
-              <Feather name="edit" size={20} color={Colors.info} />
-              <Text style={[styles.gridBtnText, { color: Colors.info }]}>Modifier</Text>
+              <Feather name="camera" size={20} color={Colors.info} />
+              <Text style={[styles.gridBtnText, { color: Colors.info }]}>Photo Labo</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridBtn, { backgroundColor: Colors.primary100 }]}>
-              <Ionicons name="sync" size={20} color={Colors.primary} />
-              <Text style={[styles.gridBtnText, { color: Colors.primary }]}>Statut</Text>
+            <TouchableOpacity 
+              style={[styles.gridBtn, { backgroundColor: Colors.primary100 }]}
+              onPress={() => handleAddPhotos('reception')}
+              disabled={uploadingImage}
+            >
+              <Ionicons name="images" size={20} color={Colors.primary} />
+              <Text style={[styles.gridBtnText, { color: Colors.primary }]}>Photo Récep.</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.gridRow}>
@@ -913,6 +1013,12 @@ const styles = StyleSheet.create({
   timelineStatus: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
   timelineMeta: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   timelineComment: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic', marginTop: 4 },
+
+  galleryImg: { width: 100, height: 100, borderRadius: 12, backgroundColor: '#F1F5F9' },
+  itemGalleryImg: { width: 80, height: 80, borderRadius: 10, backgroundColor: '#F1F5F9' },
+
+  imgBadge: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  imgBadgeText: { color: 'white', fontSize: 9, fontWeight: '700' },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },

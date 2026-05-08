@@ -67,7 +67,8 @@ export default function OrderItemsScreen() {
   const [configForm, setConfigForm] = useState({
     qty: 1, largura: '', hauteur: '', longueur: '', poids: '', 
     customPrice: '', noteAtelier: '', couleur: '', 
-    hasRemise: false, remiseMontant: '', remiseRaison: ''
+    hasRemise: false, remiseMontant: '', remiseRaison: '',
+    images: [] as string[]
   });
 
   const loadCatalog = async () => {
@@ -170,7 +171,8 @@ export default function OrderItemsScreen() {
       couleur: configForm.couleur,
       notes: configForm.noteAtelier,
       pricingMethod: product.pricingMethod,
-      uniteLabel: product.uniteLabel
+      uniteLabel: product.uniteLabel,
+      imageUrls: configForm.images.length > 0 ? configForm.images : undefined,
     };
 
     if (editCartId) {
@@ -182,10 +184,57 @@ export default function OrderItemsScreen() {
     setConfigModal({ open: false, product: null, editCartId: null });
   };
 
+  const pickItemImage = async (source: 'camera' | 'gallery') => {
+    try {
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission requise', "L'accès à la caméra est nécessaire");
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.7,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission requise', "L'accès à la galerie est nécessaire");
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.7,
+          allowsMultipleSelection: true,
+          selectionLimit: 5,
+        });
+      }
+
+      if (!result.canceled && result.assets.length > 0) {
+        const newUris = result.assets.map(a => a.uri);
+        setConfigForm(prev => ({
+          ...prev,
+          images: [...prev.images, ...newUris].slice(0, 5) // max 5 images
+        }));
+      }
+    } catch (e) {
+      console.error('Image picker error:', e);
+    }
+  };
+
+  const removeItemImage = (uri: string) => {
+    setConfigForm(prev => ({
+      ...prev,
+      images: prev.images.filter(i => i !== uri)
+    }));
+  };
+
+  // Keep original pickImage for the action bar
   const pickImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire');
+      Alert.alert('Permission requise', "L'accès à la caméra est nécessaire");
       return;
     }
 
@@ -195,7 +244,7 @@ export default function OrderItemsScreen() {
     });
 
     if (!result.canceled) {
-       Alert.alert("Succès", "Photo capturée.");
+       Alert.alert('Succès', 'Photo capturée.');
     }
   };
 
@@ -292,10 +341,21 @@ export default function OrderItemsScreen() {
         {item.pricingMethod === 'PER_M2' && (
           <Text style={styles.cartItemDetails}>{item.largeur}×{item.hauteur}={(item.largeur! * item.hauteur!).toFixed(2)}m²</Text>
         )}
+        {item.imageUrls && item.imageUrls.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+             {item.imageUrls.slice(0, 3).map((uri, idx) => (
+                <Image key={idx} source={{ uri }} style={{ width: 30, height: 30, borderRadius: 6 }} />
+             ))}
+          </View>
+        )}
         <Text style={styles.cartItemPrice}>{item.prixFinal.toFixed(2)} DH</Text>
       </View>
       <View style={styles.cartItemImgBox}>
-         <Text style={{ fontSize: 28 }}>{item.categoryIcon || '🧺'}</Text>
+         {item.imageUrls && item.imageUrls.length > 0 ? (
+           <Image source={{ uri: item.imageUrls[0] }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+         ) : (
+           <Text style={{ fontSize: 28 }}>{item.categoryIcon || '🧺'}</Text>
+         )}
       </View>
     </View>
   );
@@ -322,7 +382,8 @@ export default function OrderItemsScreen() {
     setConfigForm({
       qty: 1, largura: '', hauteur: '', longueur: '', poids: '', 
       customPrice: '', noteAtelier: '', couleur: '', 
-      hasRemise: false, remiseMontant: '', remiseRaison: ''
+      hasRemise: false, remiseMontant: '', remiseRaison: '',
+      images: []
     });
     setConfigModal({ open: true, product, editCartId: null });
   };
@@ -340,7 +401,8 @@ export default function OrderItemsScreen() {
       couleur: item.couleur || '',
       hasRemise: !!item.remiseMontant,
       remiseMontant: item.remiseMontant?.toString() || '',
-      remiseRaison: item.remiseRaison || ''
+      remiseRaison: item.remiseRaison || '',
+      images: item.imageUrls || []
     });
     setConfigModal({ open: true, product, editCartId: item.cartId });
   };
@@ -544,6 +606,51 @@ export default function OrderItemsScreen() {
                 onChangeText={t => setConfigForm({...configForm, noteAtelier: t})}
               />
 
+              {/* PHOTOS SECTION */}
+              <View style={styles.remiseSection}>
+                <View style={styles.remiseHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="camera-outline" size={18} color={AdminColors.primary} />
+                    <Text style={styles.remiseTitle}>Photos de l'article</Text>
+                    {configForm.images.length > 0 && (
+                      <View style={styles.pillBadge}>
+                        <Text style={styles.pillText}>{configForm.images.length}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.photoBtn, { backgroundColor: '#E8F5E9' }]}
+                      onPress={() => pickItemImage('gallery')}
+                    >
+                      <Ionicons name="images-outline" size={16} color="#388E3C" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.photoBtn, { backgroundColor: '#E3F2FD' }]}
+                      onPress={() => pickItemImage('camera')}
+                    >
+                      <Ionicons name="camera" size={16} color="#1976D2" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {configForm.images.length > 0 && (
+                  <View style={styles.photoPreviewRow}>
+                    {configForm.images.map((uri, idx) => (
+                      <View key={idx} style={styles.photoThumbWrap}>
+                        <Image source={{ uri }} style={styles.photoThumb} />
+                        <TouchableOpacity
+                          style={styles.photoRemoveBtn}
+                          onPress={() => removeItemImage(uri)}
+                        >
+                          <Ionicons name="close" size={10} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               {/* REMISE SECTION */}
               <View style={styles.remiseSection}>
                 <View style={styles.remiseHeader}>
@@ -738,4 +845,10 @@ const styles = StyleSheet.create({
   dialogBtn: { paddingVertical: 10, paddingHorizontal: 16 },
   dialogBtnCancel: { color: AdminColors.textSecondary, fontWeight: '600' },
   dialogBtnConfirm: { color: AdminColors.primary, fontWeight: '700' },
+
+  photoBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  photoPreviewRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  photoThumbWrap: { width: 60, height: 60, borderRadius: 10, overflow: 'hidden', position: 'relative' },
+  photoThumb: { width: '100%', height: '100%' },
+  photoRemoveBtn: { position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.5)', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 });

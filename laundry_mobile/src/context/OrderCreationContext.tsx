@@ -20,7 +20,9 @@ export interface OrderItem {
   notes?: string;
   pricingMethod: string;
   uniteLabel?: string;
+  imageUrls?: string[]; // Local URIs captured during order creation
 }
+
 
 export interface ClientData {
   id?: number;

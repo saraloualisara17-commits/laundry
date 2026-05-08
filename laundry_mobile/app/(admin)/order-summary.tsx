@@ -9,7 +9,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -52,6 +53,20 @@ export default function OrderSummaryScreen() {
 
     setLoading(true);
     try {
+      // 1. Upload Images if any
+      const itemsWithRemoteImages = await Promise.all(items.map(async (item) => {
+        if (item.imageUrls && item.imageUrls.length > 0) {
+          const localImages = item.imageUrls.map(uri => ({
+            uri,
+            name: `item_${Date.now()}.jpg`,
+            type: 'image/jpeg'
+          }));
+          const uploadRes = await adminApi.uploadFiles(localImages);
+          return { ...item, remoteImageUrls: uploadRes.data };
+        }
+        return { ...item, remoteImageUrls: [] };
+      }));
+
       const payload = {
         clientId: client?.id,
         mode: mode,
@@ -61,8 +76,8 @@ export default function OrderSummaryScreen() {
         paymentMethod: mode === 'immediate' ? paymentMethod : undefined,
         montantPaye: paidAmount || 0,
         notes: orderNotes,
-        tapis: items.map(item => ({
-          nom: item.nom,
+        tapis: itemsWithRemoteImages.map(item => ({
+          productId: item.productId,
           quantite: item.quantite || 1,
           largeur: item.largeur,
           hauteur: item.hauteur,
@@ -73,9 +88,9 @@ export default function OrderSummaryScreen() {
           modeTarification: item.pricingMethod,
           remiseMontant: item.remiseMontant,
           remiseRaison: item.remiseRaison,
-          description: item.couleur,
+          couleur: item.couleur,
           notes: item.notes,
-          productId: item.productId
+          imageUrls: item.remoteImageUrls
         }))
       };
 
@@ -167,6 +182,15 @@ export default function OrderSummaryScreen() {
                  item.pricingMethod === 'PER_M2' ? `${item.largeur}m × ${item.hauteur}m · ${(item.largeur! * item.hauteur!).toFixed(2)}m²` :
                  item.pricingMethod === 'PER_KG' ? `${item.poids}kg` : ''}
               </Text>
+              
+              {item.imageUrls && item.imageUrls.length > 0 && (
+                <View style={styles.summaryImageRow}>
+                  {item.imageUrls.map((uri, i) => (
+                    <Image key={i} source={{ uri }} style={styles.summaryThumb} />
+                  ))}
+                </View>
+              )}
+
               {item.remiseMontant ? (
                 <Text style={[styles.itemDetails, { color: AdminColors.danger, fontSize: 11 }]}>
                   Remise: -{item.remiseMontant.toFixed(2)} DH {item.remiseRaison ? `(${item.remiseRaison})` : ''}
@@ -522,4 +546,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  summaryImageRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  summaryThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#F1F5F9' },
 });

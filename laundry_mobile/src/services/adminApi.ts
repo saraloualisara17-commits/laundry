@@ -15,6 +15,9 @@ export const adminApi = {
     search?: string
     page?: number
     limit?: number
+    dateDebut?: string
+    dateFin?: string
+    livreurId?: number | string
   }) => api.get('/admin/commandes', { params }),
 
   getOrder: (id: number | string) =>
@@ -26,10 +29,13 @@ export const adminApi = {
   updateOrderStatus: (
     id: number | string,
     status: string,
-    commentaire?: string
+    paymentData?: {
+      montantCollecte?: number,
+      notesPaiement?: string
+    }
   ) => api.patch(
     `/api/commandes/${id}/status`,
-    { status, commentaire }
+    { status, ...paymentData }
   ),
 
   assignDeliveryDriver: (id: number | string, driverId: string | number) =>
@@ -46,6 +52,9 @@ export const adminApi = {
 
   createOrder: (data: any) =>
     api.post('/admin/commandes', data),
+
+  updateOrder: (id: number | string, data: any) =>
+    api.put(`/admin/commandes/${id}`, data),
 
   uploadFiles: (files: any[]) => {
     const formData = new FormData();
@@ -121,8 +130,11 @@ export const adminApi = {
   updateUser: (id: number | string, data: any) =>
     api.put(`/admin/update-user/${id}`, data),
 
-  toggleUserActive: (id: number | string) =>
-    api.patch(`/admin/inactive-user/${id}`), // The backend uses /inactive-user/{id} to toggle? No, activate/inactivate are separate
+  activateUser: (id: number | string) =>
+    api.patch(`/admin/active-user/${id}`),
+
+  deactivateUser: (id: number | string) =>
+    api.patch(`/admin/inactive-user/${id}`),
 
   resetPassword: (id: number | string, password: string) =>
     api.put(`/admin/change-user-password/${id}`,
@@ -141,4 +153,17 @@ export const adminApi = {
 
   getAllUnpaidOrders: () =>
     api.get('/api/admin/unpaid/orders'),
+
+  // Receipts & PDFs
+  getOrderPdfUrl: (id: number | string) => 
+    `${api.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf`,
+
+  getDeliveryPdfUrl: (id: number | string) => 
+    `${api.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf`,
+
+  getOrderReceipt: (id: number | string) =>
+    api.get(`/api/commandes/${id}/receipt/order/whatsapp`),
+
+  getDeliveryReceipt: (id: number | string) =>
+    api.get(`/api/commandes/${id}/receipt/delivery/whatsapp`),
 }

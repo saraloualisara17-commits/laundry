@@ -14,7 +14,9 @@ export default function DeliveriesScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { readyDeliveries, paymentTypes, loading } = useSelector((state: RootState) => state.livreur);
   const [refreshing, setRefreshing] = useState(false);
-  const [paymentModal, setPaymentModal] = useState<{ visible: boolean; order: any | null }>({ visible: false, order: null });
+  const [deliveryModal, setDeliveryModal] = useState<{ visible: boolean; order: any | null }>({ visible: false, order: null });
+  const [collectedAmount, setCollectedAmount] = useState('0');
+  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
 
   const loadData = useCallback(() => {
@@ -59,18 +61,32 @@ export default function DeliveriesScreen() {
     }
   };
 
-  const handleConfirmPayment = async (methodId: number) => {
-    if (!paymentModal.order) return;
-    setProcessingId(paymentModal.order.id);
-    setPaymentModal({ visible: false, order: null });
+  const handleConfirmDelivery = async () => {
+    if (!deliveryModal.order) return;
+    const amount = parseFloat(collectedAmount) || 0;
+    if (isNaN(amount) || amount < 0) {
+      Alert.alert('Erreur', 'Veuillez saisir un montant valide.');
+      return;
+    }
+    if (amount > parseFloat(deliveryModal.order.montantTotal)) {
+      Alert.alert('Erreur', 'Le montant collecté ne peut pas dépasser le total.');
+      return;
+    }
+
+    setConfirmingDelivery(true);
     try {
-      await dispatch(confirmPayment({ orderId: paymentModal.order.id, methodId })).unwrap();
-      Alert.alert('✅ Paiement Enregistré', 'La livraison a été marquée comme payée !');
-    } catch (err: any) {
-      Alert.alert('Erreur', typeof err === 'string' ? err : 'Échec de l\'enregistrement du paiement.');
-    } finally {
-      setProcessingId(null);
+      // Use adminApi to update status with payment
+      const { adminApi } = require('../../src/services/adminApi');
+      await adminApi.updateOrderStatus(deliveryModal.order.id, 'DELIVERED', {
+        montantCollecte: amount
+      });
+      setDeliveryModal({ visible: false, order: null });
+      Alert.alert('✅ Livré', 'La livraison a été confirmée !');
       loadData();
+    } catch (err: any) {
+      Alert.alert('Erreur', 'Échec de la confirmation de livraison.');
+    } finally {
+      setConfirmingDelivery(false);
     }
   };
 
@@ -162,10 +178,13 @@ export default function DeliveriesScreen() {
 
             <TouchableOpacity
               style={styles.payBtn}
-              onPress={() => setPaymentModal({ visible: true, order })}
+              onPress={() => {
+                setCollectedAmount('0');
+                setDeliveryModal({ visible: true, order });
+              }}
             >
-              <Feather name="credit-card" size={18} color={Colors.primary} />
-              <Text style={styles.payBtnText}>ENCAISSER</Text>
+              <Feather name="truck" size={18} color={Colors.primary} />
+              <Text style={styles.payBtnText}>LIVRER</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: Colors.danger }]} onPress={() => handleCancel(order)}>
@@ -211,57 +230,116 @@ export default function DeliveriesScreen() {
         />
       )}
 
-      {/* Payment Modal */}
-      <Modal visible={paymentModal.visible} transparent animationType="slide" onRequestClose={() => setPaymentModal({ visible: false, order: null })}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={() => setPaymentModal({ visible: false, order: null })} />
-          <View style={styles.modalSheet}>
+      {/* Delivery Payment Modal */}
+      <Modal visible={deliveryModal.visible} transparent animationType="slide" onRequestClose={() => setDeliveryModal({ visible: false, order: null })}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={() => setDeliveryModal({ visible: false, order: null })} />
+          <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
             <View style={styles.modalHandle} />
-
-            <View style={styles.modalIconContainer}>
-              <Feather name="credit-card" size={32} color={Colors.primary} />
-            </View>
-            <Text style={styles.modalTitle}>Encaisser le paiement</Text>
-
-            <View style={styles.modalSummary}>
-              <View>
-                <Text style={styles.modalSummaryLabel}>COMMANDE</Text>
-                <Text style={styles.modalSummaryValue}>#{paymentModal.order?.numeroCommande}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={styles.modalIconContainer}>
+                <Feather name="truck" size={32} color={Colors.primary} />
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.modalSummaryLabel}>MONTANT</Text>
-                <Text style={[styles.modalSummaryValue, { color: Colors.primary, fontSize: 24 }]}>
-                  {paymentModal.order?.montantTotal} DH
+              <Text style={styles.modalTitle}>Confirmer la livraison</Text>
+              <Text style={{ fontSize: 14, color: Colors.textSecondary, marginBottom: 20, textAlign: 'center' }}>
+                Déclarez le montant encaissé pour la commande #{deliveryModal.order?.numeroCommande}
+              </Text>
+
+              <View style={styles.modalSummary}>
+                <View>
+                  <Text style={styles.modalSummaryLabel}>CLIENT</Text>
+                  <Text style={styles.modalSummaryValue}>{deliveryModal.order?.client?.name}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.modalSummaryLabel}>TOTAL À PAYER</Text>
+                  <Text style={[styles.modalSummaryValue, { color: Colors.primary, fontSize: 24 }]}>
+                    {deliveryModal.order?.montantTotal} DH
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.modalSectionLabel}>Montant encaissé (DH)</Text>
+              <TextInput
+                style={{
+                  width: '100%',
+                  height: 60,
+                  backgroundColor: Colors.surface2,
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(0,0,0,0.12)',
+                  fontSize: 24,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  color: Colors.textPrimary,
+                  marginBottom: 10
+                }}
+                value={collectedAmount}
+                onChangeText={setCollectedAmount}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                autoFocus
+              />
+
+              <View style={{ flexDirection: 'row', gap: 8, width: '100%', marginBottom: 20 }}>
+                <TouchableOpacity 
+                  style={{ flex: 1, height: 40, borderRadius: 10, backgroundColor: Colors.primary100, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => setCollectedAmount('0')}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>0 DH</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ flex: 1, height: 40, borderRadius: 10, backgroundColor: Colors.primary100, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => setCollectedAmount(deliveryModal.order?.montantTotal.toString())}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>{deliveryModal.order?.montantTotal} DH</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Payment status preview */}
+              <View style={{ 
+                width: '100%',
+                borderRadius: 12, 
+                padding: 14,
+                marginBottom: 24,
+                backgroundColor: parseFloat(collectedAmount) === 0 ? Colors.dangerBg : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '#FFF7ED' : Colors.successBg,
+                borderWidth: 1,
+                borderColor: parseFloat(collectedAmount) === 0 ? 'rgba(239,68,68,0.2)' : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'
+              }}>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '600', 
+                  color: parseFloat(collectedAmount) === 0 ? Colors.danger : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '#D97706' : Colors.success 
+                }}>
+                  {parseFloat(collectedAmount) === 0 ? '⚠️ Commande non payée' : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '⚡ Paiement partiel' : '✅ Paiement complet'}
                 </Text>
               </View>
-            </View>
 
-            <Text style={styles.modalSectionLabel}>Mode de paiement</Text>
-            <View style={styles.paymentGrid}>
-              {paymentTypes.map((type: any) => (
-                <TouchableOpacity
-                  key={type.id}
-                  style={styles.paymentChip}
-                  onPress={() => handleConfirmPayment(type.id)}
-                >
-                  <Feather
-                    name={type.code === 'especes' ? 'dollar-sign' : 'credit-card'}
-                    size={24}
-                    color={Colors.primary}
-                  />
-                  <Text style={styles.paymentChipText}>{type.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <TouchableOpacity
+                style={[styles.confirmBtn, { width: '100%', marginBottom: 10, backgroundColor: Colors.primary }]}
+                onPress={handleConfirmDelivery}
+                disabled={confirmingDelivery}
+              >
+                {confirmingDelivery ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '700' }}>
+                    🚚 CONFIRMER LA LIVRAISON
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => setPaymentModal({ visible: false, order: null })}
-            >
-              <Text style={styles.cancelBtnText}>Annuler</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cancelBtn, { width: '100%', marginBottom: 20 }]}
+                onPress={() => setDeliveryModal({ visible: false, order: null })}
+              >
+                <Text style={styles.cancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -387,4 +465,6 @@ const styles = StyleSheet.create({
   paymentChipText: { fontSize: 13, fontWeight: Typography.weight.bold, color: Colors.textPrimary, textTransform: 'uppercase' },
   cancelBtn: { width: '100%', backgroundColor: Colors.surface2, padding: 14, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   cancelBtnText: { fontSize: 14, fontWeight: Typography.weight.bold, color: Colors.textSecondary, textTransform: 'uppercase' },
+  confirmBtn: { height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', ...Shadows.teal },
+  confirmBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
 });

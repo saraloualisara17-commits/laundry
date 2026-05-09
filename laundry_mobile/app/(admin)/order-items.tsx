@@ -14,7 +14,8 @@ import {
   Dimensions,
   Platform,
   Image,
-  Share
+  Share,
+  Linking
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -24,6 +25,10 @@ import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { SkeletonCard } from '../../components/admin/SkeletonCard';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,11 +54,12 @@ export default function OrderItemsScreen() {
     client, items, addItem, removeItem, updateItem, 
     totalAmount, totalArea, totalCarpets, itemCount,
     paidAmount, setPaidAmount, remainingAmount,
-    orderNotes, setOrderNotes
+    orderNotes, setOrderNotes, editingOrderId
   } = useOrderCreation();
   
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
   
   // Modals
   const [configModal, setConfigModal] = useState<{ open: boolean, product: any, editCartId: string | null }>({
@@ -249,12 +255,57 @@ export default function OrderItemsScreen() {
   };
 
   const handleShare = async () => {
+    if (!editingOrderId) {
+      // For new orders not yet saved, fallback to simple text share
+      try {
+        await Share.share({
+          message: `Récapitulatif de commande pour ${client?.name}\nTotal: ${totalAmount.toFixed(2)} DH\nArticles: ${itemCount}`,
+        });
+      } catch (error) {
+        console.log(error);
+      }
+      return;
+    }
+
     try {
-      await Share.share({
-        message: `Reçu de commande pour ${client?.name}\nTotal: ${totalAmount.toFixed(2)} DH\nPayé: ${paidAmount.toFixed(2)} DH\nReste: ${remainingAmount.toFixed(2)} DH`,
+      const pdfUrl = adminApi.getOrderPdfUrl(editingOrderId);
+      const fileName = `recu_commande_${editingOrderId}.pdf`;
+      const localUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      
+      if (download.status !== 200) {
+        throw new Error('Échec du téléchargement');
+      }
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Erreur', 'Le partage n\'est pas disponible sur cet appareil');
+        return;
+      }
+
+      await Sharing.shareAsync(download.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Partager le reçu de commande',
+        UTI: 'com.adobe.pdf',
       });
-    } catch (error) {
-      console.log(error);
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de générer ou de partager le PDF');
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!editingOrderId) {
+      return Alert.alert('Information', 'Veuillez d\'abord enregistrer la commande pour l\'imprimer.');
+    }
+    const pdfUrl = adminApi.getOrderPdfUrl(editingOrderId);
+    const localUri = `${FileSystem.cacheDirectory}receipt_${editingOrderId}.pdf`;
+
+    try {
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      if (download.status !== 200) throw new Error('Download failed');
+      await Print.printAsync({ uri: download.uri });
+    } catch (e) {
+      WebBrowser.openBrowserAsync(pdfUrl);
     }
   };
 
@@ -267,7 +318,7 @@ export default function OrderItemsScreen() {
         <Text style={styles.actionText}>Partager</Text>
       </TouchableOpacity>
       
-      <TouchableOpacity style={styles.actionBtn}>
+      <TouchableOpacity style={styles.actionBtn} onPress={handlePrint}>
         <View style={[styles.actionIcon, { backgroundColor: '#F3E5F5' }]}>
           <Ionicons name="print" size={20} color="#7B1FA2" />
         </View>

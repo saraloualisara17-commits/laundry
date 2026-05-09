@@ -32,7 +32,7 @@ export default function OrderSummaryScreen() {
     mode, client, items, totalAmount, orderNotes, setOrderNotes,
     deliveryType, livreurId, scheduledDate, paymentMethod, setPaymentMethod,
     paidAmount, remainingAmount,
-    clearOrder 
+    clearOrder, editingOrderId 
   } = useOrderCreation();
   
   const [loading, setLoading] = useState(false);
@@ -53,18 +53,21 @@ export default function OrderSummaryScreen() {
 
     setLoading(true);
     try {
-      // 1. Upload Images if any
+      // 1. Upload Images if any (only local ones)
       const itemsWithRemoteImages = await Promise.all(items.map(async (item) => {
-        if (item.imageUrls && item.imageUrls.length > 0) {
-          const localImages = item.imageUrls.map(uri => ({
-            uri,
-            name: `item_${Date.now()}.jpg`,
-            type: 'image/jpeg'
-          }));
+        const localImages = (item.imageUrls || []).filter(uri => uri.startsWith('file://')).map(uri => ({
+          uri,
+          name: `item_${Date.now()}.jpg`,
+          type: 'image/jpeg'
+        }));
+
+        const existingRemoteImages = (item.imageUrls || []).filter(uri => !uri.startsWith('file://'));
+
+        if (localImages.length > 0) {
           const uploadRes = await adminApi.uploadFiles(localImages);
-          return { ...item, remoteImageUrls: uploadRes.data };
+          return { ...item, remoteImageUrls: [...existingRemoteImages, ...uploadRes.data] };
         }
-        return { ...item, remoteImageUrls: [] };
+        return { ...item, remoteImageUrls: existingRemoteImages };
       }));
 
       const payload = {
@@ -94,25 +97,33 @@ export default function OrderSummaryScreen() {
         }))
       };
 
-      const res = await adminApi.createOrder(payload);
-      const order = res.data.data || res.data;
-      
-      clearOrder();
+      if (editingOrderId) {
+        await adminApi.updateOrder(editingOrderId, payload);
+        Alert.alert('Succès', 'Commande mise à jour');
+        clearOrder();
+        router.dismissAll();
+        router.push(`/order/${editingOrderId}`);
+      } else {
+        const res = await adminApi.createOrder(payload);
+        const order = res.data.data || res.data;
+        
+        clearOrder();
 
-      router.push({
-        pathname: '/(admin)/order-confirmation',
-        params: {
-          orderId: order.id.toString(),
-          reference: order.numeroCommande,
-          clientName: client?.name,
-          total: totalAmount.toFixed(2),
-          paid: paidAmount.toFixed(2),
-          remaining: remainingAmount.toFixed(2)
-        }
-      });
+        router.push({
+          pathname: '/(admin)/order-confirmation',
+          params: {
+            orderId: order.id.toString(),
+            reference: order.numeroCommande,
+            clientName: client?.name,
+            total: totalAmount.toFixed(2),
+            paid: paidAmount.toFixed(2),
+            remaining: remainingAmount.toFixed(2)
+          }
+        });
+      }
     } catch (error: any) {
-      console.error('Order creation error:', error);
-      Alert.alert('Erreur', error.response?.data?.message || 'Une erreur est survenue lors de la création');
+      console.error('Order submission error:', error);
+      Alert.alert('Erreur', error.response?.data?.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
@@ -125,7 +136,7 @@ export default function OrderSummaryScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Récapitulatif</Text>
+        <Text style={styles.headerTitle}>{editingOrderId ? 'Modifier Commande' : 'Récapitulatif'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -261,7 +272,7 @@ export default function OrderSummaryScreen() {
         >
           {loading ? <ActivityIndicator color="white" /> : (
             <>
-              <Text style={styles.submitBtnText}>Créer la commande</Text>
+              <Text style={styles.submitBtnText}>{editingOrderId ? 'Mettre à jour' : 'Créer la commande'}</Text>
               <Ionicons name="checkmark-circle" size={20} color="white" style={{ marginLeft: 8 }} />
             </>
           )}

@@ -7,18 +7,7 @@ import { clearSelectedClient } from '../../src/store/adminSlice';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Radius, StatusColors } from '../../constants/theme';
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const normalizedStatus = status?.toLowerCase().replace(' ', '_') || 'en_attente';
-  const config = StatusColors[normalizedStatus] || StatusColors.en_attente;
-
-  return (
-    <View style={[styles.statusBadge, { backgroundColor: config.bg, borderColor: config.border }]}>
-      <View style={[styles.statusDot, { backgroundColor: config.dot }]} />
-      <Text style={[styles.statusText, { color: config.text }]}>{status?.toUpperCase()}</Text>
-    </View>
-  );
-};
+import { StatusBadge } from '../../components/admin/StatusBadge';
 
 export default function ClientDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -271,18 +260,6 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateText: { fontSize: 12, color: Colors.textMuted },
   
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    gap: 4,
-  },
-  statusDot: { width: 5, height: 5, borderRadius: 2.5 },
-  statusText: { fontSize: 9, fontWeight: Typography.weight.bold },
-
   orderFooter: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 

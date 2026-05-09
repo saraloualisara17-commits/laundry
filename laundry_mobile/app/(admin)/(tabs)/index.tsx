@@ -70,7 +70,6 @@ export default function AdminDashboard() {
   const [isLoadingOverview, setIsLoadingOverview] = useState(true);
   const [overviewError, setOverviewError] = useState(false);
 
-  const unpaidBorderAnim = React.useRef(new Animated.Value(0)).current;
   const readyPulsingAnim = useRef(new Animated.Value(1)).current;
   const unpaidPulseAnim = useRef(new Animated.Value(0)).current;
 
@@ -111,27 +110,6 @@ export default function AdminDashboard() {
       fetchData();
     }, [])
   );
-
-  React.useEffect(() => {
-    if (stats?.unpaid?.amount && stats.unpaid.amount > 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(unpaidBorderAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(unpaidBorderAnim, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: false,
-          })
-        ])
-      ).start();
-    } else {
-      unpaidBorderAnim.setValue(0);
-    }
-  }, [stats?.unpaid?.amount]);
 
   // READY_FOR_DELIVERY pulsing
   useEffect(() => {
@@ -177,11 +155,6 @@ export default function AdminDashboard() {
       unpaidPulseAnim.setValue(0);
     }
   }, [unpaidOverview?.totalRemaining]);
-
-  const unpaidBorderColor = unpaidBorderAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(239,68,68,0.3)', 'rgba(239,68,68,0.7)']
-  });
 
   const fetchData = async () => {
     if (!user) return;
@@ -318,67 +291,20 @@ export default function AdminDashboard() {
           
           <View style={styles.heroGrid}>
             <View style={styles.heroGridItem}>
-              <Text style={styles.gridLabel}>REVENUS</Text>
-              <Text style={[styles.gridValue, { color: '#E2C06E' }]}>
+              <Text style={styles.gridLabel}>REVENUS ENCAISSÉS</Text>
+              <Text style={[styles.gridValue, { color: '#6EE7B7' }]}>
                 {stats?.revenueToday?.toLocaleString() || 0} DH
               </Text>
             </View>
             <View style={styles.gridDivider} />
             <View style={styles.heroGridItem}>
-              <Text style={styles.gridLabel}>EN ATTENTE</Text>
-              <Text style={[styles.gridValue, { color: '#FCD34D' }]}>
-                {stats?.pendingCount || 0}
-              </Text>
-            </View>
-            <View style={styles.gridDivider} />
-            <View style={styles.heroGridItem}>
-              <Text style={styles.gridLabel}>PRÊTES</Text>
-              <Text style={[styles.gridValue, { color: '#6EE7B7' }]}>
-                {stats?.readyCount || 0}
+              <Text style={styles.gridLabel}>TOTAL CLIENTS</Text>
+              <Text style={[styles.gridValue, { color: 'white' }]}>
+                {stats?.clientsCount || 0}
               </Text>
             </View>
           </View>
         </View>
-
-        {/* Unpaid Card */}
-        {stats?.unpaid && (
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            onPress={() => router.push('/(admin)/unpaid-orders')}
-          >
-            <Animated.View style={[
-              styles.unpaidCard, 
-              { borderColor: stats.unpaid.amount > 0 ? unpaidBorderColor : 'rgba(0,0,0,0.07)' }
-            ]}>
-              <View style={styles.unpaidTop}>
-                <View style={styles.unpaidIconCircle}>
-                  <Text style={styles.unpaidIconEmoji}>💰</Text>
-                </View>
-                <View style={styles.unpaidTextCol}>
-                  <Text style={styles.unpaidTitle}>Soldes impayés</Text>
-                  <Text style={styles.unpaidSubtitle}>
-                    {stats.unpaid.clientsCount} client(s) concerné(s)
-                  </Text>
-                </View>
-                <View style={styles.unpaidAmountCol}>
-                  <Text style={[
-                    styles.unpaidAmountValue, 
-                    { color: stats.unpaid.amount > 0 ? '#EF4444' : '#10B981' }
-                  ]}>
-                    {stats.unpaid.amount.toLocaleString()} DH
-                  </Text>
-                  <Text style={styles.unpaidAmountLabel}>à encaisser</Text>
-                </View>
-              </View>
-              <View style={styles.unpaidBottom}>
-                <Text style={styles.unpaidBottomText}>
-                  {stats.unpaid.count} commandes with solde restant
-                </Text>
-                <Text style={styles.unpaidBottomAction}>Voir →</Text>
-              </View>
-            </Animated.View>
-          </TouchableOpacity>
-        )}
 
         {/* Quick Actions Grid - Top Part */}
         <View style={styles.actionsGrid}>

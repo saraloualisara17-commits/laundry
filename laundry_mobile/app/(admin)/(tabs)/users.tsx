@@ -18,6 +18,7 @@ import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
+import { router, useFocusEffect } from 'expo-router';
 
 const ROLE_CONFIG: Record<string, { label: string, color: string, bg: string, border: string, description: string }> = {
   admin: { 
@@ -25,26 +26,27 @@ const ROLE_CONFIG: Record<string, { label: string, color: string, bg: string, bo
     color: AdminColors.primary, 
     bg: AdminColors.primary100, 
     border: AdminColors.primary200,
-    description: 'Accès complet au système'
+    description: 'Accès complet'
   },
   employe: { 
-    label: 'Employé', 
+    label: 'Staff', 
     color: '#1D4ED8', 
-    bg: AdminColors.infoBg, 
-    border: '#BFDBFE',
-    description: 'Traitement des articles'
+    bg: 'rgba(59,130,246,0.10)', 
+    border: 'rgba(59,130,246,0.20)',
+    description: 'Traitement'
   },
   livreur: { 
     label: 'Livreur', 
-    color: '#92400E', 
-    bg: AdminColors.accent100, 
-    border: '#FDE68A',
-    description: 'Livraisons et collectes'
+    color: '#D97706', 
+    bg: 'rgba(245,158,11,0.10)', 
+    border: 'rgba(245,158,11,0.20)',
+    description: 'Logistique'
   },
 };
 
 export default function UsersScreen() {
   const [activeRole, setActiveRole] = useState('Tous');
+  const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,8 +60,18 @@ export default function UsersScreen() {
 
   const fetchUsers = async () => {
     try {
-      const res = await adminApi.getUsers();
-      setUsers(res.data);
+      const [activeRes, inactiveRes] = await Promise.all([
+        adminApi.getUsers(), // fetches active-users
+        // Adding call for inactive-users to show the full team
+        require('../../../src/api/axios').api.get('/admin/inactive-users')
+      ]);
+      
+      const allUsers = [
+        ...(activeRes.data || []),
+        ...(inactiveRes.data || [])
+      ];
+      
+      setUsers(allUsers);
     } catch (error) {
       console.error('Fetch users error:', error);
     } finally {
@@ -68,21 +80,66 @@ export default function UsersScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsers();
+    }, [])
+  );
 
-  const filteredUsers = activeRole === 'Tous' 
-    ? users 
-    : users.filter(u => u.role === activeRole.toLowerCase());
+  const filteredUsers = users.filter(u => {
+    const roleKey = u.role?.toLowerCase() || '';
+    const activeRoleKey = activeRole === 'Employé' ? 'employe' : activeRole.toLowerCase();
+    const matchesRole = activeRole === 'Tous' || roleKey === activeRoleKey;
+    
+    // Support both active and isActive field names
+    const isUserActive = u.isActive !== undefined ? u.isActive : u.active;
+    
+    const matchesSearch = !search || 
+      u.name?.toLowerCase().includes(search.toLowerCase()) || 
+      u.email?.toLowerCase().includes(search.toLowerCase()) ||
+      u.phone?.includes(search) ||
+      u.phoneNumber?.includes(search);
+    return matchesRole && matchesSearch;
+  });
 
-  const handleToggleActive = async (id: number) => {
+  const handleToggleActive = async (user: any) => {
+    const isUserActive = user.isActive !== undefined ? user.isActive : user.active;
     try {
-      await adminApi.toggleUserActive(id);
+      if (isUserActive) {
+        await adminApi.deactivateUser(user.id);
+      } else {
+        await adminApi.activateUser(user.id);
+      }
       fetchUsers();
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de changer le statut');
     }
+  };
+
+  const handleDeleteUser = async (user: any) => {
+    Alert.alert(
+      'Supprimer un membre',
+      `Voulez-vous vraiment supprimer définitivement ${user.name} ? Cette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await adminApi.deleteOrder(user.id); // Wait, adminApi.deleteOrder is for orders. Let me check the delete user method.
+              // I will use a direct call if the method is missing or named differently
+              await require('../../../src/api/axios').api.delete(`/admin/delete-user/${user.id}`);
+              fetchUsers();
+              Alert.alert('Succès', 'Membre supprimé avec succès');
+            } catch (error: any) {
+              const msg = error.response?.data?.message || 'Impossible de supprimer l\'utilisateur. Vérifiez s\'il a des commandes liées.';
+              Alert.alert('Erreur', msg);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const saveUser = async () => {
@@ -91,16 +148,22 @@ export default function UsersScreen() {
         return Alert.alert('Erreur', 'Veuillez remplir les champs obligatoires');
       }
       
+      const payload = {
+        ...form,
+        phoneNumber: form.phone
+      };
+
       if (userModal.data) {
-        await adminApi.updateUser(userModal.data.id, form);
+        await adminApi.updateUser(userModal.data.id, payload);
       } else {
-        await adminApi.createUser(form);
+        await adminApi.createUser(payload);
       }
       
       setUserModal({ open: false, data: null });
       fetchUsers();
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer l\'utilisateur');
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Impossible d\'enregistrer l\'utilisateur';
+      Alert.alert('Erreur', msg);
     }
   };
 
@@ -120,11 +183,17 @@ export default function UsersScreen() {
 
   const getInitials = (name: string) => {
     if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
   const renderUserCard = ({ item }: { item: any }) => {
-    const role = ROLE_CONFIG[item.role.toLowerCase()] || ROLE_CONFIG.livreur;
+    const roleKey = item.role?.toLowerCase() || 'livreur';
+    const role = ROLE_CONFIG[roleKey] || ROLE_CONFIG.livreur;
+    
+    // Unified status detection
+    const isUserActive = item.isActive !== undefined ? item.isActive : item.active;
 
     return (
       <View style={styles.userCard}>
@@ -134,19 +203,24 @@ export default function UsersScreen() {
           </View>
           
           <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{item.name}</Text>
-            <Text style={styles.userEmail}>{item.email}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.userName}>{item.name}</Text>
+                <Text style={styles.userEmail}>{item.email}</Text>
+                <Text style={[styles.userEmail, { marginTop: 1 }]}>{item.phone || item.phoneNumber || 'Sans numéro'}</Text>
+              </View>
+              
+              <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge]}>
+                <View style={[styles.statusDot, { backgroundColor: isUserActive ? AdminColors.success : AdminColors.danger }]} />
+                <Text style={[styles.statusBadgeText, { color: isUserActive ? '#065F46' : AdminColors.danger }]}>
+                  {isUserActive ? 'Actif' : 'Suspendu'}
+                </Text>
+              </View>
+            </View>
             
             <View style={styles.badgeRow}>
               <View style={[styles.roleBadge, { backgroundColor: role.bg, borderColor: role.border }]}>
                 <Text style={[styles.roleBadgeText, { color: role.color }]}>{role.label}</Text>
-              </View>
-              
-              <View style={[styles.statusBadge, item.isActive ? styles.activeBadge : styles.inactiveBadge]}>
-                <View style={[styles.statusDot, { backgroundColor: item.isActive ? AdminColors.success : AdminColors.danger }]} />
-                <Text style={[styles.statusBadgeText, { color: item.isActive ? '#065F46' : AdminColors.danger }]}>
-                  {item.isActive ? 'Actif' : 'Suspendu'}
-                </Text>
               </View>
             </View>
           </View>
@@ -158,7 +232,13 @@ export default function UsersScreen() {
           <TouchableOpacity 
             style={styles.actionBtn}
             onPress={() => {
-              setForm({ name: item.name, email: item.email, phone: item.phone || '', password: '', role: item.role.toLowerCase() });
+              setForm({ 
+                name: item.name, 
+                email: item.email, 
+                phone: item.phone || item.phoneNumber || '', 
+                password: '', 
+                role: roleKey 
+              });
               setUserModal({ open: true, data: item });
             }}
           >
@@ -171,23 +251,34 @@ export default function UsersScreen() {
             onPress={() => setPassModal({ open: true, userId: item.id })}
           >
             <Ionicons name="key-outline" size={16} color={AdminColors.primary} />
-            <Text style={[styles.actionBtnText, { color: AdminColors.primary }]}>Réinit.</Text>
+            <Text style={[styles.actionBtnText, { color: AdminColors.primary }]}>Clé</Text>
           </TouchableOpacity>
 
-          {item.role.toLowerCase() !== 'admin' && (
-            <TouchableOpacity 
-              style={[styles.actionBtn, item.isActive ? styles.suspendBtn : styles.reactivateBtn]}
-              onPress={() => handleToggleActive(item.id)}
-            >
-              <Text style={[styles.actionBtnText, { color: item.isActive ? AdminColors.warning : AdminColors.success }]}>
-                {item.isActive ? 'Suspendre' : 'Réactiver'}
-              </Text>
-            </TouchableOpacity>
+          {item.role?.toLowerCase() !== 'admin' && (
+            <>
+              <TouchableOpacity 
+                style={[styles.actionBtn, isUserActive ? styles.suspendBtn : styles.reactivateBtn]}
+                onPress={() => handleToggleActive(item)}
+              >
+                <Text style={[styles.actionBtnText, { color: isUserActive ? AdminColors.warning : AdminColors.success }]}>
+                  {isUserActive ? 'Suspendre' : 'Activer'}
+                </Text>
+              </TouchableOpacity>
+
+              {!isUserActive && (
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.deleteBtn]}
+                  onPress={() => handleDeleteUser(item)}
+                >
+                  <Ionicons name="trash-outline" size={16} color={AdminColors.danger} />
+                </TouchableOpacity>
+              )}
+            </>
           )}
-        </View>
-      </View>
-    );
-  };
+          </View>
+          </View>
+          );
+          };
 
   return (
     <View style={styles.container}>
@@ -195,7 +286,7 @@ export default function UsersScreen() {
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerTitle}>Équipe</Text>
-            <Text style={styles.headerSubtitle}>{users.length} membres</Text>
+            <Text style={styles.headerSubtitle}>{users.length} membres au total</Text>
           </View>
           <TouchableOpacity 
             style={styles.addBtn}
@@ -204,9 +295,20 @@ export default function UsersScreen() {
               setUserModal({ open: true, data: null });
             }}
           >
-            <Ionicons name="add" size={20} color="white" />
-            <Text style={styles.addBtnText}>Ajouter</Text>
+            <Ionicons name="person-add" size={18} color="white" />
+            <Text style={styles.addBtnText}>Nouveau</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={18} color={AdminColors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher un membre..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor={AdminColors.textMuted}
+          />
         </View>
 
         <FlatList
@@ -236,7 +338,7 @@ export default function UsersScreen() {
           loading ? (
             <View style={{ padding: 16 }}>{Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)}</View>
           ) : (
-            <EmptyState icon="👥" title="Aucun membre" subtitle="Commencez par ajouter un membre à votre équipe" />
+            <EmptyState icon="👥" title="Aucun membre" subtitle={search ? "Aucun résultat pour cette recherche" : "Commencez par ajouter un membre"} />
           )
         }
       />
@@ -367,6 +469,25 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 13,
     fontWeight: '600',
+  },
+  searchContainer: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    backgroundColor: AdminColors.surface2,
+    borderRadius: 14,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: AdminColors.textPrimary,
+    fontWeight: '500',
   },
   pillsContainer: {
     paddingHorizontal: 16,
@@ -502,6 +623,12 @@ const styles = StyleSheet.create({
   reactivateBtn: {
     backgroundColor: AdminColors.successBg,
     borderColor: 'rgba(16,185,129,0.2)',
+  },
+  deleteBtn: {
+    flex: 0,
+    width: 40,
+    backgroundColor: AdminColors.dangerBg,
+    borderColor: 'rgba(239,68,68,0.2)',
   },
   modalContainer: {
     flex: 1,

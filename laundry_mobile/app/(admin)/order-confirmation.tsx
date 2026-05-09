@@ -10,13 +10,20 @@ import {
   Platform,
   Dimensions,
   ScrollView,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { adminApi } from '../../src/services/adminApi';
+import * as WebBrowser from 'expo-web-browser';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import { store } from '../../src/store/store';
 
 export default function OrderConfirmationScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +37,8 @@ export default function OrderConfirmationScreen() {
     remaining: string
   }>();
 
+  const [sharing, setSharing] = React.useState(false);
+  const [viewing, setViewing] = React.useState(false);
   const checkScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -51,9 +60,62 @@ export default function OrderConfirmationScreen() {
     router.replace('/(admin)/create-order');
   };
 
-  const sendWhatsApp = () => {
-    const msg = `Bonjour ${params.clientName || 'Cher client'}, votre commande #${params.reference} a bien été enregistrée pour un montant de ${params.total} DH. Merci de votre confiance !`;
-    Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
+  const handleSharePdf = async () => {
+    if (!params.orderId) return;
+    setSharing(true);
+    try {
+      const token = store.getState().auth.token;
+      const pdfUrl = adminApi.getOrderPdfUrl(params.orderId);
+      const localUri = `${FileSystem.cacheDirectory}recu_${params.reference}.pdf`;
+
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (download.status !== 200) throw new Error('Échec du téléchargement');
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Erreur', 'Partage non disponible');
+        return;
+      }
+
+      await Sharing.shareAsync(download.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Envoyer le reçu',
+        UTI: 'com.adobe.pdf',
+      });
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de générer le PDF');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleViewPdf = async () => {
+    if (!params.orderId) return;
+    setViewing(true);
+    try {
+      const token = store.getState().auth.token;
+      const pdfUrl = adminApi.getOrderPdfUrl(params.orderId);
+      const localUri = `${FileSystem.cacheDirectory}preview_${params.reference}.pdf`;
+
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (download.status === 200) {
+        await Print.printAsync({ uri: download.uri });
+      } else {
+        await WebBrowser.openBrowserAsync(pdfUrl);
+      }
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir le PDF');
+    } finally {
+      setViewing(false);
+    }
   };
 
   return (
@@ -105,9 +167,19 @@ export default function OrderConfirmationScreen() {
 
           <Text style={styles.sectionTitle}>Envoyer le reçu</Text>
           
-          <TouchableOpacity style={styles.whatsappBtn} onPress={sendWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={24} color="white" />
-            <Text style={styles.whatsappBtnText}>Envoyer sur WhatsApp</Text>
+          <TouchableOpacity 
+            style={[styles.whatsappBtn, sharing && { opacity: 0.7 }]} 
+            onPress={handleSharePdf}
+            disabled={sharing}
+          >
+            {sharing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="logo-whatsapp" size={24} color="white" />
+                <Text style={styles.whatsappBtnText}>Envoyer sur WhatsApp</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.ghostBtn} onPress={() => Alert.alert('Email', 'Envoi d\'email bientôt disponible')}>
@@ -115,9 +187,19 @@ export default function OrderConfirmationScreen() {
             <Text style={styles.ghostBtnText}>Envoyer par email</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.ghostBtn} onPress={() => Alert.alert('PDF', 'Génération PDF bientôt disponible')}>
-            <Ionicons name="print-outline" size={22} color={AdminColors.primary} />
-            <Text style={styles.ghostBtnText}>Voir le reçu PDF</Text>
+          <TouchableOpacity 
+            style={[styles.ghostBtn, viewing && { opacity: 0.7 }]} 
+            onPress={handleViewPdf}
+            disabled={viewing}
+          >
+            {viewing ? (
+              <ActivityIndicator color={AdminColors.primary} />
+            ) : (
+              <>
+                <Ionicons name="print-outline" size={22} color={AdminColors.primary} />
+                <Text style={styles.ghostBtnText}>Voir le reçu PDF</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <View style={styles.actions}>

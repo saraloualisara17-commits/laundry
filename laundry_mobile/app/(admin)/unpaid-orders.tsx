@@ -58,19 +58,19 @@ export default function UnpaidOrdersScreen() {
   const openWhatsApp = async (phone: string, clientName: string, amount: number, orderCount: number) => {
     if (!phone) return;
     
-    // Format phone for WhatsApp
-    let waPhone = phone;
-    if (waPhone.startsWith('0')) {
-      waPhone = '+212' + waPhone.slice(1);
+    // Format phone for WhatsApp wa.me (digits only)
+    let waPhone = phone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      waPhone = '212' + phone.slice(1).replace(/\D/g, '');
     }
     
     const text = `Bonjour ${clientName},\nVous avez un solde restant de ${amount} DH sur ${orderCount} commande(s).\nMerci de régulariser votre situation.`;
     const encodedText = encodeURIComponent(text);
     
     try {
-      await Linking.openURL(`whatsapp://send?phone=${waPhone}&text=${encodedText}`);
-    } catch (e) {
       await Linking.openURL(`https://wa.me/${waPhone}?text=${encodedText}`);
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
     }
   };
 
@@ -202,7 +202,10 @@ export default function UnpaidOrdersScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Impayés</Text>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={styles.headerTitle}>Impayés</Text>
+          <Text style={{ fontSize: 11, color: AdminColors.textSecondary }}>Commandes livrées avec solde restant</Text>
+        </View>
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>
             {overview?.totalRemaining || 0} DH
@@ -264,8 +267,14 @@ export default function UnpaidOrdersScreen() {
           contentContainerStyle={styles.listContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 40 }}>
-              <Text style={{ color: AdminColors.textSecondary }}>Aucun solde impayé trouvé.</Text>
+            <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 40 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>🎉</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary, textAlign: 'center' }}>
+                Tous les paiements sont à jour
+              </Text>
+              <Text style={{ fontSize: 14, color: AdminColors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+                Aucune commande livrée avec solde impayé
+              </Text>
             </View>
           }
         />

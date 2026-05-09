@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import { setCredentials } from '../src/store/authSlice';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { OrderCreationProvider } from '../src/context/OrderCreationContext';
 
 function RootLayoutNav() {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -83,7 +84,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Provider store={store}>
-        <RootLayoutNav />
+        <OrderCreationProvider>
+          <RootLayoutNav />
+        </OrderCreationProvider>
       </Provider>
     </GestureHandlerRootView>
   );

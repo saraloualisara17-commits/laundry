@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { 
   View, 
   Text, 
@@ -13,11 +14,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   SafeAreaView,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
+import { BASE_URL } from '../../../src/api/axios';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 
@@ -36,25 +39,26 @@ export default function CatalogScreen() {
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Modal states
   const [categoryModal, setCategoryModal] = useState({ open: false, data: null as any });
   const [productModal, setProductModal] = useState({ open: false, categoryId: null as number | null, data: null as any });
   
-  const [catForm, setCatForm] = useState({ nom: '', nomAr: '', icon: '🧺' });
+  const [catForm, setCatForm] = useState({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
   const [prodForm, setProdForm] = useState({ 
     nom: '', 
     description: '', 
     pricingMethod: 'PER_UNIT', 
     prixUnitaire: '', 
     uniteLabel: 'pièce',
-    processingDays: 2 
+    processingDays: 2,
+    imageUrl: ''
   });
 
   const fetchData = async () => {
     try {
       const res = await adminApi.getCategories();
-      // Backend returns { success: true, data: [...] } based on previous logic
       setCategories(res.data.data || res.data);
     } catch (error) {
       console.error('Fetch catalog error:', error);
@@ -89,6 +93,44 @@ export default function CatalogScreen() {
       fetchData();
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de changer le statut');
+    }
+  };
+
+  const pickImage = async (type: 'category' | 'product') => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      const file = result.assets[0];
+      uploadImage(file, type);
+    }
+  };
+
+  const uploadImage = async (file: any, type: 'category' | 'product') => {
+    setIsUploading(true);
+    try {
+      const res = await adminApi.uploadFiles([{
+        uri: file.uri,
+        name: `upload_${Date.now()}.jpg`,
+        type: 'image/jpeg'
+      }]);
+      
+      const imageUrl = res.data[0]?.imageUrl;
+      if (imageUrl) {
+        if (type === 'category') {
+          setCatForm(prev => ({ ...prev, imageUrl }));
+        } else {
+          setProdForm(prev => ({ ...prev, imageUrl }));
+        }
+      }
+    } catch (error) {
+      Alert.alert('Erreur', 'Échec de l\'envoi de l\'image');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -135,6 +177,14 @@ export default function CatalogScreen() {
     const method = PRICING_METHODS[product.pricingMethod] || PRICING_METHODS.PER_UNIT;
     return (
       <View key={product.id} style={[styles.productRow, !product.isActive && { opacity: 0.6 }]}>
+        <View style={styles.productIconBox}>
+          {product.imageUrl ? (
+            <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${product.imageUrl}` }} style={styles.productImg} />
+          ) : (
+            <Ionicons name="cube-outline" size={20} color={AdminColors.primary} />
+          )}
+        </View>
+
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.nom}</Text>
           <View style={[styles.pricingBadge, { backgroundColor: method.color + '15' }]}>
@@ -161,7 +211,8 @@ export default function CatalogScreen() {
             pricingMethod: product.pricingMethod,
             prixUnitaire: product.prixUnitaire?.toString() || '',
             uniteLabel: product.uniteLabel || 'pièce',
-            processingDays: product.processingDays || 2
+            processingDays: product.processingDays || 2,
+            imageUrl: product.imageUrl || ''
           });
           setProductModal({ open: true, categoryId: null, data: product });
         }}>
@@ -182,7 +233,11 @@ export default function CatalogScreen() {
           activeOpacity={0.8}
         >
           <View style={styles.catIconBox}>
-            <Text style={{ fontSize: 22 }}>{item.icon || '📦'}</Text>
+            {item.imageUrl ? (
+              <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${item.imageUrl}` }} style={styles.catImg} />
+            ) : (
+              <Text style={{ fontSize: 22 }}>{item.icon || '📦'}</Text>
+            )}
           </View>
           
           <View style={{ flex: 1 }}>
@@ -198,7 +253,7 @@ export default function CatalogScreen() {
               thumbColor="white"
             />
             <TouchableOpacity onPress={() => {
-              setCatForm({ nom: item.nom, nomAr: item.nomAr || '', icon: item.icon || '🧺' });
+              setCatForm({ nom: item.nom, nomAr: item.nomAr || '', icon: item.icon || '🧺', imageUrl: item.imageUrl || '' });
               setCategoryModal({ open: true, data: item });
             }}>
               <Ionicons name="pencil" size={18} color={AdminColors.textMuted} />
@@ -214,7 +269,7 @@ export default function CatalogScreen() {
             <TouchableOpacity 
               style={styles.addProductBtn}
               onPress={() => {
-                setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: 'pièce', processingDays: 2 });
+                setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: 'pièce', processingDays: 2, imageUrl: '' });
                 setProductModal({ open: true, categoryId: item.id, data: null });
               }}
             >
@@ -234,7 +289,7 @@ export default function CatalogScreen() {
           <TouchableOpacity 
             style={styles.addCatBtn}
             onPress={() => {
-              setCatForm({ nom: '', nomAr: '', icon: '🧺' });
+              setCatForm({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
               setCategoryModal({ open: true, data: null });
             }}
           >
@@ -273,6 +328,31 @@ export default function CatalogScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
+              <Text style={styles.label}>Image de la catégorie (Optionnel)</Text>
+              <View style={styles.imagePickerContainer}>
+                {catForm.imageUrl ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${catForm.imageUrl}` }} style={styles.imagePreview} />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => setCatForm({ ...catForm, imageUrl: '' })}>
+                      <Ionicons name="close-circle" size={24} color={AdminColors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.pickImageBtn} onPress={() => pickImage('category')} disabled={isUploading}>
+                    {isUploading ? (
+                      <ActivityIndicator color={AdminColors.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="camera-outline" size={32} color={AdminColors.textMuted} />
+                        <Text style={styles.pickImageText}>Ajouter une image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.formField}>
               <Text style={styles.label}>Nom de la catégorie</Text>
               <TextInput 
                 style={styles.input} 
@@ -292,7 +372,7 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Icône</Text>
+              <Text style={styles.label}>Icône (si pas d'image)</Text>
               <View style={styles.iconGrid}>
                 {ICONS.map(icon => (
                   <TouchableOpacity 
@@ -324,6 +404,31 @@ export default function CatalogScreen() {
           </View>
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+            <View style={styles.formField}>
+              <Text style={styles.label}>Image du produit (Optionnel)</Text>
+              <View style={styles.imagePickerContainer}>
+                {prodForm.imageUrl ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${prodForm.imageUrl}` }} style={styles.imagePreview} />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => setProdForm({ ...prodForm, imageUrl: '' })}>
+                      <Ionicons name="close-circle" size={24} color={AdminColors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.pickImageBtn} onPress={() => pickImage('product')} disabled={isUploading}>
+                    {isUploading ? (
+                      <ActivityIndicator color={AdminColors.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="camera-outline" size={32} color={AdminColors.textMuted} />
+                        <Text style={styles.pickImageText}>Ajouter une image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
             <View style={styles.formField}>
               <Text style={styles.label}>Nom du produit</Text>
               <TextInput 
@@ -473,6 +578,12 @@ const styles = StyleSheet.create({
     backgroundColor: AdminColors.primary100,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  catImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   catName: {
     fontSize: 16,
@@ -504,6 +615,20 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
+  },
+  productIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: AdminColors.primary50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   productInfo: {
     flex: 1,
@@ -588,6 +713,44 @@ const styles = StyleSheet.create({
     color: AdminColors.textPrimary,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
+  },
+  imagePickerContainer: {
+    marginTop: 4,
+  },
+  pickImageBtn: {
+    height: 100,
+    borderRadius: 14,
+    backgroundColor: AdminColors.surface2,
+    borderWidth: 1.5,
+    borderColor: AdminColors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  pickImageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AdminColors.textMuted,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    height: 120,
+    width: 120,
+    alignSelf: 'center',
+  },
+  imagePreview: {
+    height: '100%',
+    width: '100%',
+    borderRadius: 14,
+    backgroundColor: AdminColors.surface2,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: 'white',
+    borderRadius: 12,
   },
   iconGrid: {
     flexDirection: 'row',

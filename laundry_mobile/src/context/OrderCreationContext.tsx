@@ -58,6 +58,7 @@ interface OrderCreationContextType {
   paymentMethod: string | null;
   paidAmount: number;
   pendingLocation: PendingLocation | null;
+  editingOrderId: number | string | null;
   
   setMode: (mode: OrderMode | null) => void;
   setClient: (client: ClientData | null) => void;
@@ -71,6 +72,8 @@ interface OrderCreationContextType {
   setPaymentMethod: (method: string | null) => void;
   setPaidAmount: (amount: number) => void;
   setPendingLocation: (loc: PendingLocation | null) => void;
+  setEditingOrderId: (id: number | string | null) => void;
+  loadOrderForEditing: (order: any) => void;
   clearOrder: () => void;
   
   totalAmount: number;
@@ -93,6 +96,7 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [paidAmount, setPaidAmount] = useState(0);
   const [pendingLocation, setPendingLocation] = useState<PendingLocation | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<number | string | null>(null);
 
   const totalAmount = useMemo(() => items.reduce((sum, item) => sum + item.prixFinal, 0), [items]);
   const itemCount = items.length;
@@ -112,6 +116,46 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateItem = (cartId: string, updatedItem: OrderItem) => 
     setItems(prev => prev.map(item => item.cartId === cartId ? updatedItem : item));
 
+  const loadOrderForEditing = (order: any) => {
+    setEditingOrderId(order.id);
+    setMode(order.mode || 'immediate');
+    setClient({
+        id: order.client?.id,
+        name: order.client?.name,
+        phone: order.client?.phone || (order.client?.phones?.[0]?.phoneNumber),
+        address: order.client?.addresses?.[0]?.address,
+        latitude: order.client?.addresses?.[0]?.latitude ? parseFloat(order.client.addresses[0].latitude) : undefined,
+        longitude: order.client?.addresses?.[0]?.longitude ? parseFloat(order.client.addresses[0].longitude) : undefined
+    });
+    setDeliveryType(order.deliveryType);
+    setLivreur(order.livreur?.id || null);
+    setScheduledDate(order.scheduledPickupDate);
+    setOrderNotes(order.notes || '');
+    setPaymentMethod(order.modePaiement);
+    setPaidAmount(parseFloat(order.montantPaye || 0));
+    
+    // Map items
+    const mappedItems: OrderItem[] = (order.commandeTapis || []).map((t: any) => ({
+        cartId: `edit_${t.id}`,
+        productId: t.productId,
+        nom: t.productNom,
+        quantite: t.quantite,
+        largeur: t.largeur ? parseFloat(t.largeur) : undefined,
+        hauteur: t.hauteur ? parseFloat(t.hauteur) : undefined,
+        longueur: t.longueur ? parseFloat(t.longueur) : undefined,
+        poids: t.poids ? parseFloat(t.poids) : undefined,
+        prixUnitaire: parseFloat(t.prixUnitaire),
+        prixFinal: parseFloat(t.prixFinal),
+        remiseMontant: parseFloat(t.remiseMontant || 0),
+        remiseRaison: t.remiseRaison,
+        couleur: t.couleur,
+        notes: t.notes,
+        pricingMethod: t.productPricingMethod,
+        imageUrls: (t.images || []).map((img: any) => img.imageUrl) // Remote URLs will be kept as strings
+    }));
+    setItems(mappedItems);
+  };
+
   const clearOrder = () => {
     setMode(null);
     setClient(null);
@@ -123,12 +167,14 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setPaymentMethod(null);
     setPaidAmount(0);
     setPendingLocation(null);
+    setEditingOrderId(null);
   };
 
   const value = {
-    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, paymentMethod, paidAmount, pendingLocation,
+    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, paymentMethod, paidAmount, pendingLocation, editingOrderId,
     setMode, setClient, setDeliveryType, setLivreur, setScheduledDate,
-    addItem, removeItem, updateItem, setOrderNotes, setPaymentMethod, setPaidAmount, setPendingLocation, clearOrder,
+    addItem, removeItem, updateItem, setOrderNotes, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId,
+    loadOrderForEditing, clearOrder,
     totalAmount, itemCount, totalArea, totalCarpets, remainingAmount
   };
 

@@ -55,18 +55,19 @@ export default function ClientDebtDetailScreen() {
   const openWhatsApp = async () => {
     if (!clientData?.clientPhone) return;
     
-    let waPhone = clientData.clientPhone;
-    if (waPhone.startsWith('0')) {
-      waPhone = '+212' + waPhone.slice(1);
+    // Format phone for WhatsApp wa.me (digits only)
+    let waPhone = clientData.clientPhone.replace(/\D/g, '');
+    if (clientData.clientPhone.startsWith('0')) {
+      waPhone = '212' + clientData.clientPhone.slice(1).replace(/\D/g, '');
     }
     
     const text = `Bonjour ${clientData.clientName},\nVous avez un solde restant de ${clientData.totalRemaining} DH sur ${clientData.orderCount} commande(s).\nMerci de régulariser votre situation.`;
     const encodedText = encodeURIComponent(text);
     
     try {
-      await Linking.openURL(`whatsapp://send?phone=${waPhone}&text=${encodedText}`);
-    } catch (e) {
       await Linking.openURL(`https://wa.me/${waPhone}?text=${encodedText}`);
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
     }
   };
 

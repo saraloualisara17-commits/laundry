@@ -15,7 +15,7 @@ import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 export default function ClientsScreen() {
   const [search, setSearch] = useState('');
@@ -26,20 +26,21 @@ export default function ClientsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const searchTimeout = React.useRef<any>(null);
 
-  const fetchClients = async (pageNum: number, isRefresh: boolean = false) => {
+  const fetchClients = async (pageNum: number, isRefresh: boolean = false, currentSearch?: string) => {
     try {
-      if (pageNum === 0) setLoading(true);
-      else setLoadingMore(true);
+      if (pageNum === 0 && !isRefresh) setLoading(true);
+      if (pageNum > 0) setLoadingMore(true);
 
       const params = {
-        search: search.length > 2 ? search : undefined,
+        search: currentSearch && currentSearch.length > 1 ? currentSearch : undefined,
         page: pageNum,
         limit: 20
       };
 
       const res = await adminApi.getClients(params);
-      const newClients = res.data.content || res.data;
+      const newClients = res.data.content || res.data || [];
       
       if (isRefresh || pageNum === 0) {
         setClients(newClients);
@@ -58,33 +59,62 @@ export default function ClientsScreen() {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchClients(0, true, search);
+    }, [])
+  );
+
   useEffect(() => {
-    fetchClients(0, true);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    
+    searchTimeout.current = setTimeout(() => {
+      setPage(0);
+      fetchClients(0, true, search);
+    }, 400);
+
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
   }, [search]);
 
   const onRefresh = () => {
     setRefreshing(true);
     setPage(0);
-    fetchClients(0, true);
+    fetchClients(0, true, search);
   };
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchClients(nextPage);
+      fetchClients(nextPage, false, search);
     }
   };
 
   const getInitials = (name: string) => {
     if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const getClientPhone = (item: any) => {
+    if (item.phone) return item.phone;
+    if (item.phones && item.phones.length > 0) return item.phones[0].phoneNumber;
+    return 'Pas de numéro';
+  };
+
+  const getClientAddress = (item: any) => {
+    if (item.address) return item.address;
+    if (item.addresses && item.addresses.length > 0) return item.addresses[0].address;
+    return 'Pas d\'adresse';
   };
 
   const renderClientCard = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.clientCard}
-      onPress={() => router.push(`/(admin)/clients`)} // Detail screen can be implemented later
+      onPress={() => router.push(`/client/${item.id}`)}
       activeOpacity={0.7}
     >
       <View style={styles.avatar}>
@@ -93,16 +123,18 @@ export default function ClientsScreen() {
 
       <View style={styles.infoCol}>
         <Text style={styles.clientName}>{item.name}</Text>
-        <Text style={styles.clientPhone}>{item.phone || (item.phones && item.phones[0]?.phoneNumber) || 'Pas de numéro'}</Text>
+        <Text style={styles.clientPhone}>{getClientPhone(item)}</Text>
         <Text style={styles.clientAddress} numberOfLines={1}>
-          {item.address || (item.addresses && item.addresses[0]?.address) || 'Pas d\'adresse'}
+          {getClientAddress(item)}
         </Text>
         
         <View style={styles.statsRow}>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{item.commandesCount || 0} commandes</Text>
+            <Text style={styles.countBadgeText}>{item.totalCommandes || 0} commandes</Text>
           </View>
-          <Text style={styles.sinceText}>Client depuis {new Date(item.createdAt).toLocaleDateString()}</Text>
+          {item.createdAt && (
+            <Text style={styles.sinceText}>Client depuis {new Date(item.createdAt).toLocaleDateString()}</Text>
+          )}
         </View>
       </View>
 
@@ -120,7 +152,7 @@ export default function ClientsScreen() {
           </View>
           <TouchableOpacity 
             style={styles.addBtn}
-            onPress={() => router.push('/(livreur)/clients')}
+            onPress={() => router.push('/(admin)/order-client?mode=immediate')}
           >
             <Ionicons name="person-add" size={16} color="white" />
             <Text style={styles.addBtnText}>Nouveau</Text>

@@ -29,8 +29,11 @@ export const updateCommande = createAsyncThunk('admin/updateCommande', async ({ 
   catch (error: any) { return rejectWithValue(extractErrorMessage(error)); }
 });
 
-export const updateCommandeStatus = createAsyncThunk('admin/updateStatus', async ({ id, newStatus }: { id: number | string, newStatus: string }, { rejectWithValue }) => {
-  try { const response = await api.patch(`/admin/commandes/${id}/status`, { newStatus }); return response.data; }
+export const updateCommandeStatus = createAsyncThunk('admin/updateStatus', async ({ id, status, paymentData }: { id: number | string, status: string, paymentData?: any }, { rejectWithValue }) => {
+  try { 
+    const response = await api.patch(`/api/commandes/${id}/status`, { status, ...paymentData }); 
+    return response.data; 
+  }
   catch (error: any) { return rejectWithValue(extractErrorMessage(error)); }
 });
 

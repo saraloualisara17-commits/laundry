@@ -4,7 +4,6 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  SafeAreaView, 
   TextInput,
   ActivityIndicator,
   Alert,
@@ -19,8 +18,10 @@ import { router } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 export default function MapPickerScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { setPendingLocation } = useOrderCreation();
 
@@ -143,7 +144,7 @@ export default function MapPickerScreen() {
             <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.titleBadge}>
-            <Text style={styles.titleText}>Select Location</Text>
+            <Text style={styles.titleText}>{t('admin.map_picker.title', { defaultValue: "Sélectionner l'emplacement" })}</Text>
           </View>
           <View style={{ width: 40 }} />
         </View>
@@ -152,7 +153,7 @@ export default function MapPickerScreen() {
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search address, neighborhood, city..."
+            placeholder={t('admin.map_picker.search_placeholder', { defaultValue: 'Rechercher adresse, quartier, ville...' })}
             placeholderTextColor={AdminColors.textMuted}
             value={searchQuery}
             onChangeText={(text) => {
@@ -208,7 +209,7 @@ export default function MapPickerScreen() {
           </Text>
           
           <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-            <Text style={styles.confirmBtnText}>Confirm this location</Text>
+            <Text style={styles.confirmBtnText}>{t('admin.map_picker.confirm_btn', { defaultValue: 'Confirmer cet emplacement' })}</Text>
           </TouchableOpacity>
         </View>
       )}

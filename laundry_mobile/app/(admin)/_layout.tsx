@@ -16,6 +16,7 @@ export default function AdminLayout() {
       <Stack.Screen name="map-picker" />
       <Stack.Screen name="unpaid-orders" />
       <Stack.Screen name="client-debt-detail" />
+      <Stack.Screen name="all-orders-map" options={{ headerShown: false }} />
       <Stack.Screen name="order-confirmation" options={{ presentation: 'fullScreenModal' }} />
     </Stack>
   );

@@ -4,7 +4,6 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  SafeAreaView, 
   ScrollView, 
   TextInput, 
   ActivityIndicator,
@@ -15,6 +14,7 @@ import {
   Animated,
   Dimensions
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
@@ -23,20 +23,23 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const DELIVERY_TYPES = [
-  { id: 'home', label: 'Home delivery', emoji: '🏠' },
-  { id: 'hotel', label: 'Hotel', emoji: '🏨' },
-  { id: 'office', label: 'Office', emoji: '🏢' },
-  { id: 'shop', label: 'Store / Shop', emoji: '🏪' },
-  { id: 'car', label: 'Car pickup', emoji: '🚗' },
-  { id: 'self', label: 'Self pickup', emoji: '🏃' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function OrderClientScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   
+  const DELIVERY_TYPES = [
+    { id: 'home', label: t('admin.orders.create.delivery_types.home'), emoji: '🏠' },
+    { id: 'hotel', label: t('admin.orders.create.delivery_types.hotel'), emoji: '🏨' },
+    { id: 'office', label: t('admin.orders.create.delivery_types.office'), emoji: '🏢' },
+    { id: 'shop', label: t('admin.orders.create.delivery_types.shop'), emoji: '🏪' },
+    { id: 'car', label: t('admin.orders.create.delivery_types.car'), emoji: '🚗' },
+    { id: 'self', label: t('admin.orders.create.delivery_types.self'), emoji: '🏃' },
+  ];
+
   // Mode parsing
   const modeRaw = (params.mode as string) || 'immediate';
   const mode = modeRaw.trim().toLowerCase();
@@ -143,7 +146,6 @@ export default function OrderClientScreen() {
         setClientFound(true);
         setClientId(found.id);
         setClientName(found.name || '');
-        // When client is found, we don't display location fields per requirement
       } else {
         setClientFound(false);
         setClientId(null);
@@ -154,7 +156,7 @@ export default function OrderClientScreen() {
       }
       setShowForm(true);
     } catch (e) {
-      Alert.alert('Error', 'Search failed. Try again.');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {
       setSearching(false);
     }
@@ -163,7 +165,7 @@ export default function OrderClientScreen() {
   const captureLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission denied', 'Enable location in settings');
+      Alert.alert(t('common.error'), t('admin.orders.location_permission_denied', { defaultValue: 'Enable location in settings' }));
       return;
     }
 
@@ -180,7 +182,7 @@ export default function OrderClientScreen() {
         setRegion(geo.region || geo.district || geo.city || '');
       }
     } catch (error) {
-      Alert.alert('Error', 'Could not capture location');
+      Alert.alert(t('common.error'), t('admin.orders.location_capture_error', { defaultValue: 'Could not capture location' }));
     }
   };
 
@@ -243,7 +245,6 @@ export default function OrderClientScreen() {
       } else {
         setLivreur(selectedDriver.id);
         
-        // Combine pickupDate and pickupTime into one Date object
         const finalScheduledDate = new Date(pickupDate!);
         finalScheduledDate.setHours(pickupTime!.getHours());
         finalScheduledDate.setMinutes(pickupTime!.getMinutes());
@@ -254,7 +255,7 @@ export default function OrderClientScreen() {
 
       router.push('/(admin)/order-items');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save client info');
+      Alert.alert(t('common.error'), t('admin.users.required_fields'));
     } finally {
       setSubmitting(false);
     }
@@ -262,14 +263,14 @@ export default function OrderClientScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
+          <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Informations client</Text>
+        <Text style={styles.headerTitle}>{t('admin.clients.info_client')}</Text>
         <View style={[styles.modeBadge, { backgroundColor: isImmediate ? AdminColors.primary50 : AdminColors.accent100 }]}>
           <Text style={[styles.modeBadgeText, { color: isImmediate ? AdminColors.primary : AdminColors.accent }]}>
-            {isImmediate ? 'Au local' : 'Téléphonique'}
+            {isImmediate ? t('admin.orders.create.mode_immediate') : t('admin.orders.create.mode_scheduled')}
           </Text>
         </View>
       </View>
@@ -282,12 +283,12 @@ export default function OrderClientScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Search Section (Single Phone Input) */}
+          {/* Search Section */}
           <View style={styles.searchSection}>
-            <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
-            <View style={styles.searchRow}>
+            <Text style={[styles.fieldLabel, isArabic && { textAlign: 'right' }]}>{t('admin.users.phone')}</Text>
+            <View style={[styles.searchRow, isArabic && { flexDirection: 'row-reverse' }]}>
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
                 placeholder="0600000000"
                 keyboardType="phone-pad"
                 value={phone}
@@ -303,87 +304,80 @@ export default function OrderClientScreen() {
           {showForm && (
             <Animated.View style={{ opacity: formOpacity }}>
               {/* Client Info Section */}
-              <View style={styles.sectionHeader}>
+              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={styles.headerIconBox}>
                   <Ionicons name="person" size={18} color={AdminColors.primary} />
                 </View>
-                <Text style={styles.sectionTitle}>Information Client</Text>
+                <Text style={styles.sectionTitle}>{t('admin.clients.info_client')}</Text>
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.label}>Nom Complet *</Text>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.full_name')} *</Text>
                 <TextInput 
-                  style={styles.input} 
+                  style={[styles.input, isArabic && { textAlign: 'right' }]} 
                   value={clientName}
                   onChangeText={setClientName}
-                  placeholder="Nom du client"
+                  placeholder={t('admin.users.full_name')}
                 />
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.label}>Notes</Text>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.description')}</Text>
                 <TextInput 
-                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
+                  style={[styles.input, { height: 80, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]} 
                   multiline 
-                  placeholder="Instructions spéciales..."
+                  placeholder={t('admin.catalog.description')}
                   value={clientNotes}
                   onChangeText={setClientNotes}
                 />
               </View>
 
-              {/* Location Section - Only show if NEW client or SCHEDULED mode */}
-              {(!clientFound || isScheduled) && (
-                <>
-                  <View style={styles.sectionHeader}>
-                    <View style={styles.headerIconBox}>
-                      <Ionicons name="pin" size={18} color={AdminColors.primary} />
-                    </View>
-                    <Text style={styles.sectionTitle}>Localisation</Text>
-                  </View>
+              {/* Location Section */}
+              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={styles.headerIconBox}>
+                  <Ionicons name="pin" size={18} color={AdminColors.primary} />
+                </View>
+                <Text style={styles.sectionTitle}>{t('admin.orders.create.location_title')}</Text>
+              </View>
 
-                  <View style={styles.formField}>
-                    <Text style={styles.label}>Région / Zone (ou coller localisation)</Text>
-                    <TextInput 
-                      style={styles.input} 
-                      value={region}
-                      onChangeText={setRegion}
-                      placeholder="Coller ici..."
-                    />
-                  </View>
+              <View style={styles.formField}>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.region_label')}</Text>
+                <TextInput 
+                  style={[styles.input, isArabic && { textAlign: 'right' }]} 
+                  value={region}
+                  onChangeText={setRegion}
+                  placeholder={t('admin.orders.create.region_placeholder')}
+                />
+              </View>
 
-                  {!clientFound && (
-                    <>
-                      <View style={styles.formField}>
-                        <Text style={styles.label}>Adresse</Text>
-                        <TextInput 
-                          style={styles.input} 
-                          value={address}
-                          onChangeText={setAddress}
-                        />
-                      </View>
+              <View style={styles.formField}>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.clients.address')}</Text>
+                <TextInput 
+                  style={[styles.input, isArabic && { textAlign: 'right' }]} 
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder={t('admin.clients.address')}
+                />
+              </View>
 
-                      <View style={styles.locationButtonsRow}>
-                        <TouchableOpacity 
-                          style={styles.locBtnPrimary} 
-                          onPress={() => router.push({
-                            pathname: '/(admin)/map-picker',
-                            params: { returnTo: 'order-client' }
-                          })}
-                        >
-                          <Ionicons name="map" size={18} color="white" />
-                          <Text style={styles.locBtnText}>Carte</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.locBtnSecondary} onPress={captureLocation}>
-                          <Ionicons name="locate" size={18} color="white" />
-                          <Text style={styles.locBtnText}>GPS Actuel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}
-                </>
-              )}
+              <View style={[styles.locationButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <TouchableOpacity 
+                  style={[styles.locBtnPrimary, isArabic && { flexDirection: 'row-reverse' }]} 
+                  onPress={() => router.push({
+                    pathname: '/(admin)/map-picker',
+                    params: { returnTo: 'order-client' }
+                  })}
+                >
+                  <Ionicons name="map" size={18} color="white" />
+                  <Text style={styles.locBtnText}>{t('admin.orders.create.location_map')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.locBtnSecondary, isArabic && { flexDirection: 'row-reverse' }]} onPress={captureLocation}>
+                  <Ionicons name="locate" size={18} color="white" />
+                  <Text style={styles.locBtnText}>{t('admin.orders.create.location_gps')}</Text>
+                </TouchableOpacity>
+              </View>
 
-              <View style={styles.sectionHeader}>
+              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={styles.headerIconBox}>
                   {isImmediate ? (
                     <MaterialCommunityIcons name="truck-delivery" size={18} color={AdminColors.primary} />
@@ -391,21 +385,21 @@ export default function OrderClientScreen() {
                     <Ionicons name="calendar" size={18} color={AdminColors.primary} />
                   )}
                 </View>
-                <Text style={styles.sectionTitle}>{isImmediate ? 'Delivery Details' : 'Scheduling'}</Text>
+                <Text style={styles.sectionTitle}>{isImmediate ? t('admin.orders.create.delivery_details') : t('admin.orders.create.scheduling')}</Text>
               </View>
 
 
               {isImmediate ? (
                 <View style={styles.formField}>
-                  <Text style={styles.label}>Type de Livraison</Text>
+                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.delivery_type')}</Text>
                   <TouchableOpacity 
-                    style={styles.dropdown} 
+                    style={[styles.dropdown, isArabic && { flexDirection: 'row-reverse' }]} 
                     onPress={() => setShowDeliveryModal(true)}
                   >
-                    <View style={styles.dropdownLeft}>
+                    <View style={[styles.dropdownLeft, isArabic && { flexDirection: 'row-reverse' }]}>
                       {deliveryType ? (
                         <>
-                          <Text style={{ fontSize: 20, marginRight: 10 }}>
+                          <Text style={{ fontSize: 20, [isArabic ? 'marginLeft' : 'marginRight']: 10 }}>
                             {DELIVERY_TYPES.find(t => t.id === deliveryType)?.emoji}
                           </Text>
                           <Text style={styles.dropdownValue}>
@@ -413,7 +407,7 @@ export default function OrderClientScreen() {
                           </Text>
                         </>
                       ) : (
-                        <Text style={styles.placeholderText}>Sélectionner le type...</Text>
+                        <Text style={styles.placeholderText}>{t('admin.orders.create.delivery_type_placeholder')}</Text>
                       )}
                     </View>
                     <Ionicons name="chevron-down" size={18} color={AdminColors.textMuted} />
@@ -421,32 +415,48 @@ export default function OrderClientScreen() {
                 </View>
               ) : (
                 <>
-                  <View style={styles.dateTimeRow}>
+                  <View style={[styles.dateTimeRow, isArabic && { flexDirection: 'row-reverse' }]}>
                     <View style={[styles.formField, { flex: 1 }]}>
-                      <Text style={styles.label}>Date de récupération</Text>
+                      <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.pickup_date')}</Text>
                       <TouchableOpacity 
-                        style={styles.input} 
+                        style={[
+                          styles.input, 
+                          pickupDate && { borderColor: AdminColors.primary, backgroundColor: AdminColors.primary50 },
+                          isArabic && { flexDirection: 'row-reverse' }
+                        ]} 
                         onPress={() => setShowDatePicker(true)}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }}>
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                           <Ionicons name="calendar-outline" size={20} color={AdminColors.primary} />
-                          <Text style={{ color: pickupDate ? AdminColors.textPrimary : AdminColors.textMuted }}>
-                            {pickupDate ? pickupDate.toLocaleDateString() : 'Choisir date'}
+                          <Text style={{ 
+                            color: pickupDate ? AdminColors.primary : AdminColors.textMuted,
+                            fontSize: 16,
+                            fontWeight: pickupDate ? '700' : '500'
+                          }}>
+                            {pickupDate ? pickupDate.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR') : t('common.date')}
                           </Text>
                         </View>
                       </TouchableOpacity>
                     </View>
 
                     <View style={[styles.formField, { flex: 1 }]}>
-                      <Text style={styles.label}>Heure</Text>
+                      <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.time')}</Text>
                       <TouchableOpacity 
-                        style={styles.input} 
+                        style={[
+                          styles.input, 
+                          pickupTime && { borderColor: AdminColors.primary, backgroundColor: AdminColors.primary50 },
+                          isArabic && { flexDirection: 'row-reverse' }
+                        ]} 
                         onPress={() => setShowTimePicker(true)}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }}>
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                           <Ionicons name="time-outline" size={20} color={AdminColors.primary} />
-                          <Text style={{ color: pickupTime ? AdminColors.textPrimary : AdminColors.textMuted }}>
-                            {pickupTime ? pickupTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Choisir heure'}
+                          <Text style={{ 
+                            color: pickupTime ? AdminColors.primary : AdminColors.textMuted,
+                            fontSize: 16,
+                            fontWeight: pickupTime ? '700' : '500'
+                          }}>
+                            {pickupTime ? pickupTime.toLocaleTimeString(isArabic ? 'ar-EG' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }) : t('common.time')}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -477,20 +487,20 @@ export default function OrderClientScreen() {
                     />
                   )}
 
-                  <Text style={styles.label}>Assigner un Livreur</Text>
+                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.assign_driver')}</Text>
                   {drivers.length === 0 ? (
-                    <Text style={styles.emptyText}>Aucun livreur disponible</Text>
+                    <Text style={styles.emptyText}>{t('common.no_data')}</Text>
                   ) : (
                     drivers.map(driver => (
                       <TouchableOpacity 
                         key={driver.id} 
-                        style={[styles.driverCard, selectedDriver?.id === driver.id && styles.driverCardSelected]}
+                        style={[styles.driverCard, selectedDriver?.id === driver.id && styles.driverCardSelected, isArabic && { flexDirection: 'row-reverse' }]}
                         onPress={() => setSelectedDriver(driver)}
                       >
                         <View style={styles.driverAvatar}>
                           <Text style={styles.avatarText}>{driver.name?.[0]?.toUpperCase()}</Text>
                         </View>
-                        <View style={{ flex: 1 }}>
+                        <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 12 }]}>
                           <Text style={styles.driverName}>{driver.name}</Text>
                           <Text style={styles.driverPhone}>{driver.phone}</Text>
                         </View>
@@ -519,7 +529,7 @@ export default function OrderClientScreen() {
           {submitting ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
-            <Text style={styles.continueBtnText}>Continuer →</Text>
+            <Text style={styles.continueBtnText}>{t('common.continue')} {isArabic ? '←' : '→'}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -529,8 +539,8 @@ export default function OrderClientScreen() {
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowDeliveryModal(false)} />
           <View style={styles.modalSheet}>
-             <View style={styles.modalHeader}>
-               <Text style={styles.modalTitle}>Type de Livraison</Text>
+             <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+               <Text style={styles.modalTitle}>{t('admin.orders.create.delivery_type')}</Text>
                <TouchableOpacity onPress={() => setShowDeliveryModal(false)}>
                  <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
                </TouchableOpacity>
@@ -539,13 +549,13 @@ export default function OrderClientScreen() {
                {DELIVERY_TYPES.map(type => (
                  <TouchableOpacity 
                    key={type.id} 
-                   style={styles.modalRow}
+                   style={[styles.modalRow, isArabic && { flexDirection: 'row-reverse' }]}
                    onPress={() => { setDeliveryType(type.id); setShowDeliveryModal(false); }}
                  >
                    <View style={styles.emojiCircle}>
                      <Text style={{ fontSize: 24 }}>{type.emoji}</Text>
                    </View>
-                   <Text style={styles.modalRowLabel}>{type.label}</Text>
+                   <Text style={[styles.modalRowLabel, isArabic && { textAlign: 'right' }]}>{type.label}</Text>
                    {deliveryType === type.id && <Ionicons name="checkmark" size={24} color={AdminColors.primary} />}
                  </TouchableOpacity>
                ))}
@@ -715,27 +725,40 @@ const styles = StyleSheet.create({
   },
   continueBtnDisabled: { backgroundColor: 'rgba(13,115,119,0.4)' },
   continueBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'flex-end' 
+  },
   modalSheet: {
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: Dimensions.get('window').height * 0.5,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.06)',
+    marginBottom: 8,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: AdminColors.textPrimary,
+    flex: 1,
+    textAlign: 'center',
+  },
   modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.06)',
     gap: 14,
@@ -748,5 +771,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalRowLabel: { fontSize: 16, fontWeight: '500', color: AdminColors.textPrimary, flex: 1 },
+  modalRowLabel: { 
+    fontSize: 16, 
+    fontWeight: '500', 
+    color: AdminColors.textPrimary, 
+    flex: 1 
+  },
 });

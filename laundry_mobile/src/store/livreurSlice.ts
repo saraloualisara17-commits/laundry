@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { fetchLivreurDashboardStats, fetchLivreurClients, fetchReadyDeliveries, fetchReadyOrders, fetchCanceledDeliveries, searchClient, fetchCarpetTypes, registerClient, createOrder, fetchPaymentTypes, confirmPayment, cancelDelivery } from './livreurThunks';
+import { fetchLivreurDashboardStats, fetchLivreurClients, fetchReadyDeliveries, fetchPendingPickups, fetchCanceledDeliveries, searchClient, fetchCarpetTypes, registerClient, createOrder, fetchPaymentTypes, confirmPayment, cancelDelivery, returnToWorkplace } from './livreurThunks';
 
 interface LivreurState {
   dashboardStats: any;
@@ -73,12 +73,12 @@ const livreurSlice = createSlice({
       })
       .addCase(fetchReadyDeliveries.rejected, handleRejected)
 
-      .addCase(fetchReadyOrders.pending, handlePending)
-      .addCase(fetchReadyOrders.fulfilled, (state, action) => {
+      .addCase(fetchPendingPickups.pending, handlePending)
+      .addCase(fetchPendingPickups.fulfilled, (state, action) => {
         state.loading = false;
         state.readyOrders = action.payload || [];
       })
-      .addCase(fetchReadyOrders.rejected, handleRejected)
+      .addCase(fetchPendingPickups.rejected, handleRejected)
 
       .addCase(fetchCanceledDeliveries.pending, handlePending)
       .addCase(fetchCanceledDeliveries.fulfilled, (state, action) => {

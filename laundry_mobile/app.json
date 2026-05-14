@@ -2,7 +2,7 @@
   "expo": {
     "jsEngine": "hermes",
     "ios": {
-      "jsEngine": "jsc"
+      "supportsTablet": true
     },
     "name": "laundry_mobile",
     "slug": "laundry_mobile",
@@ -12,9 +12,6 @@
     "scheme": "laundrymobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -43,7 +40,9 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-localization",
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true,

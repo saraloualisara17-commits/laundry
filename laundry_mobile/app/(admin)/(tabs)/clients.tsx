@@ -7,9 +7,9 @@ import {
   TouchableOpacity, 
   TextInput, 
   ActivityIndicator,
-  RefreshControl,
-  SafeAreaView
+  RefreshControl
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
@@ -17,7 +17,12 @@ import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router, useFocusEffect } from 'expo-router';
 
+import { useTranslation } from 'react-i18next';
+
 export default function ClientsScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+
   const [search, setSearch] = useState('');
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,13 +107,13 @@ export default function ClientsScreen() {
   const getClientPhone = (item: any) => {
     if (item.phone) return item.phone;
     if (item.phones && item.phones.length > 0) return item.phones[0].phoneNumber;
-    return 'Pas de numéro';
+    return t('admin.clients.no_phone');
   };
 
   const getClientAddress = (item: any) => {
     if (item.address) return item.address;
     if (item.addresses && item.addresses.length > 0) return item.addresses[0].address;
-    return 'Pas d\'adresse';
+    return t('admin.clients.no_address');
   };
 
   const renderClientCard = ({ item }: { item: any }) => (
@@ -117,53 +122,53 @@ export default function ClientsScreen() {
       onPress={() => router.push(`/client/${item.id}`)}
       activeOpacity={0.7}
     >
-      <View style={styles.avatar}>
+      <View style={[isArabic ? styles.avatarAr : styles.avatar]}>
         <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
       </View>
 
-      <View style={styles.infoCol}>
-        <Text style={styles.clientName}>{item.name}</Text>
-        <Text style={styles.clientPhone}>{getClientPhone(item)}</Text>
-        <Text style={styles.clientAddress} numberOfLines={1}>
+      <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+        <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{item.name}</Text>
+        <Text style={[styles.clientPhone, isArabic && { textAlign: 'right' }]}>{getClientPhone(item)}</Text>
+        <Text style={[styles.clientAddress, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
           {getClientAddress(item)}
         </Text>
         
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{item.totalCommandes || 0} commandes</Text>
+            <Text style={styles.countBadgeText}>{item.totalCommandes || 0} {t('dashboard.orders_count')}</Text>
           </View>
           {item.createdAt && (
-            <Text style={styles.sinceText}>Client depuis {new Date(item.createdAt).toLocaleDateString()}</Text>
+            <Text style={styles.sinceText}>{t('admin.clients.client_since')} {new Date(item.createdAt).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
           )}
         </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={18} color={AdminColors.textMuted} />
+      <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={18} color={AdminColors.textMuted} />
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.headerContent}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Clients</Text>
-            <Text style={styles.headerSubtitle}>{totalCount} au total</Text>
+        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={styles.headerTitle}>{t('admin.clients.title')}</Text>
+            <Text style={styles.headerSubtitle}>{totalCount} {t('admin.clients.total_count')}</Text>
           </View>
           <TouchableOpacity 
-            style={styles.addBtn}
+            style={[styles.addBtn, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => router.push('/(admin)/order-client?mode=immediate')}
           >
             <Ionicons name="person-add" size={16} color="white" />
-            <Text style={styles.addBtnText}>Nouveau</Text>
+            <Text style={styles.addBtnText}>{t('admin.clients.new_client')}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Nom ou numéro de téléphone..."
+            style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
+            placeholder={t('admin.clients.search_placeholder')}
             placeholderTextColor={AdminColors.textMuted}
             value={search}
             onChangeText={setSearch}
@@ -187,8 +192,8 @@ export default function ClientsScreen() {
           ) : (
             <EmptyState 
               icon="👥" 
-              title="Aucun client" 
-              subtitle={search.length > 0 ? `Aucun résultat pour "${search}"` : "Commencez par enregistrer un client"} 
+              title={t('admin.clients.empty_title')} 
+              subtitle={search.length > 0 ? `${t('common.no_data')} "${search}"` : t('admin.clients.empty_subtitle')} 
             />
           )
         }
@@ -275,6 +280,15 @@ const styles = StyleSheet.create({
     backgroundColor: AdminColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarAr: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AdminColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    order: 2,
   },
   avatarText: {
     fontSize: 20,

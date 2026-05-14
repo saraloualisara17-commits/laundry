@@ -1,163 +1,116 @@
-import { Tabs } from 'expo-router';
-import { MaterialIcons, Feather, Ionicons } from '@expo/vector-icons';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Colors, Typography, Radius, Shadows } from '../../constants/theme';
+import { Tabs, Stack } from 'expo-router';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
 
-function CustomTabBar({ state, descriptors, navigation }: any) {
-  const insets = useSafeAreaInsets();
-
-  return (
-    <View style={[styles.tabBar, { paddingBottom: insets.bottom || 12 }]}>
-      {state.routes.map((route: any, index: number) => {
-        const { options } = descriptors[route.key];
-        if (options.href === null) return null;
-
-        const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
-        const isFocused = state.index === index;
-
-        const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
-          }
-        };
-
-        const renderIcon = (color: string) => {
-          switch (route.name) {
-            case 'index': return <MaterialIcons name="dashboard" size={24} color={color} />;
-            case 'clients': return <Feather name="users" size={24} color={color} />;
-            case 'map': return <Feather name="map" size={24} color={color} />;
-            case 'deliveries': return <Feather name="truck" size={24} color={color} />;
-            case 'profile': return <Feather name="user" size={24} color={color} />;
-            default: return null;
-          }
-        };
-
-        return (
-          <TouchableOpacity
-            key={index}
-            onPress={onPress}
-            style={styles.tabItem}
-          >
-            {isFocused && <View style={styles.activeIndicator} />}
-            <View style={[styles.iconWrapper, isFocused && styles.activeIconWrapper]}>
-              {renderIcon(isFocused ? Colors.primary : Colors.textMuted)}
-              <Text style={[styles.tabLabel, { color: isFocused ? Colors.primary : Colors.textMuted }]}>
-                {label}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
+const PRIMARY = '#0D7377';
+const TEXT_MUTED = '#94A3B8';
 
 export default function LivreurLayout() {
+  const insets = useSafeAreaInsets();
+  const { readyDeliveries, readyOrders } = useSelector((s: RootState) => s.livreur);
+  const missionCount = (readyDeliveries?.length || 0) + (readyOrders?.length || 0);
+
   return (
     <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        headerStyle: {
-          backgroundColor: Colors.primary,
-          height: Platform.OS === 'ios' ? 100 : 56,
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(0,0,0,0.06)',
+          height: 68 + (Platform.OS === 'ios' ? insets.bottom : 10),
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          paddingTop: 10,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 16,
         },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontSize: 17,
-          fontWeight: Typography.weight.semibold,
-        },
-        headerTitleAlign: 'left',
+        tabBarActiveTintColor: PRIMARY,
+        tabBarInactiveTintColor: TEXT_MUTED,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 3 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          headerTitle: 'Tableau de bord',
+          tabBarLabel: 'Accueil',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.pill} />}
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
-        name="clients"
+        name="missions"
         options={{
-          title: 'Clients',
-          headerTitle: 'Mes Clients',
+          tabBarLabel: 'Missions',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.pill} />}
+              <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={22} color={color} />
+              {missionCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{missionCount > 99 ? '99+' : missionCount}</Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: 'Carte',
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="deliveries"
-        options={{
-          title: 'Livraisons',
-          headerTitle: 'À livrer',
-        }}
-      />
+      {/* Clients hidden — livreur has no client access */}
+      <Tabs.Screen name="clients" options={{ href: null }} />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
-          headerTitle: 'Mon Profil',
+          tabBarLabel: 'Profil',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.pill} />}
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+            </View>
+          ),
         }}
       />
+      {/* Hidden screens — accessible via Stack push */}
+      <Tabs.Screen name="map-view" options={{ href: null }} />
+      {/* Legacy screens hidden (map, deliveries, create-order) */}
+      <Tabs.Screen name="map" options={{ href: null }} />
+      <Tabs.Screen name="deliveries" options={{ href: null }} />
       <Tabs.Screen name="create-order" options={{ href: null }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    height: 72,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-    paddingTop: 10,
-    ...Shadows.md,
-    shadowColor: 'rgba(0,0,0,0.06)',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  activeIconWrapper: {
-    backgroundColor: 'rgba(13,115,119,0.06)',
-    borderRadius: 12,
-  },
-  activeIndicator: {
+  iconWrap: { alignItems: 'center', justifyContent: 'center', width: 36, height: 30 },
+  pill: {
     position: 'absolute',
     top: -10,
-    width: 20,
+    width: 18,
     height: 3,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.full,
+    backgroundColor: PRIMARY,
+    borderRadius: 999,
   },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: Typography.weight.semibold,
-    letterSpacing: 0.3,
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: 'white',
   },
+  badgeText: { fontSize: 9, fontWeight: '800', color: 'white' },
 });
-

@@ -1,574 +1,459 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  RefreshControl, ActivityIndicator, Animated, Linking, Platform, Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchReadyOrders, fetchCanceledDeliveries } from '../../src/store/livreurThunks';
 import { RootState, AppDispatch } from '../../src/store/store';
-import { MaterialIcons, Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
+import { logOut } from '../../src/store/authSlice';
+import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchReadyOrders } from '../../src/store/livreurThunks';
+import * as SecureStore from 'expo-secure-store';
+import { api } from '../../src/api/axios';
+
+const C = {
+  primary: '#0D7377',
+  primaryDark: '#0A5C5F',
+  success: '#10B981',
+  successBg: 'rgba(16,185,129,0.12)',
+  warning: '#F59E0B',
+  warningBg: 'rgba(245,158,11,0.12)',
+  danger: '#EF4444',
+  bg: '#F4F6F8',
+  surface: '#FFFFFF',
+  textPrimary: '#0D1B2A',
+  textSecondary: '#4A5568',
+  textMuted: '#94A3B8',
+};
+
+function openMapsNavigation(lat?: number, lng?: number, address?: string) {
+  const url = Platform.select({
+    ios: lat && lng
+      ? `maps://?daddr=${lat},${lng}`
+      : `maps://?daddr=${encodeURIComponent(address || '')}`,
+    android: lat && lng
+      ? `geo:${lat},${lng}?q=${lat},${lng}`
+      : `geo:0,0?q=${encodeURIComponent(address || '')}`,
+  });
+  if (url) {
+    Linking.openURL(url).catch(() =>
+      Linking.openURL(`https://maps.google.com/?daddr=${lat},${lng}`)
+    );
+  }
+}
 
 export default function LivreurDashboard() {
-  const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { dashboardStats, readyDeliveries, readyOrders, loading, error } = useSelector((state: RootState) => state.livreur);
+  const { user } = useSelector((s: RootState) => s.auth);
+  const { dashboardStats, readyDeliveries, readyOrders, loading } = useSelector((s: RootState) => s.livreur);
 
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'collections'>('deliveries');
+  const [refreshing, setRefreshing] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(0.6)).current;
 
-  const loadData = () => {
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const loadData = useCallback(() => {
     dispatch(fetchLivreurDashboardStats());
     dispatch(fetchReadyDeliveries());
     dispatch(fetchReadyOrders());
-    dispatch(fetchCanceledDeliveries());
-  };
-
-  useEffect(() => {
-    loadData();
   }, [dispatch]);
 
-  const filteredMissions = useMemo(() => {
-    return activeTab === 'deliveries' ? readyDeliveries : readyOrders;
-  }, [activeTab, readyOrders, readyDeliveries]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const nextMission = useMemo(() => {
-    if (readyDeliveries.length > 0) return readyDeliveries[0];
-    if (readyOrders.length > 0) return readyOrders[0];
-    return null;
-  }, [readyOrders, readyDeliveries]);
+  const onRefresh = () => { setRefreshing(true); loadData(); setTimeout(() => setRefreshing(false), 1200); };
 
-  const todayDate = useMemo(() => {
-    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-    return new Date().toLocaleDateString('fr-FR', options);
-  }, []);
-
-  const getClientDisplayName = (mission: any) => {
-    return mission?.client?.name || mission?.clientNom || mission?.client?.nom || 'Client Inconnu';
+  const handleLogout = async () => {
+    Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Déconnecter', style: 'destructive',
+        onPress: async () => {
+          try { await api.post('/auth/logout'); } catch { }
+          await SecureStore.deleteItemAsync('user');
+          await SecureStore.deleteItemAsync('accessToken');
+          await SecureStore.deleteItemAsync('refreshToken');
+          dispatch(logOut());
+        },
+      },
+    ]);
   };
 
-  const getClientPhone = (client: any) => {
-    if (!client) return '—';
-    if (client.phone) return client.phone;
-    if (client.telephone) return client.telephone;
-    if (Array.isArray(client.phones) && client.phones.length > 0) return client.phones[0].phoneNumber || client.phones[0].phone || '—';
-    if (Array.isArray(client.telephones) && client.telephones.length > 0) return client.telephones[0].numero || client.telephones[0].phone || '—';
-    return '—';
-  };
+  // Build "next mission" from existing data
+  const allMissions = [...(readyDeliveries || []), ...(readyOrders || [])];
+  const deliveryCount = readyDeliveries?.length || 0;
+  const pickupCount = readyOrders?.length || 0;
+  const totalCollected = dashboardStats?.totalCollectedToday || 0;
+
+  const nextMission = allMissions.length > 0 ? (() => {
+    const first = readyDeliveries?.[0] || readyOrders?.[0];
+    const isDelivery = readyDeliveries?.length > 0;
+    const addr = first?.client?.addresses?.[0];
+    return first ? {
+      type: isDelivery ? 'delivery' : 'pickup',
+      orderId: first.id,
+      clientName: first.client?.name || first.clientNom || '—',
+      clientPhone: first.client?.phones?.[0]?.phoneNumber || '',
+      clientAddress: addr?.address || addr?.fullAddress || '—',
+      clientLatitude: addr?.latitude ? parseFloat(addr.latitude) : null,
+      clientLongitude: addr?.longitude ? parseFloat(addr.longitude) : null,
+      montantTotal: first.montantTotal || 0,
+      montantRestant: first.montantRestant || 0,
+      itemCount: first.commandeTapis?.length || 0,
+    } : null;
+  })() : null;
+
+  const missionBg = nextMission?.type === 'delivery' ? C.success : C.warning;
+  const missionTextColor = nextMission?.type === 'delivery' ? 'white' : C.textPrimary;
+
+  // Preview missions (first 3 from combined list)
+  const previewMissions = allMissions.slice(0, 3);
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} colors={[Colors.primary]} />}
-    >
+    <View style={styles.container}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Bonjour,</Text>
-          <Text style={styles.userName}>{user?.name || 'Livreur'}</Text>
-          <View style={styles.underlineDecoration} />
-        </View>
-        <View style={styles.dateChip}>
-          <Text style={styles.dateText}>{todayDate}</Text>
-        </View>
-      </View>
-
-      {/* KPI GRID */}
-      <View style={styles.kpiGrid}>
-        <TouchableOpacity 
-          style={[styles.kpiCard, activeTab === 'deliveries' && styles.kpiCardActive]} 
-          onPress={() => setActiveTab('deliveries')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.kpiIconWrapper, { backgroundColor: Colors.successBg }]}>
-            <Feather name="truck" size={20} color={Colors.success} />
-          </View>
-          <Text style={styles.kpiValue}>{dashboardStats?.readyOrdersCount || 0}</Text>
-          <Text style={styles.kpiLabel}>À LIVRER</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.kpiCard, activeTab === 'collections' && styles.kpiCardActive]} 
-          onPress={() => setActiveTab('collections')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.kpiIconWrapper, { backgroundColor: Colors.primary100 }]}>
-            <Feather name="package" size={20} color={Colors.primary} />
-          </View>
-          <Text style={styles.kpiValue}>{dashboardStats?.pendingPickupCount || 0}</Text>
-          <Text style={styles.kpiLabel}>À RÉCUPÉRER</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* NEXT MISSION SPOTLIGHT */}
-      {nextMission && (
-        <View style={styles.spotlightCard}>
-          <View style={styles.heroCircleLarge} />
-          <View style={styles.heroCircleSmall} />
-          
-          <View style={styles.spotlightHeader}>
-            <Text style={styles.spotlightTag}>PROCHAINE MISSION</Text>
-            <TouchableOpacity onPress={loadData}>
-              <Ionicons name="refresh" size={18} color="rgba(255,255,255,0.6)" />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: C.primary }}>
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.greeting}>Bonjour,</Text>
+              <Text style={styles.userName}>{user?.name || 'Livreur'}</Text>
+            </View>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="white" />
             </TouchableOpacity>
           </View>
-          
-          <View style={styles.spotlightContent}>
-            <View style={styles.spotlightAvatar}>
-              <Text style={styles.spotlightAvatarText}>
-                {getClientDisplayName(nextMission).charAt(0).toUpperCase()}
-              </Text>
+
+          {/* Stats chips */}
+          <View style={styles.statsRow}>
+            <View style={styles.statChip}>
+              <View style={styles.chipRow}>
+                <Animated.View style={[styles.dot, { backgroundColor: C.success, opacity: pulseAnim }]} />
+                <Text style={styles.chipNumber}>{deliveryCount}</Text>
+              </View>
+              <Text style={styles.chipLabel}>livraisons</Text>
             </View>
-            <View style={styles.spotlightInfo}>
-              <Text style={styles.spotlightOrderNo}>#{nextMission.numeroCommande}</Text>
-              <Text style={styles.spotlightClientName} numberOfLines={1}>{getClientDisplayName(nextMission)}</Text>
-              <Text style={styles.spotlightAddress} numberOfLines={1}>
-                {nextMission.client?.addresses?.[0]?.fullAddress || nextMission.client?.address || nextMission.client?.adresse || 'Pas d\'adresse'}
-              </Text>
+            <View style={styles.statChip}>
+              <View style={styles.chipRow}>
+                <Animated.View style={[styles.dot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
+                <Text style={styles.chipNumber}>{pickupCount}</Text>
+              </View>
+              <Text style={styles.chipLabel}>collectes</Text>
+            </View>
+            <View style={styles.statChip}>
+              <Text style={styles.chipAmount}>{totalCollected} DH</Text>
+              <Text style={styles.chipLabel}>encaissé</Text>
             </View>
           </View>
+        </View>
+      </SafeAreaView>
 
-          <TouchableOpacity 
-            style={styles.spotlightButton} 
-            onPress={() => router.push(`/order/${nextMission.id}`)}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+      >
+        {/* NEXT MISSION CARD */}
+        <View style={styles.sectionPad}>
+          {nextMission ? (
+            <View style={[styles.missionCard, { backgroundColor: missionBg }]}>
+              {/* BG circle decoration */}
+              <View style={styles.missionCircle} />
+
+              <View style={styles.missionTop}>
+                <View style={styles.missionBadge}>
+                  <Text style={[styles.missionBadgeText, { color: missionTextColor }]}>
+                    {nextMission.type === 'delivery' ? '🚚 LIVRAISON' : '📦 COLLECTE'}
+                  </Text>
+                </View>
+                <Text style={styles.missionLabel}>PROCHAINE MISSION</Text>
+              </View>
+
+              <Text style={[styles.missionClientName, { color: 'white' }]}>{nextMission.clientName}</Text>
+
+              <View style={styles.missionInfoRow}>
+                <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.missionInfoText} numberOfLines={1}>{nextMission.clientAddress}</Text>
+              </View>
+              {nextMission.clientPhone ? (
+                <View style={styles.missionInfoRow}>
+                  <Ionicons name="call-outline" size={14} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.missionInfoText}>{nextMission.clientPhone}</Text>
+                </View>
+              ) : null}
+
+              {nextMission.type === 'delivery' && (
+                <View style={styles.financialRow}>
+                  <View>
+                    <Text style={styles.finLabel}>Total</Text>
+                    <Text style={styles.finValue}>{nextMission.montantTotal} DH</Text>
+                  </View>
+                  <View style={styles.finDivider} />
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.finLabel}>Reste à encaisser</Text>
+                    <Text style={[styles.finValue, { fontSize: 18 }]}>{nextMission.montantRestant} DH</Text>
+                  </View>
+                </View>
+              )}
+
+              {nextMission.type === 'pickup' && (
+                <Text style={styles.itemsText}>{nextMission.itemCount} article(s) à collecter</Text>
+              )}
+
+              <View style={styles.missionActions}>
+                {nextMission.clientPhone ? (
+                  <TouchableOpacity
+                    style={styles.callBtn}
+                    onPress={() => Linking.openURL(`tel:${nextMission.clientPhone}`)}
+                  >
+                    <Ionicons name="call" size={16} color="white" />
+                    <Text style={styles.callBtnText}>Appeler</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.startBtn, { borderColor: missionBg }]}
+                  onPress={() => router.push({
+                    pathname: '/(livreur)/missions',
+                    params: { tab: nextMission.type, orderId: nextMission.orderId },
+                  })}
+                >
+                  <Text style={[styles.startBtnText, { color: missionBg }]}>
+                    Démarrer la mission →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.missionCard, { backgroundColor: C.primary, alignItems: 'center', paddingVertical: 32 }]}>
+              <Text style={{ fontSize: 28 }}>✅</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: 'white', marginTop: 10, textAlign: 'center' }}>
+                Toutes les missions sont terminées!
+              </Text>
+              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>Bonne journée</Text>
+            </View>
+          )}
+        </View>
+
+        {/* QUICK ACTIONS */}
+        <View style={[styles.sectionPad, { flexDirection: 'row', gap: 10 }]}>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(livreur)/map-view')}
+            activeOpacity={0.8}
           >
-            <Feather name="navigation" size={18} color={Colors.primary} />
-            <Text style={styles.spotlightButtonText}>
-              {activeTab === 'deliveries' ? 'COMMENCER LA LIVRAISON' : 'COMMENCER LA RÉCUPÉRATION'}
-            </Text>
+            <View style={styles.quickIcon}>
+              <Text style={{ fontSize: 26 }}>🗺️</Text>
+            </View>
+            <Text style={styles.quickLabel}>Voir la carte</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'delivery' } })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.quickIcon, { backgroundColor: C.successBg }]}>
+              <Text style={{ fontSize: 26 }}>🚚</Text>
+            </View>
+            <Text style={styles.quickLabel}>Livraisons</Text>
+            {deliveryCount > 0 && (
+              <View style={[styles.quickBadge, { backgroundColor: C.success }]}>
+                <Text style={styles.quickBadgeText}>{deliveryCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'pickup' } })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.quickIcon, { backgroundColor: C.warningBg }]}>
+              <Text style={{ fontSize: 26 }}>📦</Text>
+            </View>
+            <Text style={styles.quickLabel}>Collectes</Text>
+            {pickupCount > 0 && (
+              <View style={[styles.quickBadge, { backgroundColor: C.warning }]}>
+                <Text style={styles.quickBadgeText}>{pickupCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
-      )}
 
-      {/* MISSIONS LIST */}
-      <View style={styles.missionsSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Missions</Text>
-          <View style={styles.tabSelector}>
-            <TouchableOpacity 
-              style={[styles.tabMini, activeTab === 'deliveries' && styles.tabMiniActive]}
-              onPress={() => setActiveTab('deliveries')}
-            >
-              <Text style={[styles.tabMiniText, activeTab === 'deliveries' && styles.tabMiniTextActive]}>
-                Livraisons
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tabMini, activeTab === 'collections' && styles.tabMiniActive]}
-              onPress={() => setActiveTab('collections')}
-            >
-              <Text style={[styles.tabMiniText, activeTab === 'collections' && styles.tabMiniTextActive]}>
-                Récupérations
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* TODAY'S MISSIONS PREVIEW */}
+        {previewMissions.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Missions du jour</Text>
+              <TouchableOpacity onPress={() => router.push('/(livreur)/missions')}>
+                <Text style={styles.seeAll}>Voir tout →</Text>
+              </TouchableOpacity>
+            </View>
 
-        {loading && filteredMissions.length === 0 ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
-        ) : filteredMissions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="check-circle" size={52} color="#CBD5E1" />
-            <Text style={styles.emptyStateTitle}>Tout est à jour</Text>
-            <Text style={styles.emptyStateDesc}>Aucune mission en attente pour le moment.</Text>
-          </View>
-        ) : (
-          filteredMissions.map((mission: any) => {
-            const isDelivery = mission.status === 'DELIVERED' || mission.status === 'READY_FOR_DELIVERY' || mission.status === 'IN_PROCESS';
-            return (
-              <TouchableOpacity 
-                key={mission.id} 
-                style={styles.missionCard}
-                onPress={() => router.push(`/order/${mission.id}`)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.missionCardHeader}>
-                  <Text style={styles.missionOrderNo}>#{mission.numeroCommande}</Text>
-                  <View style={[
-                    styles.missionBadge, 
-                    { 
-                      backgroundColor: isDelivery ? Colors.infoBg : Colors.warningBg,
-                      borderColor: isDelivery ? 'rgba(59,130,246,0.20)' : 'rgba(245,158,11,0.20)'
-                    }
-                  ]}>
-                    <Text style={[
-                      styles.missionBadgeText, 
-                      { color: isDelivery ? Colors.info : Colors.warning }
-                    ]}>
-                      {isDelivery ? 'LIVRAISON' : 'COLLECTE'}
+            {previewMissions.map((mission: any, idx: number) => {
+              const isDelivery = readyDeliveries?.some((d: any) => d.id === mission.id);
+              const addr = mission.client?.addresses?.[0];
+              return (
+                <TouchableOpacity
+                  key={mission.id}
+                  style={styles.miniCard}
+                  onPress={() => router.push(`/order/${mission.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.miniAccent, { backgroundColor: isDelivery ? C.success : C.warning }]} />
+                  <View style={[styles.miniIconCircle, { backgroundColor: isDelivery ? C.successBg : C.warningBg }]}>
+                    <Text style={{ fontSize: 18 }}>{isDelivery ? '🚚' : '📦'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.miniClientName}>{mission.client?.name || mission.clientNom || '—'}</Text>
+                    <Text style={styles.miniAddress} numberOfLines={1}>
+                      {addr?.address || addr?.fullAddress || '—'}
                     </Text>
                   </View>
-                </View>
+                  {isDelivery ? (
+                    <Text style={[styles.miniAmount, { color: C.success }]}>{mission.montantTotal} DH</Text>
+                  ) : (
+                    <Text style={[styles.miniAmount, { color: C.warning }]}>
+                      {mission.commandeTapis?.length || 0} art.
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
 
-                <View style={styles.missionCardBody}>
-                  <View style={styles.missionAvatar}>
-                    <Text style={styles.missionAvatarText}>{getClientDisplayName(mission).charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.missionInfo}>
-                    <Text style={styles.missionClientName} numberOfLines={1}>{getClientDisplayName(mission)}</Text>
-                    <View style={styles.missionLocationRow}>
-                      <Feather name="map-pin" size={12} color={Colors.primary} />
-                      <Text style={styles.missionAddress} numberOfLines={1}>
-                        {mission.client?.addresses?.[0]?.fullAddress || mission.client?.address || mission.client?.adresse || 'Pas d\'adresse'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.cardDivider} />
-
-                <View style={styles.missionCardFooter}>
-                  <View style={styles.missionPhoneRow}>
-                    <Feather name="phone" size={14} color={Colors.success} />
-                    <Text style={styles.missionPhoneText}>{getClientPhone(mission.client)}</Text>
-                  </View>
-                  <View style={styles.detailsRow}>
-                    <Text style={styles.detailsText}>DÉTAILS</Text>
-                    <Feather name="chevron-right" size={16} color={Colors.primary} />
-                  </View>
-                </View>
+            {allMissions.length > 3 && (
+              <TouchableOpacity
+                style={{ alignItems: 'center', marginTop: 8 }}
+                onPress={() => router.push('/(livreur)/missions')}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: C.primary }}>
+                  + {allMissions.length - 3} autres missions
+                </Text>
               </TouchableOpacity>
-            );
-          })
+            )}
+          </>
         )}
-      </View>
-      <View style={{ height: 100 }} />
-    </ScrollView>
+
+        {loading && allMissions.length === 0 && (
+          <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: C.bg },
+  header: { paddingHorizontal: 20, paddingBottom: 18, paddingTop: 12 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  greeting: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
+  userName: { fontSize: 22, color: 'white', fontWeight: '800', marginTop: 2 },
+  logoutBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  statChip: {
     flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  contentContainer: {
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 20,
-  },
-  greeting: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.regular,
-    color: Colors.textMuted,
-  },
-  userName: {
-    fontSize: Typography.size['2xl'],
-    fontWeight: Typography.weight.bold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.02,
-  },
-  underlineDecoration: {
-    width: 32,
-    height: 3,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.full,
-    marginTop: 4,
-  },
-  dateChip: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    ...Shadows.xs,
   },
-  dateText: {
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.medium,
-    color: Colors.textSecondary,
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginBottom: 24,
-  },
-  kpiCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.sm,
-  },
-  kpiCardActive: {
-    borderColor: Colors.primary200,
-    backgroundColor: Colors.primary50,
-  },
-  kpiIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  kpiValue: {
-    fontSize: Typography.size['2xl'],
-    fontWeight: Typography.weight.bold,
-    color: Colors.textPrimary,
-  },
-  kpiLabel: {
-    fontSize: 10,
-    fontWeight: Typography.weight.bold,
-    color: Colors.textMuted,
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
-  spotlightCard: {
-    marginHorizontal: 20,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.xl,
-    padding: 24,
-    marginBottom: 28,
-    ...Shadows.teal,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroCircleLarge: {
-    width: 160,
-    height: 160,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 80,
-    position: 'absolute',
-    top: -40,
-    right: -40,
-  },
-  heroCircleSmall: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 40,
-    position: 'absolute',
-    bottom: -20,
-    left: -20,
-  },
-  spotlightHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  spotlightTag: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    fontWeight: Typography.weight.bold,
-    letterSpacing: 1,
-  },
-  spotlightContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  spotlightAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  spotlightAvatarText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: Typography.weight.bold,
-  },
-  spotlightInfo: {
-    flex: 1,
-  },
-  spotlightOrderNo: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: Typography.weight.bold,
-    marginBottom: 2,
-  },
-  spotlightClientName: {
-    color: 'white',
-    fontSize: Typography.size.xl,
-    fontWeight: Typography.weight.bold,
-    marginBottom: 4,
-  },
-  spotlightAddress: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: Typography.size.sm,
-  },
-  spotlightButton: {
-    backgroundColor: 'white',
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    ...Shadows.sm,
-  },
-  spotlightButtonText: {
-    color: Colors.primary,
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.bold,
-  },
-  missionsSection: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.bold,
-    color: Colors.textPrimary,
-  },
-  tabSelector: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface2,
-    borderRadius: Radius.md,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  tabMini: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.sm,
-  },
-  tabMiniActive: {
-    backgroundColor: Colors.surface,
-    ...Shadows.xs,
-  },
-  tabMiniText: {
-    fontSize: 11,
-    fontWeight: Typography.weight.bold,
-    color: Colors.textMuted,
-  },
-  tabMiniTextActive: {
-    color: Colors.primary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.semibold,
-    color: Colors.textSecondary,
-    marginTop: 16,
-  },
-  emptyStateDesc: {
-    fontSize: Typography.size.base,
-    color: Colors.textMuted,
-    marginTop: 4,
-    textAlign: 'center',
-  },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  chipNumber: { fontSize: 24, fontWeight: '800', color: 'white' },
+  chipAmount: { fontSize: 16, fontWeight: '800', color: 'white', marginBottom: 4 },
+  chipLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
+  scroll: { flex: 1 },
+  sectionPad: { paddingHorizontal: 16, marginTop: 16 },
   missionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.sm,
+    borderRadius: 20, padding: 20,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
   },
-  missionCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  missionCircle: {
+    position: 'absolute', right: -30, top: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  missionOrderNo: {
-    fontSize: 11,
-    fontWeight: Typography.weight.bold,
-    color: Colors.textMuted,
-  },
+  missionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   missionBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999, paddingVertical: 4, paddingHorizontal: 12,
   },
-  missionBadgeText: {
-    fontSize: 9,
-    fontWeight: Typography.weight.bold,
+  missionBadgeText: { fontSize: 11, fontWeight: '700' },
+  missionLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '700', letterSpacing: 1.5 },
+  missionClientName: { fontSize: 22, fontWeight: '800', marginBottom: 8 },
+  missionInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  missionInfoText: { fontSize: 13, color: 'rgba(255,255,255,0.85)', flex: 1 },
+  financialRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 10, padding: 10, paddingHorizontal: 14, marginTop: 14,
   },
-  missionCardBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+  finLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginBottom: 2 },
+  finValue: { fontSize: 16, color: 'white', fontWeight: '800' },
+  finDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
+  itemsText: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 10 },
+  missionActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  callBtn: {
+    flex: 1, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  missionAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+  callBtnText: { fontSize: 14, color: 'white', fontWeight: '600' },
+  startBtn: {
+    flex: 2, height: 44, borderRadius: 12,
+    backgroundColor: 'white',
+    alignItems: 'center', justifyContent: 'center',
   },
-  missionAvatarText: {
-    fontSize: 18,
-    fontWeight: Typography.weight.bold,
-    color: Colors.primary,
+  startBtnText: { fontSize: 14, fontWeight: '700' },
+  quickCard: {
+    flex: 1, backgroundColor: C.surface, borderRadius: 16,
+    padding: 14, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  missionInfo: {
-    flex: 1,
-    marginLeft: 12,
+  quickIcon: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: 'rgba(13,115,119,0.08)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
-  missionClientName: {
-    fontSize: Typography.size.md,
-    fontWeight: Typography.weight.bold,
-    color: Colors.textPrimary,
+  quickLabel: { fontSize: 11, fontWeight: '600', color: C.textPrimary, textAlign: 'center' },
+  quickBadge: {
+    position: 'absolute', top: 8, right: 8,
+    minWidth: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  missionLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+  quickBadgeText: { fontSize: 10, fontWeight: '800', color: 'white' },
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, marginTop: 20, marginBottom: 10,
   },
-  missionAddress: {
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-    flex: 1,
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.textPrimary },
+  seeAll: { fontSize: 13, fontWeight: '600', color: C.primary },
+  miniCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.surface, borderRadius: 14,
+    marginHorizontal: 16, marginBottom: 8, padding: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
-  cardDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginBottom: 12,
-  },
-  missionCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  missionPhoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  missionPhoneText: {
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.semibold,
-    color: Colors.textPrimary,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailsText: {
-    fontSize: 11,
-    fontWeight: Typography.weight.bold,
-    color: Colors.primary,
-  },
+  miniAccent: { width: 4, height: 40, borderRadius: 2 },
+  miniIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  miniClientName: { fontSize: 14, fontWeight: '600', color: C.textPrimary },
+  miniAddress: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+  miniAmount: { fontSize: 14, fontWeight: '700' },
 });

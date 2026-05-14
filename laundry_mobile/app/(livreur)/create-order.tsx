@@ -6,8 +6,12 @@ import { fetchCarpetTypes, createOrder } from '../../src/store/livreurThunks';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
 export default function CreateOrder() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   
@@ -39,21 +43,21 @@ export default function CreateOrder() {
           <View style={styles.emptyIconContainer}>
             <Feather name="shopping-bag" size={40} color={Colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Nouvelle Mission</Text>
-          <View style={styles.emptyNotice}>
+          <Text style={styles.emptyTitle}>{t('driver.dashboard.next_mission')}</Text>
+          <View style={[styles.emptyNotice, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="alert-circle" size={16} color={Colors.warning} style={{ marginTop: 2 }} />
-            <Text style={styles.emptyNoticeText}>
-              Vous devez sélectionner un client existant ou en créer un nouveau avant d'ajouter des articles.
+            <Text style={[styles.emptyNoticeText, isArabic && { textAlign: 'right' }]}>
+              {t('admin.orders.create.items.select_client_first')}
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.emptyPrimaryBtn} onPress={() => router.push('/(livreur)/clients')}>
+          <TouchableOpacity style={[styles.emptyPrimaryBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={() => router.push('/(livreur)/clients')}>
             <Feather name="users" size={20} color="white" />
-            <Text style={styles.emptyPrimaryBtnText}>SÉLECTIONNER UN CLIENT</Text>
+            <Text style={styles.emptyPrimaryBtnText}>{t('admin.orders.create.items.select_client_btn')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.emptySecondaryBtn} onPress={() => router.push('/(livreur)')}>
-            <Text style={styles.emptySecondaryBtnText}>RETOUR AU TABLEAU DE BORD</Text>
+            <Text style={styles.emptySecondaryBtnText}>{t('admin.orders.create.confirmation.back_dashboard').toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -81,7 +85,7 @@ export default function CreateOrder() {
     if (articles.length > 1) {
       setArticles(articles.filter(a => a.id !== id));
     } else {
-      Alert.alert('Attention', 'Vous devez avoir au moins un article.');
+      Alert.alert(t('common.info'), t('admin.orders.create.summary.empty_order'));
     }
   };
 
@@ -130,7 +134,7 @@ export default function CreateOrder() {
     });
 
     if (invalid) {
-      Alert.alert('Erreur de validation', 'Veuillez remplir tous les champs obligatoires pour chaque article.');
+      Alert.alert(t('common.error'), t('driver.register_client.toasts.required_fields'));
       return;
     }
 
@@ -157,23 +161,23 @@ export default function CreateOrder() {
 
     try {
       await dispatch(createOrder(payload)).unwrap();
-      Alert.alert('Succès', 'Commande créée avec succès !');
+      Alert.alert(t('common.success'), t('common.success_msg'));
       router.replace('/(livreur)');
     } catch (err: any) {
       const errorMessage = typeof err === 'string' ? err : 
-                           (err?.message || JSON.stringify(err) || 'Échec de la création de la commande');
-      Alert.alert('Erreur', errorMessage);
+                           (err?.message || JSON.stringify(err) || t('common.error_msg'));
+      Alert.alert(t('common.error'), errorMessage);
     }
   };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       {/* Header Bar */}
-      <View style={styles.appBar}>
+      <View style={[styles.appBar, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+          <Feather name={isArabic ? "arrow-right" : "arrow-left"} size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.appBarTitle}>Créer une commande</Text>
+        <Text style={styles.appBarTitle}>{t('dashboard.create_order')}</Text>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{pendingClient.name?.[0]?.toUpperCase()}</Text>
         </View>
@@ -183,33 +187,33 @@ export default function CreateOrder() {
         
         {/* Client Summary */}
         <View style={styles.clientCard}>
-          <View style={styles.clientHeader}>
+          <View style={[styles.clientHeader, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="user" size={14} color={Colors.primary} />
-            <Text style={styles.clientHeaderText}>DÉTAILS CLIENT</Text>
+            <Text style={styles.clientHeaderText}>{t('admin.orders.create.client_info').toUpperCase()}</Text>
           </View>
-          <Text style={styles.clientName}>{pendingClient.name}</Text>
-          <View style={styles.clientInfoRow}>
+          <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{pendingClient.name}</Text>
+          <View style={[styles.clientInfoRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="phone" size={14} color={Colors.success} />
-            <Text style={styles.clientInfoText}>{pendingClient.phones?.[0]?.phoneNumber || 'Pas de numéro'}</Text>
+            <Text style={styles.clientInfoText}>{pendingClient.phones?.[0]?.phoneNumber || t('admin.clients.no_phone')}</Text>
           </View>
-          <View style={styles.clientInfoRow}>
+          <View style={[styles.clientInfoRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="map-pin" size={14} color={Colors.primary} />
-            <Text style={styles.clientInfoText} numberOfLines={2}>
-              {pendingClient.addresses?.[0]?.address || 'Pas d\'adresse'}
+            <Text style={[styles.clientInfoText, isArabic && { textAlign: 'right' }]} numberOfLines={2}>
+              {pendingClient.addresses?.[0]?.address || t('admin.clients.no_address')}
             </Text>
           </View>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Articles</Text>
-          <Text style={styles.sectionCount}>{articles.length} TAPIS</Text>
+        <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.sectionTitle}>{t('admin.orders.title')}</Text>
+          <Text style={styles.sectionCount}>{articles.length} {t('admin.catalog.title').toUpperCase()}</Text>
         </View>
 
         {articles.map((article, index) => (
           <View key={article.id} style={styles.articleCard}>
-            <View style={styles.articleHeader}>
+            <View style={[styles.articleHeader, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.articleBadge}>
-                <Text style={styles.articleBadgeText}>ARTICLE {index + 1}</Text>
+                <Text style={styles.articleBadgeText}>{t('admin.orders.title').toUpperCase()} {index + 1}</Text>
               </View>
               {articles.length > 1 && (
                 <TouchableOpacity onPress={() => handleRemoveArticle(article.id)}>
@@ -219,17 +223,17 @@ export default function CreateOrder() {
             </View>
 
             {/* Type */}
-            <Text style={styles.label}>Type de tapis</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.add_category')}</Text>
             <View style={styles.pickerContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {carpetTypes.map(t => (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[isArabic && { flexDirection: 'row-reverse' }, { gap: 8 }]}>
+                {carpetTypes.map(t_item => (
                   <TouchableOpacity 
-                    key={t.id} 
-                    style={[styles.typeChip, article.carpetTypeId === t.id && styles.typeChipActive]}
-                    onPress={() => handleTypeChange(index, t.id)}
+                    key={t_item.id} 
+                    style={[styles.typeChip, article.carpetTypeId === t_item.id && styles.typeChipActive]}
+                    onPress={() => handleTypeChange(index, t_item.id)}
                   >
-                    <Text style={[styles.typeChipText, article.carpetTypeId === t.id && styles.typeChipTextActive]}>
-                      {t.nom}
+                    <Text style={[styles.typeChipText, article.carpetTypeId === t_item.id && styles.typeChipTextActive]}>
+                      {isArabic && t_item.nomAr ? t_item.nomAr : t_item.nom}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -237,31 +241,31 @@ export default function CreateOrder() {
             </View>
 
             {/* Pricing Mode */}
-            <Text style={styles.label}>Mode de tarification</Text>
-            <View style={styles.modeToggle}>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing_method')}</Text>
+            <View style={[styles.modeToggle, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity 
-                style={[styles.modeBtn, article.pricingMode === 'SIZE_BASED' && styles.modeBtnActive]}
+                style={[styles.modeBtn, article.pricingMode === 'SIZE_BASED' && styles.modeBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={() => updateArticle(index, 'pricingMode', 'SIZE_BASED')}
               >
                 <FontAwesome5 name="ruler-combined" size={12} color={article.pricingMode === 'SIZE_BASED' ? 'white' : Colors.textSecondary} />
-                <Text style={[styles.modeBtnText, article.pricingMode === 'SIZE_BASED' && styles.modeBtnTextActive]}>PAR TAILLE</Text>
+                <Text style={[styles.modeBtnText, article.pricingMode === 'SIZE_BASED' && styles.modeBtnTextActive]}>{t('admin.orders.create.items.area').toUpperCase()}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modeBtn, article.pricingMode === 'MANUAL' && styles.modeBtnActive]}
+                style={[styles.modeBtn, article.pricingMode === 'MANUAL' && styles.modeBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={() => updateArticle(index, 'pricingMode', 'MANUAL')}
               >
                 <Feather name="dollar-sign" size={14} color={article.pricingMode === 'MANUAL' ? 'white' : Colors.textSecondary} />
-                <Text style={[styles.modeBtnText, article.pricingMode === 'MANUAL' && styles.modeBtnTextActive]}>MANUEL</Text>
+                <Text style={[styles.modeBtnText, article.pricingMode === 'MANUAL' && styles.modeBtnTextActive]}>{t('admin.catalog.pricing.custom').toUpperCase()}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Dimensions */}
             {article.pricingMode === 'SIZE_BASED' && (
-              <View style={styles.row}>
+              <View style={[styles.row, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={styles.col}>
-                  <Text style={styles.label}>Largeur (m)</Text>
+                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.width')}</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, isArabic && { textAlign: 'right' }]}
                     placeholder="2.00"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
@@ -270,9 +274,9 @@ export default function CreateOrder() {
                   />
                 </View>
                 <View style={styles.col}>
-                  <Text style={styles.label}>Hauteur (m)</Text>
+                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.height')}</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, isArabic && { textAlign: 'right' }]}
                     placeholder="3.00"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="numeric"
@@ -286,13 +290,13 @@ export default function CreateOrder() {
             {/* Pricing display */}
             {article.pricingMode === 'SIZE_BASED' && article.prixCalcule !== '0' && (
               <View style={styles.priceCalcBox}>
-                <View style={styles.priceCalcRow}>
-                  <Text style={styles.priceCalcLabel}>Calculé</Text>
-                  <Text style={styles.priceCalcValue}>{article.prixCalcule} DH</Text>
+                <View style={[styles.priceCalcRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Text style={styles.priceCalcLabel}>{t('admin.orders.create.items.calculated')}</Text>
+                  <Text style={styles.priceCalcValue}>{article.prixCalcule} {t('common.dh')}</Text>
                 </View>
-                <Text style={styles.label}>Prix Final (DH)</Text>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.price_dh')}</Text>
                 <TextInput
-                  style={styles.priceInput}
+                  style={[styles.priceInput, isArabic && { textAlign: 'right' }]}
                   keyboardType="numeric"
                   value={article.prixFinal}
                   onChangeText={(val) => updateArticle(index, 'prixFinal', val)}
@@ -302,9 +306,9 @@ export default function CreateOrder() {
 
             {article.pricingMode === 'MANUAL' && (
               <View style={{ marginBottom: 16 }}>
-                <Text style={styles.label}>Prix Estimé (DH)</Text>
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.price_dh')}</Text>
                 <TextInput
-                  style={styles.priceInput}
+                  style={[styles.priceInput, isArabic && { textAlign: 'right' }]}
                   placeholder="Ex: 150"
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="numeric"
@@ -315,8 +319,8 @@ export default function CreateOrder() {
             )}
 
             {/* Quantity */}
-            <Text style={styles.label}>Quantité</Text>
-            <View style={styles.qtyControl}>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.pieces')}</Text>
+            <View style={[styles.qtyControl, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity style={styles.qtyBtn} onPress={() => updateArticle(index, 'quantite', Math.max(1, article.quantite - 1))}>
                 <Feather name="minus" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -327,10 +331,10 @@ export default function CreateOrder() {
             </View>
 
             {/* Notes */}
-            <Text style={styles.label}>Notes / Observations</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('common.notes')}</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Ex: Taches, usure..."
+              style={[styles.input, styles.textArea, isArabic && { textAlign: 'right' }]}
+              placeholder={t('admin.orders.create.items.workshop_notes_placeholder')}
               placeholderTextColor={Colors.textMuted}
               multiline
               numberOfLines={2}
@@ -340,26 +344,26 @@ export default function CreateOrder() {
           </View>
         ))}
 
-        <TouchableOpacity style={styles.addBtn} onPress={handleAddArticle}>
+        <TouchableOpacity style={[styles.addBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={handleAddArticle}>
           <Feather name="plus" size={20} color={Colors.primary} />
-          <Text style={styles.addBtnText}>AJOUTER UN AUTRE TAPIS</Text>
+          <Text style={styles.addBtnText}>{t('admin.orders.create.items.add_to_bag').toUpperCase()}</Text>
         </TouchableOpacity>
 
       </ScrollView>
 
       {/* Footer / Submit */}
       <View style={styles.footer}>
-        <View style={styles.footerTotals}>
-          <Text style={styles.footerItemsText}>{totalItems} ARTICLE{totalItems !== 1 ? 'S' : ''}</Text>
-          <Text style={styles.footerTotalText}>{totalAmount.toFixed(2)} DH</Text>
+        <View style={[styles.footerTotals, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.footerItemsText}>{totalItems} {t('admin.orders.title').toUpperCase()}</Text>
+          <Text style={styles.footerTotalText}>{totalAmount.toFixed(2)} {t('common.dh')}</Text>
         </View>
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
+        <TouchableOpacity style={[styles.submitBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={handleSubmit} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
             <>
               <Feather name="check-circle" size={20} color="white" />
-              <Text style={styles.submitBtnText}>FINALISER LA COMMANDE</Text>
+              <Text style={styles.submitBtnText}>{t('admin.orders.create.summary.create_btn').toUpperCase()}</Text>
             </>
           )}
         </TouchableOpacity>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
+import { useTranslation } from 'react-i18next';
 
 interface AdminHeaderProps {
   title: string;
@@ -10,14 +11,17 @@ interface AdminHeaderProps {
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, rightAction }) => {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.content}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{title}</Text>
+        <View style={[styles.titleRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={[styles.title, isArabic && { textAlign: 'right' }]}>{title}</Text>
           {rightAction}
         </View>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        {subtitle && <Text style={[styles.subtitle, isArabic && { textAlign: 'right' }]}>{subtitle}</Text>}
       </View>
     </SafeAreaView>
   );

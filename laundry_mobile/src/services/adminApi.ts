@@ -9,6 +9,9 @@ export const adminApi = {
   getRecentOrders: () =>
     api.get('/admin/commandes?limit=5&sort=recent'),
 
+  getOrdersForMap: () =>
+    api.get('/api/admin/commandes/map'),
+
   // Orders
   getOrders: (params: {
     status?: string

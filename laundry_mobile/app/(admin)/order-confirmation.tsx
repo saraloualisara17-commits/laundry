@@ -1,367 +1,259 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  SafeAreaView, 
   Animated,
   Linking,
   Platform,
   Dimensions,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Share
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { adminApi } from '../../src/services/adminApi';
-import * as WebBrowser from 'expo-web-browser';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import { store } from '../../src/store/store';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 export default function OrderConfirmationScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
+  const { orderId, orderNumber } = useLocalSearchParams();
   const { clearOrder } = useOrderCreation();
-  const params = useLocalSearchParams<{ 
-    orderId: string, 
-    reference: string, 
-    clientName: string,
-    total: string,
-    paid: string,
-    remaining: string
-  }>();
-
-  const [sharing, setSharing] = React.useState(false);
-  const [viewing, setViewing] = React.useState(false);
-  const checkScale = useRef(new Animated.Value(0)).current;
+  const [sharing, setSharing] = useState(false);
+  
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.spring(checkScale, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true
-    }).start();
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    ]).start();
   }, []);
 
   const handleFinish = () => {
     clearOrder();
+    // Safety check before back navigation
+    if (router.canGoBack()) {
+       router.dismissAll();
+    }
     router.replace('/(admin)/(tabs)');
   };
 
-  const handleNewOrder = () => {
+  const handleViewOrder = () => {
+    const id = orderId;
     clearOrder();
-    router.replace('/(admin)/create-order');
+    router.replace(`/order/${id}`);
   };
 
-  const handleSharePdf = async () => {
-    if (!params.orderId) return;
-    setSharing(true);
+  const handleWhatsApp = async () => {
+    const pdfUrl = adminApi.getOrderPdfUrl(orderId as string);
+    const localUri = `${FileSystem.cacheDirectory}recu_${orderNumber}.pdf`;
+
     try {
-      const token = store.getState().auth.token;
-      const pdfUrl = adminApi.getOrderPdfUrl(params.orderId);
-      const localUri = `${FileSystem.cacheDirectory}recu_${params.reference}.pdf`;
-
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      setSharing(true);
       
-      if (download.status !== 200) throw new Error('Échec du téléchargement');
+      // 1. Download the PDF file
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      
+      if (download.status !== 200) {
+        throw new Error('Download failed');
+      }
 
+      // 2. Check if sharing is available
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Erreur', 'Partage non disponible');
+        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
         return;
       }
 
+      // 3. Open the native sharing dialog (User picks WhatsApp & Contact)
       await Sharing.shareAsync(download.uri, {
         mimeType: 'application/pdf',
-        dialogTitle: 'Envoyer le reçu',
+        dialogTitle: `${t('admin.orders.create.confirmation.send_receipt')} #${orderNumber}`,
         UTI: 'com.adobe.pdf',
       });
+
     } catch (e) {
-      Alert.alert('Erreur', 'Impossible de générer le PDF');
+      console.error('WhatsApp/PDF share error:', e);
+      Linking.openURL(pdfUrl);
     } finally {
       setSharing(false);
     }
   };
 
-  const handleViewPdf = async () => {
-    if (!params.orderId) return;
-    setViewing(true);
-    try {
-      const token = store.getState().auth.token;
-      const pdfUrl = adminApi.getOrderPdfUrl(params.orderId);
-      const localUri = `${FileSystem.cacheDirectory}preview_${params.reference}.pdf`;
+  const handlePrint = async () => {
+    const pdfUrl = adminApi.getOrderPdfUrl(orderId as string);
+    const localUri = `${FileSystem.cacheDirectory}receipt_${orderNumber}.pdf`;
 
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (download.status === 200) {
-        await Print.printAsync({ uri: download.uri });
-      } else {
-        await WebBrowser.openBrowserAsync(pdfUrl);
-      }
+    try {
+      setSharing(true);
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      if (download.status !== 200) throw new Error('Download failed');
+      await Print.printAsync({ uri: download.uri });
     } catch (e) {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir le PDF');
+      console.error('Print error:', e);
+      Linking.openURL(pdfUrl);
     } finally {
-      setViewing(false);
+      setSharing(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topSection}>
-        <SafeAreaView style={styles.safeArea}>
-          <TouchableOpacity 
-            style={[styles.closeBtn, { top: insets.top + 10 }]} 
-            onPress={handleFinish}
-          >
-            <Ionicons name="close" size={28} color="white" />
-          </TouchableOpacity>
-          
-          <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkScale }] }]}>
-            <Ionicons name="checkmark" size={60} color={AdminColors.primary} />
-          </Animated.View>
-          <Text style={styles.successTitle}>Commande créée !</Text>
-          <Text style={styles.orderRef}>#{params.reference}</Text>
-        </SafeAreaView>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Animated.View style={[
+          styles.successCircle,
+          { transform: [{ scale: scaleAnim }] }
+        ]}>
+          <Ionicons name="checkmark-circle" size={120} color={AdminColors.primary} />
+        </Animated.View>
 
-      <View style={styles.bottomSection}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>CLIENT</Text>
-                <Text style={styles.infoValue}>{params.clientName}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>TOTAL</Text>
-                <Text style={styles.infoValue}>{params.total} DH</Text>
-              </View>
-            </View>
-
-            <View style={[styles.infoRow, { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>PAYÉ</Text>
-                <Text style={[styles.infoValue, { color: AdminColors.success }]}>{params.paid} DH</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>RESTE</Text>
-                <Text style={[styles.infoValue, { color: (parseFloat(params.remaining || '0') > 0) ? AdminColors.danger : AdminColors.textPrimary }]}>
-                  {params.remaining} DH
-                </Text>
-              </View>
-            </View>
+        <Animated.View style={{ opacity: fadeAnim, alignItems: 'center', width: '100%' }}>
+          <Text style={styles.title}>{t('admin.orders.create.confirmation.success_title')}</Text>
+          <View style={styles.orderBadge}>
+             <Text style={styles.orderRef}>#{orderNumber}</Text>
           </View>
+          <Text style={styles.subtitle}>
+            {t('admin.orders.create.confirmation.success_msg')}
+          </Text>
 
-          <Text style={styles.sectionTitle}>Envoyer le reçu</Text>
-          
-          <TouchableOpacity 
-            style={[styles.whatsappBtn, sharing && { opacity: 0.7 }]} 
-            onPress={handleSharePdf}
-            disabled={sharing}
-          >
-            {sharing ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Ionicons name="logo-whatsapp" size={24} color="white" />
-                <Text style={styles.whatsappBtnText}>Envoyer sur WhatsApp</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ghostBtn} onPress={() => Alert.alert('Email', 'Envoi d\'email bientôt disponible')}>
-            <Ionicons name="mail-outline" size={22} color={AdminColors.primary} />
-            <Text style={styles.ghostBtnText}>Envoyer par email</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.ghostBtn, viewing && { opacity: 0.7 }]} 
-            onPress={handleViewPdf}
-            disabled={viewing}
-          >
-            {viewing ? (
-              <ActivityIndicator color={AdminColors.primary} />
-            ) : (
-              <>
-                <Ionicons name="print-outline" size={22} color={AdminColors.primary} />
-                <Text style={styles.ghostBtnText}>Voir le reçu PDF</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleNewOrder}>
-              <Text style={styles.primaryBtnText}>Nouvelle commande</Text>
+          {/* Quick Receipts */}
+          <View style={[styles.receiptActions, isArabic && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity 
+              style={[styles.receiptBtn, { backgroundColor: '#E8F5E9' }]} 
+              onPress={handleWhatsApp}
+              disabled={sharing}
+            >
+              <Ionicons name="logo-whatsapp" size={24} color="#2E7D32" />
+              <Text style={[styles.receiptBtnText, { color: '#2E7D32' }]}>WhatsApp</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleFinish}>
-              <Text style={styles.secondaryBtnLabel}>Retour au tableau de bord</Text>
+
+            <TouchableOpacity 
+              style={[styles.receiptBtn, { backgroundColor: '#F3E5F5' }]} 
+              onPress={handlePrint}
+              disabled={sharing}
+            >
+              <Ionicons name="print" size={24} color="#7B1FA2" />
+              <Text style={[styles.receiptBtnText, { color: '#7B1FA2' }]}>{t('admin.orders.create.items.print')}</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </Animated.View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleViewOrder}>
+            <Ionicons name="document-text-outline" size={20} color="white" />
+            <Text style={styles.primaryBtnText}>{t('common.details')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleFinish}>
+            <Ionicons name="home-outline" size={20} color={AdminColors.primary} />
+            <Text style={styles.secondaryBtnText}>{t('admin.orders.create.confirmation.back_dashboard')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+
+      {sharing && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={AdminColors.primary} />
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F6F8',
-  },
-  topSection: {
-    backgroundColor: AdminColors.primary,
-    height: '38%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  safeArea: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  closeBtn: {
-    position: 'absolute',
-    right: 20,
-    zIndex: 30,
-    padding: 8,
-  },
-  checkCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
     backgroundColor: 'white',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    ...AdminShadows.shadowMedium,
+    padding: 32,
   },
-  successTitle: {
+  successCircle: {
+    marginBottom: 24,
+  },
+  title: {
     fontSize: 26,
     fontWeight: '800',
-    color: 'white',
-    marginTop: 20,
-  },
-  orderRef: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    opacity: 0.85,
-    marginTop: 4,
-  },
-  bottomSection: {
-    flex: 1,
-    backgroundColor: '#F4F6F8',
-    marginTop: -24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 28,
-  },
-  infoCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    ...AdminShadows.shadowSmall,
-  },
-  infoRow: {
-    flexDirection: 'row',
-  },
-  infoItem: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: AdminColors.textMuted,
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: '700',
     color: AdminColors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(245,158,11,0.1)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#F59E0B',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#D97706',
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
+  orderBadge: {
+    backgroundColor: AdminColors.primary100,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 99,
     marginBottom: 16,
   },
-  whatsappBtn: {
-    backgroundColor: '#25D366',
-    height: 54,
-    borderRadius: 14,
+  orderRef: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: AdminColors.primary,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: AdminColors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+    paddingHorizontal: 20,
+  },
+  receiptActions: {
+    width: '100%',
     flexDirection: 'row',
+    gap: 12,
+    marginBottom: 40,
+  },
+  receiptBtn: {
+    flex: 1,
+    height: 80,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 8,
     ...AdminShadows.shadowSmall,
   },
-  whatsappBtnText: {
-    color: 'white',
-    fontSize: 15,
+  receiptBtnText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  ghostBtn: {
-    backgroundColor: 'white',
-    height: 54,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: AdminColors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  ghostBtnText: {
-    color: AdminColors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
   actions: {
-    marginTop: 20,
+    width: '100%',
     gap: 12,
   },
   primaryBtn: {
     backgroundColor: AdminColors.primary,
-    height: 56,
     borderRadius: 16,
+    height: 56,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
     ...AdminShadows.shadowTeal,
   },
   primaryBtnText: {
@@ -371,25 +263,25 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     backgroundColor: 'white',
-    height: 56,
     borderRadius: 16,
+    height: 56,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.1)',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: AdminColors.primary,
   },
-  secondaryBtnLabel: {
-    color: AdminColors.textSecondary,
-    fontSize: 15,
-    fontWeight: '600',
+  secondaryBtnText: {
+    color: AdminColors.primary,
+    fontSize: 16,
+    fontWeight: '700',
   },
-  textBtn: {
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
-    paddingVertical: 8,
-  },
-  textBtnLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: AdminColors.textMuted,
-  },
+    justifyContent: 'center',
+    zIndex: 100,
+  }
 });

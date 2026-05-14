@@ -10,9 +10,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  RefreshControl,
-  SafeAreaView
+  RefreshControl
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
@@ -20,31 +20,36 @@ import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router, useFocusEffect } from 'expo-router';
 
-const ROLE_CONFIG: Record<string, { label: string, color: string, bg: string, border: string, description: string }> = {
-  admin: { 
-    label: 'Administrateur', 
-    color: AdminColors.primary, 
-    bg: AdminColors.primary100, 
-    border: AdminColors.primary200,
-    description: 'Accès complet'
-  },
-  employe: { 
-    label: 'Staff', 
-    color: '#1D4ED8', 
-    bg: 'rgba(59,130,246,0.10)', 
-    border: 'rgba(59,130,246,0.20)',
-    description: 'Traitement'
-  },
-  livreur: { 
-    label: 'Livreur', 
-    color: '#D97706', 
-    bg: 'rgba(245,158,11,0.10)', 
-    border: 'rgba(245,158,11,0.20)',
-    description: 'Logistique'
-  },
-};
+import { useTranslation } from 'react-i18next';
 
 export default function UsersScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+
+  const ROLE_CONFIG: Record<string, { label: string, color: string, bg: string, border: string, description: string }> = {
+    admin: { 
+      label: t('tabs.admin', { defaultValue: 'Administrateur' }), 
+      color: AdminColors.primary, 
+      bg: AdminColors.primary100, 
+      border: AdminColors.primary200,
+      description: t('admin.users.roles.admin_desc')
+    },
+    employe: { 
+      label: t('common.staff', { defaultValue: 'Staff' }), 
+      color: '#1D4ED8', 
+      bg: 'rgba(59,130,246,0.10)', 
+      border: 'rgba(59,130,246,0.20)',
+      description: t('admin.users.roles.staff_desc')
+    },
+    livreur: { 
+      label: t('tabs.livreur', { defaultValue: 'Livreur' }), 
+      color: '#D97706', 
+      bg: 'rgba(245,158,11,0.10)', 
+      border: 'rgba(245,158,11,0.20)',
+      description: t('admin.users.roles.driver_desc')
+    },
+  };
+
   const [activeRole, setActiveRole] = useState('Tous');
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<any[]>([]);
@@ -61,8 +66,7 @@ export default function UsersScreen() {
   const fetchUsers = async () => {
     try {
       const [activeRes, inactiveRes] = await Promise.all([
-        adminApi.getUsers(), // fetches active-users
-        // Adding call for inactive-users to show the full team
+        adminApi.getUsers(),
         require('../../../src/api/axios').api.get('/admin/inactive-users')
       ]);
       
@@ -91,7 +95,6 @@ export default function UsersScreen() {
     const activeRoleKey = activeRole === 'Employé' ? 'employe' : activeRole.toLowerCase();
     const matchesRole = activeRole === 'Tous' || roleKey === activeRoleKey;
     
-    // Support both active and isActive field names
     const isUserActive = u.isActive !== undefined ? u.isActive : u.active;
     
     const matchesSearch = !search || 
@@ -112,29 +115,27 @@ export default function UsersScreen() {
       }
       fetchUsers();
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer le statut');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
   const handleDeleteUser = async (user: any) => {
     Alert.alert(
-      'Supprimer un membre',
-      `Voulez-vous vraiment supprimer définitivement ${user.name} ? Cette action est irréversible.`,
+      t('common.supprimer'),
+      `${t('common.supprimer')} ${user.name} ?`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Supprimer', 
+          text: t('common.supprimer'), 
           style: 'destructive',
           onPress: async () => {
             try {
-              await adminApi.deleteOrder(user.id); // Wait, adminApi.deleteOrder is for orders. Let me check the delete user method.
-              // I will use a direct call if the method is missing or named differently
               await require('../../../src/api/axios').api.delete(`/admin/delete-user/${user.id}`);
               fetchUsers();
-              Alert.alert('Succès', 'Membre supprimé avec succès');
+              Alert.alert(t('common.success'), t('admin.users.user_deleted', { defaultValue: 'Membre supprimé avec succès' }));
             } catch (error: any) {
-              const msg = error.response?.data?.message || 'Impossible de supprimer l\'utilisateur. Vérifiez s\'il a des commandes liées.';
-              Alert.alert('Erreur', msg);
+              const msg = error.response?.data?.message || t('common.error_msg');
+              Alert.alert(t('common.error'), msg);
             }
           }
         }
@@ -145,7 +146,7 @@ export default function UsersScreen() {
   const saveUser = async () => {
     try {
       if (!form.name || !form.email || (!userModal.data && !form.password)) {
-        return Alert.alert('Erreur', 'Veuillez remplir les champs obligatoires');
+        return Alert.alert(t('common.error'), t('admin.users.required_fields', { defaultValue: 'Veuillez remplir les champs obligatoires' }));
       }
       
       const payload = {
@@ -162,22 +163,22 @@ export default function UsersScreen() {
       setUserModal({ open: false, data: null });
       fetchUsers();
     } catch (error: any) {
-      const msg = error.response?.data?.message || 'Impossible d\'enregistrer l\'utilisateur';
-      Alert.alert('Erreur', msg);
+      const msg = error.response?.data?.message || t('common.error_msg');
+      Alert.alert(t('common.error'), msg);
     }
   };
 
   const resetPassword = async () => {
     try {
-      if (!newPass || newPass.length < 6) return Alert.alert('Erreur', 'Minimum 6 caractères');
+      if (!newPass || newPass.length < 6) return Alert.alert(t('common.error'), t('admin.users.password_min_length', { defaultValue: 'Minimum 6 caractères' }));
       if (passModal.userId) {
         await adminApi.resetPassword(passModal.userId, newPass);
-        Alert.alert('Succès', 'Mot de passe réinitialisé');
+        Alert.alert(t('common.success'), t('admin.users.password_updated', { defaultValue: 'Mot de passe réinitialisé' }));
         setPassModal({ open: false, userId: null });
         setNewPass('');
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de réinitialiser');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
@@ -192,33 +193,32 @@ export default function UsersScreen() {
     const roleKey = item.role?.toLowerCase() || 'livreur';
     const role = ROLE_CONFIG[roleKey] || ROLE_CONFIG.livreur;
     
-    // Unified status detection
     const isUserActive = item.isActive !== undefined ? item.isActive : item.active;
 
     return (
       <View style={styles.userCard}>
-        <View style={styles.cardHeader}>
+        <View style={[styles.cardHeader, isArabic && { flexDirection: 'row-reverse' }]}>
           <View style={[styles.avatar, { backgroundColor: role.color }]}>
             <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
           </View>
           
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>{item.name}</Text>
-                <Text style={styles.userEmail}>{item.email}</Text>
-                <Text style={[styles.userEmail, { marginTop: 1 }]}>{item.phone || item.phoneNumber || 'Sans numéro'}</Text>
+            <View style={[styles.rowSpaced, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 12 }]}>
+                <Text style={[styles.userName, isArabic && { textAlign: 'right' }]}>{item.name}</Text>
+                <Text style={[styles.userEmail, isArabic && { textAlign: 'right' }]}>{item.email}</Text>
+                <Text style={[styles.userEmail, { marginTop: 1 }, isArabic && { textAlign: 'right' }]}>{item.phone || item.phoneNumber || t('admin.users.no_phone', { defaultValue: 'Sans numéro' })}</Text>
               </View>
               
-              <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge]}>
+              <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[styles.statusDot, { backgroundColor: isUserActive ? AdminColors.success : AdminColors.danger }]} />
                 <Text style={[styles.statusBadgeText, { color: isUserActive ? '#065F46' : AdminColors.danger }]}>
-                  {isUserActive ? 'Actif' : 'Suspendu'}
+                  {isUserActive ? t('admin.users.status.active') : t('admin.users.status.suspended')}
                 </Text>
               </View>
             </View>
             
-            <View style={styles.badgeRow}>
+            <View style={[styles.badgeRow, isArabic && { flexDirection: 'row-reverse', marginRight: 12 }]}>
               <View style={[styles.roleBadge, { backgroundColor: role.bg, borderColor: role.border }]}>
                 <Text style={[styles.roleBadgeText, { color: role.color }]}>{role.label}</Text>
               </View>
@@ -228,9 +228,9 @@ export default function UsersScreen() {
 
         <View style={styles.divider} />
 
-        <View style={styles.actionsRow}>
+        <View style={[styles.actionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity 
-            style={styles.actionBtn}
+            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => {
               setForm({ 
                 name: item.name, 
@@ -243,25 +243,25 @@ export default function UsersScreen() {
             }}
           >
             <Ionicons name="pencil" size={16} color={AdminColors.textSecondary} />
-            <Text style={styles.actionBtnText}>Modifier</Text>
+            <Text style={styles.actionBtnText}>{t('common.modifier')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionBtn}
+            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => setPassModal({ open: true, userId: item.id })}
           >
             <Ionicons name="key-outline" size={16} color={AdminColors.primary} />
-            <Text style={[styles.actionBtnText, { color: AdminColors.primary }]}>Clé</Text>
+            <Text style={[styles.actionBtnText, { color: AdminColors.primary }]}>{t('admin.users.key')}</Text>
           </TouchableOpacity>
 
           {item.role?.toLowerCase() !== 'admin' && (
             <>
               <TouchableOpacity 
-                style={[styles.actionBtn, isUserActive ? styles.suspendBtn : styles.reactivateBtn]}
+                style={[styles.actionBtn, isUserActive ? styles.suspendBtn : styles.reactivateBtn, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={() => handleToggleActive(item)}
               >
                 <Text style={[styles.actionBtnText, { color: isUserActive ? AdminColors.warning : AdminColors.success }]}>
-                  {isUserActive ? 'Suspendre' : 'Activer'}
+                  {isUserActive ? t('admin.users.actions.suspend') : t('admin.users.actions.activate')}
                 </Text>
               </TouchableOpacity>
 
@@ -275,36 +275,36 @@ export default function UsersScreen() {
               )}
             </>
           )}
-          </View>
-          </View>
-          );
-          };
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>Équipe</Text>
-            <Text style={styles.headerSubtitle}>{users.length} membres au total</Text>
+        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={isArabic && { alignItems: 'flex-end' }}>
+            <Text style={styles.headerTitle}>{t('admin.users.title')}</Text>
+            <Text style={styles.headerSubtitle}>{users.length} {t('admin.users.total_count')}</Text>
           </View>
           <TouchableOpacity 
-            style={styles.addBtn}
+            style={[styles.addBtn, isArabic && { marginLeft: 0, marginRight: 'auto' }]}
             onPress={() => {
               setForm({ name: '', email: '', phone: '', password: '', role: 'livreur' });
               setUserModal({ open: true, data: null });
             }}
           >
             <Ionicons name="person-add" size={18} color="white" />
-            <Text style={styles.addBtnText}>Nouveau</Text>
+            <Text style={styles.addBtnText}>{t('admin.users.new_user')}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
           <Ionicons name="search" size={18} color={AdminColors.textMuted} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Rechercher un membre..."
+            style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
+            placeholder={t('admin.users.search_placeholder')}
             value={search}
             onChangeText={setSearch}
             placeholderTextColor={AdminColors.textMuted}
@@ -313,6 +313,7 @@ export default function UsersScreen() {
 
         <FlatList
           horizontal
+          inverted={isArabic}
           data={['Tous', 'Admin', 'Employé', 'Livreur']}
           keyExtractor={item => item}
           showsHorizontalScrollIndicator={false}
@@ -322,7 +323,9 @@ export default function UsersScreen() {
               style={[styles.pill, activeRole === item && styles.activePill]}
               onPress={() => setActiveRole(item)}
             >
-              <Text style={[styles.pillText, activeRole === item && styles.activePillText]}>{item}</Text>
+              <Text style={[styles.pillText, activeRole === item && styles.activePillText]}>
+                {item === 'Tous' ? t('common.all') : (item === 'Employé' ? t('common.staff') : item)}
+              </Text>
             </TouchableOpacity>
           )}
         />
@@ -338,7 +341,7 @@ export default function UsersScreen() {
           loading ? (
             <View style={{ padding: 16 }}>{Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)}</View>
           ) : (
-            <EmptyState icon="👥" title="Aucun membre" subtitle={search ? "Aucun résultat pour cette recherche" : "Commencez par ajouter un membre"} />
+            <EmptyState icon="👥" title={t('admin.users.empty_title')} subtitle={search ? t('common.no_data') : t('admin.users.empty_subtitle')} />
           )
         }
       />
@@ -346,8 +349,8 @@ export default function UsersScreen() {
       {/* User Modal */}
       <Modal visible={userModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{userModal.data ? 'Modifier l\'utilisateur' : 'Nouveau membre'}</Text>
+          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Text style={styles.modalTitle}>{userModal.data ? t('common.modifier') : t('admin.users.new_user')}</Text>
             <TouchableOpacity onPress={() => setUserModal({ open: false, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -355,29 +358,29 @@ export default function UsersScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={styles.label}>Nom complet</Text>
-              <TextInput style={styles.input} value={form.name} onChangeText={t => setForm({...form, name: t})} />
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.full_name')}</Text>
+              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} value={form.name} onChangeText={t => setForm({...form, name: t})} />
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput style={styles.input} keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={t => setForm({...form, email: t})} />
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.email')}</Text>
+              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={t => setForm({...form, email: t})} />
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Téléphone</Text>
-              <TextInput style={styles.input} keyboardType="phone-pad" value={form.phone} onChangeText={t => setForm({...form, phone: t})} />
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.phone')}</Text>
+              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} keyboardType="phone-pad" value={form.phone} onChangeText={t => setForm({...form, phone: t})} />
             </View>
 
             {!userModal.data && (
               <View style={styles.formField}>
-                <Text style={styles.label}>Mot de passe</Text>
-                <TextInput style={styles.input} secureTextEntry value={form.password} onChangeText={t => setForm({...form, password: t})} />
+                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.password')}</Text>
+                <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} secureTextEntry value={form.password} onChangeText={t => setForm({...form, password: t})} />
               </View>
             )}
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Rôle</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.role')}</Text>
               <View style={styles.roleGrid}>
                 {Object.entries(ROLE_CONFIG).map(([key, cfg]) => (
                   <TouchableOpacity 
@@ -385,15 +388,15 @@ export default function UsersScreen() {
                     style={[styles.roleCard, form.role === key && { borderColor: cfg.color, backgroundColor: cfg.bg }]}
                     onPress={() => setForm({...form, role: key})}
                   >
-                    <Text style={[styles.roleCardTitle, { color: cfg.color }]}>{cfg.label}</Text>
-                    <Text style={styles.roleCardDesc}>{cfg.description}</Text>
+                    <Text style={[styles.roleCardTitle, { color: cfg.color }, isArabic && { textAlign: 'right' }]}>{cfg.label}</Text>
+                    <Text style={[styles.roleCardDesc, isArabic && { textAlign: 'right' }]}>{cfg.description}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
             <TouchableOpacity style={styles.primaryBtn} onPress={saveUser}>
-              <Text style={styles.primaryBtnText}>{userModal.data ? 'Enregistrer' : 'Créer le compte'}</Text>
+              <Text style={styles.primaryBtnText}>{userModal.data ? t('common.save') : t('admin.users.create_account')}</Text>
             </TouchableOpacity>
             
             <View style={{ height: 40 }} />
@@ -405,20 +408,20 @@ export default function UsersScreen() {
       <Modal visible={passModal.open} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>Réinitialiser le mot de passe</Text>
+            <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.users.reset_password')}</Text>
             <TextInput 
-              style={styles.input} 
+              style={[styles.input, isArabic && { textAlign: 'right' }]} 
               secureTextEntry 
-              placeholder="Nouveau mot de passe"
+              placeholder={t('admin.users.new_password_placeholder')}
               value={newPass}
               onChangeText={setNewPass}
             />
-            <View style={styles.dialogActions}>
+            <View style={[styles.dialogActions, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => { setPassModal({ open: false, userId: null }); setNewPass(''); }}>
-                <Text style={styles.dialogBtnText}>Annuler</Text>
+                <Text style={styles.dialogBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.dialogBtn, styles.dangerBtn]} onPress={resetPassword}>
-                <Text style={[styles.dialogBtnText, { color: 'white' }]}>Réinitialiser</Text>
+                <Text style={[styles.dialogBtnText, { color: 'white' }]}>{t('admin.users.reset_btn')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -742,5 +745,10 @@ const styles = StyleSheet.create({
   },
   dangerBtn: {
     backgroundColor: AdminColors.danger,
+  },
+  rowSpaced: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
 });

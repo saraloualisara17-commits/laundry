@@ -8,8 +8,11 @@ import { RootState, AppDispatch } from '../../src/store/store';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Radius, StatusColors } from '../../constants/theme';
 import { StatusBadge } from '../../components/admin/StatusBadge';
+import { useTranslation } from 'react-i18next';
 
 export default function ClientDetailsScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -36,30 +39,31 @@ export default function ClientDetailsScreen() {
     return '—';
   };
 
-  const getClientDisplayName = (c: any) => c?.name || c?.nom || `Client #${id}`;
+  const getClientDisplayName = (c: any) => c?.name || c?.nom || `${t('tabs.clients')} #${id}`;
 
   const stats = useMemo(() => {
+    if (!Array.isArray(clientCommandes)) return { total: 0, articles: 0 };
     const total = clientCommandes.reduce((acc, c) => acc + (c.montantTotal || 0), 0);
     const articles = clientCommandes.reduce((acc, c) => acc + (c.commandeTapis?.length || 0), 0);
     return { total, articles };
   }, [clientCommandes]);
 
-  if (loading && clientCommandes.length === 0) {
+  if (loading && !selectedClient) {
     return (
       <View style={styles.centerContent}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Chargement du profil...</Text>
+        <Text style={styles.loadingText}>{t('common.loading_data')}</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !selectedClient) {
     return (
       <View style={styles.centerContent}>
         <Feather name="alert-triangle" size={48} color={Colors.danger} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Retour</Text>
+          <Text style={styles.backButtonText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -67,14 +71,12 @@ export default function ClientDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerBar}>
+      <View style={[styles.headerBar, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity style={styles.headerBackBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+          <Feather name={isArabic ? "arrow-right" : "arrow-left"} size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Fiche Client</Text>
-        <TouchableOpacity style={styles.headerIconBtn}>
-          <Feather name="edit" size={20} color={Colors.primary} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('admin.clients.details_title', { defaultValue: 'Fiche Client' })}</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -86,80 +88,81 @@ export default function ClientDetailsScreen() {
           </View>
           <Text style={styles.clientName}>{getClientDisplayName(client)}</Text>
           
-          <View style={styles.contactInfoRow}>
-            <View style={styles.contactItem}>
+          <View style={[styles.contactInfoRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.contactItem, isArabic && { flexDirection: 'row-reverse' }]}>
               <Feather name="phone" size={14} color={Colors.success} />
               <Text style={styles.contactText}>{getClientPhone(client)}</Text>
             </View>
             <View style={styles.contactDivider} />
-            <View style={styles.contactItem}>
+            <View style={[styles.contactItem, isArabic && { flexDirection: 'row-reverse' }]}>
               <Feather name="mail" size={14} color={Colors.primary} />
-              <Text style={styles.contactText} numberOfLines={1}>{client?.email || 'Pas d\'email'}</Text>
+              <Text style={styles.contactText} numberOfLines={1}>{client?.email || t('admin.clients.no_email', { defaultValue: 'Pas d\'email' })}</Text>
             </View>
           </View>
         </View>
 
-        {/* KPI Grid */}
-        <View style={styles.kpiGrid}>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>COMMANDES</Text>
-            <Text style={styles.kpiValue}>{clientCommandes.length}</Text>
+        {/* Stats Summary */}
+        <View style={[styles.statsGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
+            <Text style={styles.statLabel}>{t('dashboard.orders')}</Text>
           </View>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>ARTICLES</Text>
-            <Text style={styles.kpiValue}>{stats.articles}</Text>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{stats.articles}</Text>
+            <Text style={styles.statLabel}>{t('admin.catalog.products_count', { defaultValue: 'Articles' })}</Text>
           </View>
-          <View style={[styles.kpiCard, { backgroundColor: Colors.primary50 }]}>
-            <Text style={[styles.kpiLabel, { color: Colors.primaryDark }]}>CHIFFRE</Text>
-            <Text style={[styles.kpiValue, { color: Colors.primary }]}>{stats.total} <Text style={styles.currencySmall}>DH</Text></Text>
+          <View style={[styles.statBox, styles.statBoxPrimary]}>
+            <Text style={[styles.statValue, { color: 'white' }]}>{stats.total} {t('common.dh')}</Text>
+            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.8)' }]}>{t('common.total')}</Text>
           </View>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Historique des commandes</Text>
+        {/* Orders List */}
+        <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.sectionTitle}>{t('dashboard.recent_orders')}</Text>
+          <View style={styles.badgeCount}>
+            <Text style={styles.badgeCountText}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
+          </View>
         </View>
 
-        {clientCommandes.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Feather name="file-text" size={48} color="#CBD5E1" />
-            <Text style={styles.emptyText}>Aucune commande trouvée.</Text>
+        {!Array.isArray(clientCommandes) || clientCommandes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="package" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyStateText}>{t('admin.orders.empty_title')}</Text>
           </View>
         ) : (
-          clientCommandes.map((order: any) => {
-            const statusConfig = StatusColors[order.status] || StatusColors.PENDING_PICKUP;
-            
-            return (
-              <TouchableOpacity 
-                key={order.id} 
-                style={styles.orderCard}
-                onPress={() => router.push(`/order/${order.id}`)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.orderAccentBar, { backgroundColor: statusConfig.dot }]} />
-                <View style={styles.orderHeader}>
-                  <View>
-                    <Text style={styles.orderNumberText}>Commande #{order.numeroCommande}</Text>
-                    <View style={styles.dateRow}>
-                       <Feather name="calendar" size={12} color={Colors.textMuted} />
-                       <Text style={styles.dateText}>{new Date(order.dateCreation).toLocaleDateString('fr-FR')}</Text>
-                    </View>
-                  </View>
-                  <StatusBadge status={order.status} />
+          clientCommandes.map((commande) => (
+            <TouchableOpacity 
+              key={commande.id} 
+              style={styles.orderCard}
+              onPress={() => router.push(`/order/${commande.id}`)}
+            >
+              <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View>
+                  <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{commande.numeroCommande}</Text>
+                  <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>
+                    {new Date(commande.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}
+                  </Text>
                 </View>
-                
-                <View style={styles.orderFooter}>
-                  <View style={styles.itemsBadge}>
-                    <MaterialIcons name="layers" size={14} color={Colors.textSecondary} style={{ marginRight: 4 }} />
-                    <Text style={styles.itemsBadgeText}>{order.commandeTapis?.length || 0} tapis</Text>
-                  </View>
-                  <Text style={styles.orderPrice}>{order.montantTotal || 0} DH</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
+                <StatusBadge status={commande.status} />
+              </View>
 
-        <View style={{ height: 40 }} />
+              <View style={[styles.orderBody, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.itemSummary, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Feather name="shopping-bag" size={14} color={Colors.textSecondary} />
+                  <Text style={styles.itemSummaryText}>
+                    {commande.commandeTapis?.length || 0} {t('admin.catalog.products_count', { defaultValue: 'articles' })}
+                  </Text>
+                </View>
+                <Text style={styles.orderPrice}>{commande.montantTotal} {t('common.dh')}</Text>
+              </View>
+              
+              <View style={styles.cardFooter}>
+                 <Text style={[styles.viewDetailsText, isArabic && { textAlign: 'left' }]}>{t('common.details')} →</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -167,122 +170,43 @@ export default function ClientDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    height: Platform.OS === 'ios' ? 100 : 60,
-    paddingTop: Platform.OS === 'ios' ? 40 : 0,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerBackBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: Typography.weight.semibold, color: Colors.textPrimary },
-  headerIconBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.primary50, justifyContent: 'center', alignItems: 'center' },
-  
+  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { marginTop: 12, fontSize: 16, color: Colors.textSecondary, ...Typography.medium },
+  errorText: { marginTop: 12, fontSize: 16, color: Colors.danger, textAlign: 'center', ...Typography.medium },
+  backButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: Colors.primary, borderRadius: Radius.md },
+  backButtonText: { color: 'white', fontSize: 15, ...Typography.bold },
+  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 15, paddingHorizontal: 20, backgroundColor: 'white', ...Shadows.sm },
+  headerBackBtn: { padding: 5 },
+  headerTitle: { fontSize: 18, color: Colors.textPrimary, ...Typography.bold },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 20 },
-  
-  profileCard: { 
-    backgroundColor: Colors.surface, 
-    borderRadius: Radius.xl, 
-    padding: 24, 
-    alignItems: 'center', 
-    marginBottom: 20, 
-    borderWidth: 1, 
-    borderColor: Colors.border,
-    ...Shadows.sm 
-  },
-  avatarLarge: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: Colors.primary100, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.primary100,
-  },
-  avatarTextLarge: { fontSize: 32, fontWeight: 'bold', color: Colors.primary },
-  clientName: { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 16 },
-  
-  contactInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  profileCard: { backgroundColor: 'white', borderRadius: Radius.xl, padding: 24, alignItems: 'center', ...Shadows.md, marginBottom: 20 },
+  avatarLarge: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary50, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  avatarTextLarge: { fontSize: 32, color: Colors.primary, ...Typography.bold },
+  clientName: { fontSize: 22, color: Colors.textPrimary, ...Typography.bold, marginBottom: 8, textAlign: 'center' },
+  contactInfoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   contactItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  contactText: { fontSize: 13, color: Colors.textSecondary, fontWeight: Typography.weight.medium },
-  contactDivider: { width: 1, height: 12, backgroundColor: Colors.border },
-  
-  kpiGrid: { flexDirection: 'row', gap: 12, marginBottom: 28 },
-  kpiCard: { 
-    flex: 1, 
-    backgroundColor: Colors.surface, 
-    padding: 16, 
-    borderRadius: Radius.lg, 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: Colors.border,
-    ...Shadows.xs 
-  },
-  kpiLabel: { fontSize: 9, fontWeight: 'bold', color: Colors.textMuted, marginBottom: 6, letterSpacing: 0.5 },
-  kpiValue: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
-  currencySmall: { fontSize: 10 },
-  
-  sectionHeader: { marginBottom: 12, marginLeft: 4 },
-  sectionTitle: { fontSize: Typography.size.lg, fontWeight: Typography.weight.bold, color: Colors.textPrimary },
-
-  emptyContainer: { alignItems: 'center', padding: 40, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
-  emptyText: { color: Colors.textMuted, marginTop: 12, fontWeight: '500' },
-  
-  orderCard: { 
-    backgroundColor: Colors.surface, 
-    padding: 16, 
-    borderRadius: Radius.lg, 
-    marginBottom: 12, 
-    borderWidth: 1, 
-    borderColor: Colors.border,
-    ...Shadows.sm,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  orderAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    borderRadius: Radius.sm,
-  },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  orderNumberText: { fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 4 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dateText: { fontSize: 12, color: Colors.textMuted },
-  
-  orderFooter: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingTop: 12, 
-    borderTopWidth: 1, 
-    borderTopColor: Colors.surface2 
-  },
-  itemsBadge: { 
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bg, 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: Radius.sm, 
-    borderWidth: 1, 
-    borderColor: Colors.border 
-  },
-  itemsBadgeText: { fontSize: 12, fontWeight: Typography.weight.semibold, color: Colors.textSecondary },
-  orderPrice: { fontSize: 16, fontWeight: 'bold', color: Colors.primary },
-
-  loadingText: { marginTop: 12, color: Colors.textSecondary, fontWeight: 'bold' },
-  errorText: { color: Colors.danger, marginBottom: 20, fontSize: 16, textAlign: 'center' },
-  backButton: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.md, ...Shadows.teal },
-  backButtonText: { color: 'white', fontWeight: 'bold' }
+  contactText: { fontSize: 14, color: Colors.textSecondary, ...Typography.regular },
+  contactDivider: { width: 1, height: 14, backgroundColor: Colors.border, marginHorizontal: 12 },
+  statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  statBox: { flex: 1, backgroundColor: 'white', borderRadius: Radius.lg, padding: 16, alignItems: 'center', ...Shadows.sm },
+  statBoxPrimary: { backgroundColor: Colors.primary, flex: 1.5 },
+  statValue: { fontSize: 18, color: Colors.textPrimary, ...Typography.bold, marginBottom: 4 },
+  statLabel: { fontSize: 12, color: Colors.textMuted, ...Typography.medium },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
+  sectionTitle: { fontSize: 18, color: Colors.textPrimary, ...Typography.bold },
+  badgeCount: { backgroundColor: Colors.primary100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full },
+  badgeCountText: { fontSize: 12, color: Colors.primary, ...Typography.bold },
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyStateText: { fontSize: 16, color: Colors.textMuted, ...Typography.medium },
+  orderCard: { backgroundColor: 'white', borderRadius: Radius.lg, padding: 16, marginBottom: 12, ...Shadows.sm },
+  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  orderRef: { fontSize: 15, color: Colors.textPrimary, ...Typography.bold, marginBottom: 2 },
+  orderDate: { fontSize: 13, color: Colors.textMuted, ...Typography.regular },
+  orderBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border },
+  itemSummary: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  itemSummaryText: { fontSize: 14, color: Colors.textSecondary, ...Typography.medium },
+  orderPrice: { fontSize: 16, color: Colors.primary, ...Typography.bold },
+  cardFooter: { paddingTop: 10 },
+  viewDetailsText: { fontSize: 13, color: Colors.textMuted, textAlign: 'right', ...Typography.medium },
 });

@@ -1,19 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { StatusColors } from '../../constants/StatusColors';
+import { useTranslation } from 'react-i18next';
 
 interface StatusBadgeProps {
   status: string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const { t } = useTranslation();
   const config = StatusColors[status] || StatusColors.PENDING_PICKUP;
 
   return (
     <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.border }]}>
       <View style={[styles.dot, { backgroundColor: config.dot }]} />
       <Text style={[styles.text, { color: config.text }]}>
-        {config.label.toUpperCase()}
+        {t(`status.${status}`).toUpperCase()}
       </Text>
     </View>
   );

@@ -29,6 +29,9 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
+import { BASE_URL } from '../../src/api/axios';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,17 +52,18 @@ const getCategoryEmoji = (category: any) => {
 };
 
 export default function OrderItemsScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
   const { 
     client, items, addItem, removeItem, updateItem, 
-    totalAmount, totalArea, totalCarpets, itemCount,
+    totalAmount, totalArea, itemCount,
     paidAmount, setPaidAmount, remainingAmount,
-    orderNotes, setOrderNotes, editingOrderId
+    orderNotes, setOrderNotes, orderImages, setOrderImages, editingOrderId
   } = useOrderCreation();
   
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sharing, setSharing] = useState(false);
   
   // Modals
   const [configModal, setConfigModal] = useState<{ open: boolean, product: any, editCartId: string | null }>({
@@ -81,14 +85,9 @@ export default function OrderItemsScreen() {
     setLoading(true);
     try {
       const res = await adminApi.getCategories();
-      
-      // Backend returns ApiResponse<List<CategoryDto>>
-      // The wrapper has { success: boolean, data: T, message: string }
       const responseData = res.data;
       const categories = responseData.data || [];
       
-      console.log(`Loaded ${categories.length} categories from API`);
-
       const allProducts = categories.flatMap((cat: any) => {
         if (!cat || !cat.products) return [];
         
@@ -101,11 +100,10 @@ export default function OrderItemsScreen() {
           }));
       });
 
-      console.log(`Mapped ${allProducts.length} active products`);
       setProducts(allProducts);
     } catch (e: any) {
       console.error('Catalog load error:', e.response?.data || e.message);
-      Alert.alert('Error', 'Could not load catalog');
+      Alert.alert(t('common.error'), t('admin.catalog.empty_title'));
     } finally {
       setLoading(false);
     }
@@ -152,10 +150,10 @@ export default function OrderItemsScreen() {
     if (!product) return;
 
     if (product.pricingMethod === 'PER_M2' && (!configForm.largura || !configForm.hauteur)) {
-      return Alert.alert('Error', 'Entrez les dimensions');
+      return Alert.alert(t('common.error'), t('admin.orders.create.items.enter_dimensions'));
     }
     if (product.pricingMethod === 'CUSTOM' && !configForm.customPrice) {
-      return Alert.alert('Error', 'Entrez un prix');
+      return Alert.alert(t('common.error'), t('admin.orders.create.items.enter_price'));
     }
 
     const finalPrice = calculateItemPrice(product, configForm);
@@ -196,21 +194,21 @@ export default function OrderItemsScreen() {
       if (source === 'camera') {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission requise', "L'accès à la caméra est nécessaire");
+          Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
           return;
         }
         result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           quality: 0.7,
         });
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission requise', "L'accès à la galerie est nécessaire");
+          Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           quality: 0.7,
           allowsMultipleSelection: true,
           selectionLimit: 5,
@@ -236,30 +234,38 @@ export default function OrderItemsScreen() {
     }));
   };
 
-  // Keep original pickImage for the action bar
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', "L'accès à la caméra est nécessaire");
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+      });
 
-    if (!result.canceled) {
-       Alert.alert('Succès', 'Photo capturée.');
+      if (!result.canceled && result.assets.length > 0) {
+        const newUri = result.assets[0].uri;
+        setOrderImages([...orderImages, newUri]);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      console.error('Order photo error:', e);
     }
+  };
+
+  const removeOrderImage = (uri: string) => {
+    setOrderImages(orderImages.filter(i => i !== uri));
   };
 
   const handleShare = async () => {
     if (!editingOrderId) {
-      // For new orders not yet saved, fallback to simple text share
       try {
         await Share.share({
-          message: `Récapitulatif de commande pour ${client?.name}\nTotal: ${totalAmount.toFixed(2)} DH\nArticles: ${itemCount}`,
+          message: `${t('admin.orders.create.items.summary_for')} ${client?.name}\nTotal: ${totalAmount.toFixed(2)} ${t('common.dh')}\n${t('dashboard.orders_count')}: ${itemCount}`,
         });
       } catch (error) {
         console.log(error);
@@ -275,27 +281,27 @@ export default function OrderItemsScreen() {
       const download = await FileSystem.downloadAsync(pdfUrl, localUri);
       
       if (download.status !== 200) {
-        throw new Error('Échec du téléchargement');
+        throw new Error('Download failed');
       }
 
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Erreur', 'Le partage n\'est pas disponible sur cet appareil');
+        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available', { defaultValue: "Partage non disponible" }));
         return;
       }
 
       await Sharing.shareAsync(download.uri, {
         mimeType: 'application/pdf',
-        dialogTitle: 'Partager le reçu de commande',
+        dialogTitle: t('admin.orders.create.confirmation.send_receipt'),
         UTI: 'com.adobe.pdf',
       });
     } catch (e) {
-      Alert.alert('Erreur', 'Impossible de générer ou de partager le PDF');
+      Alert.alert(t('common.error'), t('admin.orders.create.confirmation.share_pdf_error', { defaultValue: "Erreur de partage" }));
     }
   };
 
   const handlePrint = async () => {
     if (!editingOrderId) {
-      return Alert.alert('Information', 'Veuillez d\'abord enregistrer la commande pour l\'imprimer.');
+      return Alert.alert(t('common.info'), t('admin.orders.create.items.save_first_to_print'));
     }
     const pdfUrl = adminApi.getOrderPdfUrl(editingOrderId);
     const localUri = `${FileSystem.cacheDirectory}receipt_${editingOrderId}.pdf`;
@@ -310,75 +316,75 @@ export default function OrderItemsScreen() {
   };
 
   const renderActionBar = () => (
-    <View style={styles.actionBar}>
+    <View style={[styles.actionBar, isArabic && { flexDirection: 'row-reverse' }]}>
       <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
         <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
           <Ionicons name="share-social" size={20} color="#1976D2" />
         </View>
-        <Text style={styles.actionText}>Partager</Text>
+        <Text style={styles.actionText}>{t('admin.orders.create.items.share')}</Text>
       </TouchableOpacity>
       
       <TouchableOpacity style={styles.actionBtn} onPress={handlePrint}>
         <View style={[styles.actionIcon, { backgroundColor: '#F3E5F5' }]}>
           <Ionicons name="print" size={20} color="#7B1FA2" />
         </View>
-        <Text style={styles.actionText}>Imprimer</Text>
+        <Text style={styles.actionText}>{t('admin.orders.create.items.print')}</Text>
       </TouchableOpacity>
       
       <TouchableOpacity style={styles.actionBtn} onPress={pickImage}>
         <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
           <Ionicons name="camera" size={20} color="#388E3C" />
         </View>
-        <Text style={styles.actionText}>Photos</Text>
+        <Text style={styles.actionText}>{t('admin.orders.create.items.photos')}</Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderSummaryCard = () => (
     <View style={styles.summaryCard}>
-      <View style={styles.summaryGrid}>
+      <View style={[styles.summaryGrid, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={styles.gridItem}>
-          <Text style={styles.summaryLabel}>Total</Text>
-          <Text style={[styles.summaryValue, { color: AdminColors.textPrimary }]}>{totalAmount.toFixed(2)} DH</Text>
+          <Text style={styles.summaryLabel}>{t('common.total')}</Text>
+          <Text style={[styles.summaryValue, { color: AdminColors.textPrimary }]}>{totalAmount.toFixed(2)} {t('common.dh')}</Text>
         </View>
         <View style={styles.gridItem}>
-          <Text style={styles.summaryLabel}>Surface</Text>
+          <Text style={styles.summaryLabel}>{t('admin.orders.create.items.area')}</Text>
           <Text style={styles.summaryValue}>{totalArea.toFixed(2)} m²</Text>
         </View>
         <View style={styles.gridItem}>
-          <Text style={styles.summaryLabel}>Pièces</Text>
+          <Text style={styles.summaryLabel}>{t('admin.orders.create.items.pieces')}</Text>
           <Text style={styles.summaryValue}>{itemCount}</Text>
         </View>
       </View>
       
-      <View style={styles.paymentRow}>
+      <View style={[styles.paymentRow, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity style={styles.paymentSection} onPress={() => { setTempPaid(paidAmount.toString()); setShowPaymentModal(true); }}>
-          <Text style={styles.summaryLabel}>Payé</Text>
-          <Text style={[styles.summaryValue, { color: AdminColors.success }]}>{paidAmount.toFixed(2)} DH</Text>
+          <Text style={styles.summaryLabel}>{t('financial.paid')}</Text>
+          <Text style={[styles.summaryValue, { color: AdminColors.success }]}>{paidAmount.toFixed(2)} {t('common.dh')}</Text>
         </TouchableOpacity>
         
         <View style={styles.divider} />
         
         <View style={styles.paymentSection}>
-          <Text style={styles.summaryLabel}>Reste</Text>
+          <Text style={styles.summaryLabel}>{t('financial.remaining')}</Text>
           <Text style={[styles.summaryValue, { color: remainingAmount > 0 ? AdminColors.danger : AdminColors.textMuted }]}>
-            {remainingAmount.toFixed(2)} DH
+            {remainingAmount.toFixed(2)} {t('common.dh')}
           </Text>
         </View>
       </View>
 
       <TouchableOpacity 
-        style={styles.addNoteBtn} 
+        style={[styles.addNoteBtn, isArabic && { flexDirection: 'row-reverse' }]} 
         onPress={() => { setTempNotes(orderNotes); setShowNotesModal(true); }}
       >
         <Ionicons name="document-text-outline" size={16} color={AdminColors.primary} />
-        <Text style={styles.addNoteText}>{orderNotes ? 'Modifier Note' : 'Ajouter Note'}</Text>
+        <Text style={styles.addNoteText}>{orderNotes ? t('common.modifier') : t('admin.orders.create.items.add_note')}</Text>
       </TouchableOpacity>
     </View>
   );
 
   const renderCartItem = (item: OrderItem) => (
-    <View key={item.cartId} style={styles.cartItemCard}>
+    <View key={item.cartId} style={[styles.cartItemCard, isArabic && { flexDirection: 'row-reverse' }]}>
       <View style={styles.cartActions}>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => removeItem(item.cartId)}>
           <Ionicons name="trash-outline" size={16} color={AdminColors.danger} />
@@ -387,21 +393,21 @@ export default function OrderItemsScreen() {
           <Ionicons name="pencil-outline" size={16} color={AdminColors.textSecondary} />
         </TouchableOpacity>
       </View>
-      <View style={styles.cartInfo}>
-        <Text style={styles.cartItemName}>{item.nom} ({item.quantite})</Text>
+      <View style={[styles.cartInfo, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 12 }]}>
+        <Text style={[styles.cartItemName, isArabic && { textAlign: 'right' }]}>{item.nom} ({item.quantite})</Text>
         {item.pricingMethod === 'PER_M2' && (
-          <Text style={styles.cartItemDetails}>{item.largeur}×{item.hauteur}={(item.largeur! * item.hauteur!).toFixed(2)}m²</Text>
+          <Text style={[styles.cartItemDetails, isArabic && { textAlign: 'right' }]}>{item.largeur}×{item.hauteur}={(item.largeur! * item.hauteur!).toFixed(2)}m²</Text>
         )}
         {item.imageUrls && item.imageUrls.length > 0 && (
-          <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+          <View style={[{ flexDirection: 'row', gap: 4, marginTop: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
              {item.imageUrls.slice(0, 3).map((uri, idx) => (
                 <Image key={idx} source={{ uri }} style={{ width: 30, height: 30, borderRadius: 6 }} />
              ))}
           </View>
         )}
-        <Text style={styles.cartItemPrice}>{item.prixFinal.toFixed(2)} DH</Text>
+        <Text style={[styles.cartItemPrice, isArabic && { textAlign: 'right' }]}>{item.prixFinal.toFixed(2)} {t('common.dh')}</Text>
       </View>
-      <View style={styles.cartItemImgBox}>
+      <View style={[styles.cartItemImgBox, isArabic && { order: 2 }]}>
          {item.imageUrls && item.imageUrls.length > 0 ? (
            <Image source={{ uri: item.imageUrls[0] }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
          ) : (
@@ -412,19 +418,23 @@ export default function OrderItemsScreen() {
   );
 
   const renderProductRow = ({ item }: { item: any }) => (
-    <View style={styles.productRow}>
+    <View style={[styles.productRow, isArabic && { flexDirection: 'row-reverse' }]}>
       <TouchableOpacity style={styles.addIconBtn} onPress={() => openAdd(item)}>
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>
-      <View style={styles.productInfoCol}>
-        <Text style={styles.productName}>{item.nom}</Text>
-        <View style={styles.priceRowSmall}>
-          <Text style={styles.productPriceText}>{item.prixUnitaire} DH</Text>
-          <Text style={styles.unitSmall}> / {item.uniteLabel || 'unité'}</Text>
+      <View style={[styles.productInfoCol, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 14 }]}>
+        <Text style={[styles.productName, isArabic && { textAlign: 'right' }]}>{item.nom}</Text>
+        <View style={[styles.priceRowSmall, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.productPriceText}>{item.prixUnitaire} {t('common.dh')}</Text>
+          <Text style={styles.unitSmall}> / {item.uniteLabel || t('common.unit')}</Text>
         </View>
       </View>
-      <View style={styles.productImgBox}>
-        <Text style={{ fontSize: 28 }}>{item.categoryIcon}</Text>
+      <View style={[styles.productImgBox, isArabic && { order: 2 }]}>
+        {item.imageUrl ? (
+          <Image source={{ uri: `${BASE_URL}${item.imageUrl}` }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+        ) : (
+          <Text style={{ fontSize: 28 }}>{item.categoryIcon}</Text>
+        )}
       </View>
     </View>
   );
@@ -463,22 +473,16 @@ export default function OrderItemsScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <SafeAreaView edges={['top']}>
-          <View style={styles.headerContent}>
+          <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
+              <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {client ? `${client.name}` : 'Nouvelle Commande'}
+                {client ? `${client.name}` : t('dashboard.create_order')}
               </Text>
             </View>
-            <TouchableOpacity 
-              style={[styles.nextBtn, items.length === 0 && { opacity: 0.3 }]} 
-              disabled={items.length === 0}
-              onPress={() => router.push('/(admin)/order-summary')}
-            >
-              <Ionicons name="checkmark" size={24} color="white" />
-            </TouchableOpacity>
+            <View style={{ width: 40 }} />
           </View>
         </SafeAreaView>
       </View>
@@ -492,19 +496,40 @@ export default function OrderItemsScreen() {
             {renderActionBar()}
             {renderSummaryCard()}
 
+            {orderImages.length > 0 && (
+              <View style={styles.orderPhotosContainer}>
+                <Text style={[styles.sectionTitle, { marginLeft: 16, marginBottom: 8, marginTop: 16 }, isArabic && { textAlign: 'right', marginRight: 16 }]}>
+                  {t('admin.orders.create.items.photos')} ({orderImages.length})
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                  {orderImages.map((uri, idx) => (
+                    <View key={idx} style={styles.orderPhotoThumbWrap}>
+                      <Image source={{ uri }} style={styles.orderPhotoThumb} />
+                      <TouchableOpacity 
+                        style={styles.photoRemoveBtn} 
+                        onPress={() => removeOrderImage(uri)}
+                      >
+                        <Ionicons name="close" size={12} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.bagSection}>
-               <View style={styles.sectionHeader}>
+               <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={styles.bagIconBox}>
                     <MaterialCommunityIcons name="shopping" size={16} color="white" />
                   </View>
-                  <Text style={styles.sectionTitle}>Panier (Le sac)</Text>
+                  <Text style={styles.sectionTitle}>{t('admin.orders.create.items.bag')}</Text>
                   <View style={styles.pillBadge}><Text style={styles.pillText}>{items.length}</Text></View>
                </View>
                
                {items.length === 0 ? (
                  <View style={styles.emptyBag}>
                     <Ionicons name="basket-outline" size={48} color={AdminColors.textMuted} />
-                    <Text style={styles.emptyBagText}>Le sac est vide</Text>
+                    <Text style={styles.emptyBagText}>{t('admin.orders.create.items.bag_empty')}</Text>
                  </View>
                ) : (
                  items.map(renderCartItem)
@@ -512,20 +537,31 @@ export default function OrderItemsScreen() {
             </View>
 
             <View style={[styles.section, { marginTop: 24, marginBottom: 8 }]}>
-              <View style={styles.sectionHeader}>
+              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                 <Ionicons name="list" size={20} color={AdminColors.primary} />
-                <Text style={styles.sectionTitle}>Produits disponibles</Text>
+                <Text style={styles.sectionTitle}>{t('admin.orders.create.items.available_products')}</Text>
               </View>
             </View>
           </View>
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 150 }}
         ListEmptyComponent={loading ? (
           <View style={{ paddingHorizontal: 16 }}>
             {Array(5).fill(0).map((_, i) => <SkeletonCard key={i} />)}
           </View>
         ) : null}
       />
+
+      {/* Footer Continue Btn */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+        <TouchableOpacity 
+          style={[styles.continueBtn, items.length === 0 && styles.continueBtnDisabled]} 
+          onPress={() => router.push('/(admin)/order-summary')}
+          disabled={items.length === 0}
+        >
+          <Text style={styles.continueBtnText}>{t('common.continue')} {isArabic ? '←' : '→'}</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Config Modal */}
       <Modal visible={configModal.open} animationType="slide" transparent>
@@ -534,23 +570,27 @@ export default function OrderItemsScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.dragHandle} />
             
-            <View style={styles.modalHeaderRow}>
+            <View style={[styles.modalHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.modalHeaderImgBox}>
-                <Text style={{ fontSize: 24 }}>{configModal.product?.categoryIcon || '📦'}</Text>
+                {configModal.product?.imageUrl ? (
+                   <Image source={{ uri: `${BASE_URL}${configModal.product.imageUrl}` }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                ) : (
+                   <Text style={{ fontSize: 24 }}>{configModal.product?.categoryIcon || '📦'}</Text>
+                )}
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
                 <Text style={styles.modalProductName}>{configModal.product?.nom}</Text>
-                <Text style={styles.modalProductPrice}>{configModal.product?.prixUnitaire} DH / {configModal.product?.uniteLabel || 'unité'}</Text>
+                <Text style={styles.modalProductPrice}>{configModal.product?.prixUnitaire} {t('common.dh')} / {configModal.product?.uniteLabel || t('common.unit')}</Text>
               </View>
             </View>
 
             <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
               {configModal.product?.pricingMethod === 'PER_M2' && (
-                <View style={styles.dimRow}>
+                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Largeur (m)</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.width')}</Text>
                     <TextInput 
-                      style={styles.dimInput} 
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                       keyboardType="decimal-pad" 
                       value={configForm.largura}
                       onChangeText={t => setConfigForm({...configForm, largura: t})}
@@ -558,9 +598,9 @@ export default function OrderItemsScreen() {
                   </View>
                   <View style={{ width: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Hauteur (m)</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.height')}</Text>
                     <TextInput 
-                      style={styles.dimInput} 
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                       keyboardType="decimal-pad" 
                       value={configForm.hauteur}
                       onChangeText={t => setConfigForm({...configForm, hauteur: t})}
@@ -570,7 +610,7 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_UNIT' && (
-                <View style={styles.unitStepper}>
+                <View style={[styles.unitStepper, isArabic && { flexDirection: 'row-reverse' }]}>
                   <TouchableOpacity 
                     style={[styles.stepBtn, configForm.qty === 1 && styles.stepBtnDisabled]} 
                     disabled={configForm.qty === 1}
@@ -589,11 +629,11 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_KG' && (
-                <View style={styles.dimRow}>
+                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Poids (kg)</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_kg')} (kg)</Text>
                     <TextInput 
-                      style={styles.dimInput} 
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                       keyboardType="decimal-pad" 
                       value={configForm.poids}
                       onChangeText={t => setConfigForm({...configForm, poids: t})}
@@ -603,11 +643,11 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_LINEAR_M' && (
-                <View style={styles.dimRow}>
+                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Longueur (m)</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_linear_m')} (m)</Text>
                     <TextInput 
-                      style={styles.dimInput} 
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                       keyboardType="decimal-pad" 
                       value={configForm.longueur}
                       onChangeText={t => setConfigForm({...configForm, longueur: t})}
@@ -617,11 +657,11 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'CUSTOM' && (
-                <View style={styles.dimRow}>
+                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLabel}>Prix (DH)</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('financial.amount')} ({t('common.dh')})</Text>
                     <TextInput 
-                      style={styles.dimInput} 
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                       keyboardType="numeric" 
                       value={configForm.customPrice}
                       onChangeText={t => setConfigForm({...configForm, customPrice: t})}
@@ -632,37 +672,37 @@ export default function OrderItemsScreen() {
 
               <View style={styles.calcBox}>
                   <Text style={styles.calcFormula}>
-                    {configModal.product?.pricingMethod === 'PER_M2' ? `${configForm.largura || 0}m × ${configForm.hauteur || 0}m × ${configModal.product?.prixUnitaire} DH/m²` : 
-                     configModal.product?.pricingMethod === 'PER_UNIT' ? `${configForm.qty} × ${configModal.product?.prixUnitaire} DH` : 
-                     configModal.product?.pricingMethod === 'PER_KG' ? `${configForm.poids || 0}kg × ${configModal.product?.prixUnitaire} DH/kg` :
-                     configModal.product?.pricingMethod === 'PER_LINEAR_M' ? `${configForm.longueur || 0}m × ${configModal.product?.prixUnitaire} DH/m` : ''}
+                    {configModal.product?.pricingMethod === 'PER_M2' ? `${configForm.largura || 0}m × ${configForm.hauteur || 0}m × ${configModal.product?.prixUnitaire} ${t('common.dh')}/m²` : 
+                     configModal.product?.pricingMethod === 'PER_UNIT' ? `${configForm.qty} × ${configModal.product?.prixUnitaire} ${t('common.dh')}` : 
+                     configModal.product?.pricingMethod === 'PER_KG' ? `${configForm.poids || 0}kg × ${configModal.product?.prixUnitaire} ${t('common.dh')}/kg` :
+                     configModal.product?.pricingMethod === 'PER_LINEAR_M' ? `${configForm.longueur || 0}m × ${configModal.product?.prixUnitaire} ${t('common.dh')}/m` : ''}
                   </Text>
-                  <Text style={styles.calcResult}>= {calculateItemPrice(configModal.product, configForm).toFixed(2)} DH</Text>
+                  <Text style={styles.calcResult}>= {calculateItemPrice(configModal.product, configForm).toFixed(2)} {t('common.dh')}</Text>
               </View>
 
-              <Text style={[styles.inputLabel, { marginTop: 20 }]}>Couleur / Description</Text>
+              <Text style={[styles.inputLabel, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.color_desc')}</Text>
               <TextInput 
-                style={styles.formInput} 
-                placeholder="Ex: Bleu, avec tâches..." 
+                style={[styles.formInput, isArabic && { textAlign: 'right' }]} 
+                placeholder={t('admin.orders.create.items.color_desc_placeholder')} 
                 value={configForm.couleur}
                 onChangeText={t => setConfigForm({...configForm, couleur: t})}
               />
 
-              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Notes d'atelier</Text>
+              <Text style={[styles.inputLabel, { marginTop: 16 }, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.workshop_notes')}</Text>
               <TextInput 
-                style={[styles.formInput, { height: 80, textAlignVertical: 'top' }]} 
+                style={[styles.formInput, { height: 80, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]} 
                 multiline 
-                placeholder="Instructions de nettoyage..."
+                placeholder={t('admin.orders.create.items.workshop_notes_placeholder')}
                 value={configForm.noteAtelier}
                 onChangeText={t => setConfigForm({...configForm, noteAtelier: t})}
               />
 
               {/* PHOTOS SECTION */}
               <View style={styles.remiseSection}>
-                <View style={styles.remiseHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.remiseHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <Ionicons name="camera-outline" size={18} color={AdminColors.primary} />
-                    <Text style={styles.remiseTitle}>Photos de l'article</Text>
+                    <Text style={styles.remiseTitle}>{t('admin.orders.create.items.item_photos')}</Text>
                     {configForm.images.length > 0 && (
                       <View style={styles.pillBadge}>
                         <Text style={styles.pillText}>{configForm.images.length}</Text>
@@ -686,7 +726,7 @@ export default function OrderItemsScreen() {
                 </View>
 
                 {configForm.images.length > 0 && (
-                  <View style={styles.photoPreviewRow}>
+                  <View style={[styles.photoPreviewRow, isArabic && { flexDirection: 'row-reverse' }]}>
                     {configForm.images.map((uri, idx) => (
                       <View key={idx} style={styles.photoThumbWrap}>
                         <Image source={{ uri }} style={styles.photoThumb} />
@@ -704,10 +744,10 @@ export default function OrderItemsScreen() {
 
               {/* REMISE SECTION */}
               <View style={styles.remiseSection}>
-                <View style={styles.remiseHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.remiseHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <Ionicons name="pricetag-outline" size={18} color={AdminColors.primary} />
-                    <Text style={styles.remiseTitle}>Appliquer une remise</Text>
+                    <Text style={styles.remiseTitle}>{t('admin.orders.create.items.apply_remise')}</Text>
                   </View>
                   <Switch 
                     value={configForm.hasRemise} 
@@ -721,9 +761,9 @@ export default function OrderItemsScreen() {
                   <View style={styles.remiseInputs}>
                     <View style={styles.dimRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.inputLabel}>Montant remise (DH)</Text>
+                        <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.remise_amount')} ({t('common.dh')})</Text>
                         <TextInput 
-                          style={styles.dimInput} 
+                          style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
                           keyboardType="decimal-pad" 
                           placeholder="0.00"
                           value={configForm.remiseMontant}
@@ -731,10 +771,10 @@ export default function OrderItemsScreen() {
                         />
                       </View>
                     </View>
-                    <Text style={styles.inputLabel}>Motif de la remise</Text>
+                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.remise_reason')}</Text>
                     <TextInput 
-                      style={styles.formInput} 
-                      placeholder="Ex: Fidélité, promotion..." 
+                      style={[styles.formInput, isArabic && { textAlign: 'right' }]} 
+                      placeholder={t('admin.orders.create.items.remise_reason_placeholder')} 
                       value={configForm.remiseRaison}
                       onChangeText={t => setConfigForm({...configForm, remiseRaison: t})}
                     />
@@ -745,7 +785,7 @@ export default function OrderItemsScreen() {
 
             <View style={styles.sheetFooter}>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSaveItem}>
-                <Text style={styles.saveBtnText}>Ajouter au sac — {calculateItemPrice(configModal.product, configForm).toFixed(2)} DH</Text>
+                <Text style={styles.saveBtnText}>{t('admin.orders.create.items.add_to_bag')} — {calculateItemPrice(configModal.product, configForm).toFixed(2)} {t('common.dh')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -756,20 +796,20 @@ export default function OrderItemsScreen() {
       <Modal visible={paymentModal} transparent animationType="fade">
         <View style={styles.overlayCenter}>
           <View style={styles.dialogBox}>
-            <Text style={styles.dialogTitle}>Montant Payé</Text>
+            <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.paid_amount')}</Text>
             <TextInput
-              style={styles.dialogInput}
+              style={[styles.dialogInput, isArabic && { textAlign: 'right' }]}
               keyboardType="numeric"
               value={tempPaid}
               onChangeText={setTempPaid}
               autoFocus
             />
-            <View style={styles.dialogButtons}>
+            <View style={[styles.dialogButtons, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => setShowPaymentModal(false)}>
-                <Text style={styles.dialogBtnCancel}>Annuler</Text>
+                <Text style={styles.dialogBtnCancel}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => { setPaidAmount(parseFloat(tempPaid) || 0); setShowPaymentModal(false); }}>
-                <Text style={styles.dialogBtnConfirm}>Confirmer</Text>
+                <Text style={styles.dialogBtnConfirm}>{t('common.confirm')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -780,20 +820,20 @@ export default function OrderItemsScreen() {
       <Modal visible={notesModal} transparent animationType="fade">
         <View style={styles.overlayCenter}>
           <View style={styles.dialogBox}>
-            <Text style={styles.dialogTitle}>Note de Commande</Text>
+            <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.order_note')}</Text>
             <TextInput
-              style={[styles.dialogInput, { height: 100, textAlignVertical: 'top' }]}
+              style={[styles.dialogInput, { height: 100, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]}
               multiline
               value={tempNotes}
               onChangeText={setTempNotes}
-              placeholder="Instructions générales..."
+              placeholder={t('admin.orders.create.items.order_note_placeholder')}
             />
-            <View style={styles.dialogButtons}>
+            <View style={[styles.dialogButtons, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => setShowNotesModal(false)}>
-                <Text style={styles.dialogBtnCancel}>Annuler</Text>
+                <Text style={styles.dialogBtnCancel}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => { setOrderNotes(tempNotes); setShowNotesModal(false); }}>
-                <Text style={styles.dialogBtnConfirm}>Enregistrer</Text>
+                <Text style={styles.dialogBtnConfirm}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -810,7 +850,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8 },
   headerTitleContainer: { flex: 1, paddingHorizontal: 12 },
   headerTitle: { fontSize: 14, fontWeight: '600', color: AdminColors.textPrimary, textAlign: 'center' },
-  nextBtn: { backgroundColor: AdminColors.primary, width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', ...AdminShadows.shadowTeal },
   
   actionBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'white', marginBottom: 12 },
   actionBtn: { alignItems: 'center', flex: 1 },
@@ -859,47 +898,258 @@ const styles = StyleSheet.create({
   unitSmall: { fontSize: 12, color: AdminColors.textMuted },
   productImgBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_HEIGHT * 0.85 },
-  dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginTop: 12, marginBottom: 20 },
-  modalHeaderRow: { flexDirection: 'row', gap: 14, alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
-  modalHeaderImgBox: { width: 60, height: 60, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  modalProductName: { fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary },
-  modalProductPrice: { fontSize: 14, color: AdminColors.primary, fontWeight: '600', marginTop: 2 },
-  modalBody: { paddingHorizontal: 20 },
-  dimRow: { flexDirection: 'row', marginBottom: 16 },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: AdminColors.textSecondary, marginBottom: 6 },
-  dimInput: { flex: 1, height: 52, fontSize: 16, textAlign: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, backgroundColor: 'white' },
-  calcBox: { backgroundColor: '#F1F5F9', borderRadius: 14, padding: 16, marginTop: 12, alignItems: 'center' },
-  calcFormula: { fontSize: 14, color: AdminColors.textSecondary, textAlign: 'center' },
-  calcResult: { fontSize: 22, fontWeight: '800', color: AdminColors.primary, marginTop: 4, textAlign: 'center' },
-  unitStepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginVertical: 10 },
-  stepBtn: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, borderColor: AdminColors.primary, alignItems: 'center', justifyContent: 'center' },
-  stepBtnDisabled: { borderColor: '#E2E8F0' },
-  stepSymbol: { fontSize: 24, fontWeight: '300', color: AdminColors.primary },
-  stepValue: { fontSize: 32, fontWeight: '800', color: AdminColors.textPrimary, minWidth: 50, textAlign: 'center' },
-  formInput: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 14, fontSize: 15, backgroundColor: 'white' },
-  sheetFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  saveBtn: { backgroundColor: AdminColors.primary, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', ...AdminShadows.shadowTeal },
-  saveBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'flex-end' 
+  },
+  modalSheet: { 
+    backgroundColor: 'white', 
+    borderTopLeftRadius: 24, 
+    borderTopRightRadius: 24, 
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+  },
+  dragHandle: { 
+    width: 40, 
+    height: 4, 
+    borderRadius: 2, 
+    backgroundColor: '#E2E8F0', 
+    alignSelf: 'center', 
+    marginBottom: 20 
+  },
+  modalHeaderRow: { 
+    flexDirection: 'row', 
+    gap: 14, 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  modalHeaderImgBox: { 
+    width: 60, 
+    height: 60, 
+    borderRadius: 12, 
+    backgroundColor: '#F1F5F9', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  modalProductName: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: AdminColors.textPrimary 
+  },
+  modalProductPrice: { 
+    fontSize: 14, 
+    color: AdminColors.primary, 
+    fontWeight: '600', 
+    marginTop: 2 
+  },
+  modalBody: { 
+    // Removed paddingHorizontal here since it's on modalSheet
+  },
+  dimRow: { 
+    flexDirection: 'row', 
+    marginBottom: 12,
+    gap: 12,
+  },
+  inputLabel: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: AdminColors.textSecondary, 
+    marginBottom: 4 
+  },
+  dimInput: { 
+    flex: 1, 
+    height: 48, 
+    fontSize: 16, 
+    textAlign: 'center', 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 12, 
+    backgroundColor: 'white' 
+  },
+  calcBox: { 
+    backgroundColor: '#F1F5F9', 
+    borderRadius: 14, 
+    padding: 12, 
+    marginTop: 8, 
+    alignItems: 'center' 
+  },
+  calcFormula: { 
+    fontSize: 13, 
+    color: AdminColors.textSecondary, 
+    textAlign: 'center' 
+  },
+  calcResult: { 
+    fontSize: 20, 
+    fontWeight: '800', 
+    color: AdminColors.primary, 
+    marginTop: 2, 
+    textAlign: 'center' 
+  },
+  unitStepper: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 20, 
+    marginVertical: 8 
+  },
+  stepBtn: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    borderWidth: 2, 
+    borderColor: AdminColors.primary, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  stepBtnDisabled: { 
+    borderColor: '#E2E8F0' 
+  },
+  stepSymbol: { 
+    fontSize: 20, 
+    fontWeight: '300', 
+    color: AdminColors.primary 
+  },
+  stepValue: { 
+    fontSize: 28, 
+    fontWeight: '800', 
+    color: AdminColors.textPrimary, 
+    minWidth: 40, 
+    textAlign: 'center' 
+  },
+  formInput: { 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 12, 
+    padding: 12, 
+    fontSize: 15, 
+    backgroundColor: 'white' 
+  },
+  sheetFooter: { 
+    paddingVertical: 16, 
+    borderTopWidth: 1, 
+    borderTopColor: '#F1F5F9',
+    marginTop: 12,
+  },
+  saveBtn: { 
+    backgroundColor: AdminColors.primary, 
+    height: 52, 
+    borderRadius: 16, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    ...AdminShadows.shadowTeal 
+  },
+  saveBtnText: { 
+    color: 'white', 
+    fontSize: 16, 
+    fontWeight: '700' 
+  },
 
-  remiseSection: { marginTop: 24, padding: 16, backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  remiseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  remiseTitle: { fontSize: 15, fontWeight: '600', color: AdminColors.textPrimary },
-  remiseInputs: { marginTop: 16, gap: 12 },
+  remiseSection: { 
+    marginTop: 16, 
+    padding: 12, 
+    backgroundColor: '#F8FAFC', 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
+  remiseHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  remiseTitle: { 
+    fontSize: 15, 
+    fontWeight: '600', 
+    color: AdminColors.textPrimary 
+  },
+  remiseInputs: { 
+    marginTop: 16, 
+    gap: 12 
+  },
 
-  overlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  dialogBox: { backgroundColor: 'white', borderRadius: 20, padding: 20, ...AdminShadows.shadowSmall },
-  dialogTitle: { fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary, marginBottom: 15 },
-  dialogInput: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: '#F8FAFC' },
-  dialogButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20, gap: 12 },
-  dialogBtn: { paddingVertical: 10, paddingHorizontal: 16 },
-  dialogBtnCancel: { color: AdminColors.textSecondary, fontWeight: '600' },
-  dialogBtnConfirm: { color: AdminColors.primary, fontWeight: '700' },
+  overlayCenter: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    padding: 24 
+  },
+  dialogBox: { 
+    backgroundColor: 'white', 
+    borderRadius: 24, 
+    padding: 24, 
+    ...AdminShadows.shadowLarge 
+  },
+  dialogTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: AdminColors.textPrimary, 
+    marginBottom: 15,
+    textAlign: 'center' 
+  },
+  dialogInput: { 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    borderRadius: 14, 
+    padding: 14, 
+    fontSize: 16, 
+    backgroundColor: '#F8FAFC' 
+  },
+  dialogButtons: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    marginTop: 20, 
+    gap: 12 
+  },
+  dialogBtn: { 
+    flex: 1,
+    paddingVertical: 12, 
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialogBtnCancel: { 
+    color: AdminColors.textSecondary, 
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  dialogBtnConfirm: { 
+    color: AdminColors.primary, 
+    fontWeight: '700',
+    fontSize: 15,
+  },
 
   photoBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   photoPreviewRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   photoThumbWrap: { width: 60, height: 60, borderRadius: 10, overflow: 'hidden', position: 'relative' },
   photoThumb: { width: '100%', height: '100%' },
   photoRemoveBtn: { position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.5)', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  
+  orderPhotosContainer: { marginBottom: 16 },
+  orderPhotoThumbWrap: { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: '#F1F5F9' },
+  orderPhotoThumb: { width: '100%', height: '100%' },
+
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    ...AdminShadows.shadowLarge,
+    zIndex: 30,
+  },
+  continueBtn: {
+    backgroundColor: AdminColors.primary,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...AdminShadows.shadowTeal,
+  },
+  continueBtnDisabled: { backgroundColor: 'rgba(13,115,119,0.3)' },
+  continueBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
 });

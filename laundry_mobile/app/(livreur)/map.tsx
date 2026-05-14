@@ -13,7 +13,8 @@ import { useDriverLocation } from '../../src/hooks/useDriverLocation';
 import { useDirections } from '../../src/hooks/useDirections';
 import { fetchReadyDeliveries, fetchPaymentTypes, confirmPayment, cancelDelivery } from '../../src/store/livreurThunks';
 import { RootState, AppDispatch } from '../../src/store/store';
-import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
+import { Colors, Shadows, Typography, Radius, StatusColors } from '../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -53,6 +54,9 @@ const DriverMarker = React.memo(({ latitude, longitude }: { latitude: number; lo
 ));
 
 export default function MapScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
   const dispatch = useDispatch<AppDispatch>();
   const { readyDeliveries, paymentTypes, loading } = useSelector((s: RootState) => s.livreur);
   const { coords, isTracking } = useDriverLocation();
@@ -158,7 +162,7 @@ export default function MapScreen() {
   const handleCall = () => {
     const phone = activeOrder?.client?.phones?.[0]?.phoneNumber;
     if (phone) Linking.openURL(`tel:${phone}`);
-    else Alert.alert('Pas de numéro', 'Aucun numéro pour ce client.');
+    else Alert.alert(t('common.error'), t('admin.clients.no_phone'));
   };
 
   const handleConfirmPayment = async (methodId: number) => {
@@ -167,11 +171,11 @@ export default function MapScreen() {
     setProcessingId(activeOrder.id);
     try {
       await dispatch(confirmPayment({ orderId: activeOrder.id, methodId })).unwrap();
-      Alert.alert('✅ Livré !', 'Paiement enregistré avec succès.');
+      Alert.alert(t('delivery.delivery_success'), t('common.success_msg'));
       const next = activeIndex < ordersWithGPS.length - 1 ? activeIndex + 1 : activeIndex;
       setActiveIndex(next);
     } catch (err: any) {
-      Alert.alert('Erreur', typeof err === 'string' ? err : 'Échec de la confirmation du paiement.');
+      Alert.alert(t('common.error'), typeof err === 'string' ? err : t('common.error_msg'));
     } finally {
       setProcessingId(null);
       dispatch(fetchReadyDeliveries());
@@ -179,10 +183,10 @@ export default function MapScreen() {
   };
 
   const handleCancel = () => {
-    Alert.alert('Annuler la livraison', 'Annuler cette livraison ?', [
-      { text: 'Garder', style: 'cancel' },
+    Alert.alert(t('admin.users.actions.suspend'), t('common.confirm_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Annuler', style: 'destructive', onPress: async () => {
+        text: t('common.supprimer'), style: 'destructive', onPress: async () => {
           setProcessingId(activeOrder!.id);
           try {
             await dispatch(cancelDelivery(activeOrder!.id)).unwrap();
@@ -204,7 +208,7 @@ export default function MapScreen() {
     ? { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }
     : { latitude: 33.5731, longitude: -7.5898, latitudeDelta: 0.1, longitudeDelta: 0.1 };
 
-  const clientName = activeOrder?.client?.nom || activeOrder?.client?.name || 'Client';
+  const clientName = activeOrder?.client?.nom || activeOrder?.client?.name || t('common.unspecified');
   const phone = activeOrder?.client?.phones?.[0]?.phoneNumber;
   const addr = activeOrder?.client?.addresses?.[0];
   const isProcessing = processingId === activeOrder?.id;
@@ -239,11 +243,11 @@ export default function MapScreen() {
           {coords && <DriverMarker latitude={coords.latitude} longitude={coords.longitude} />}
         </MapView>
 
-        <View style={styles.topBar}>
-          <View style={styles.topBarPill}>
+        <View style={[styles.topBar, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.topBarPill, isArabic && { flexDirection: 'row-reverse' }]}>
             <Animated.View style={[styles.trackingDot, { transform: [{ scale: pulseAnim }] }]} />
             <Text style={styles.topBarText}>
-              {isTracking ? `${ordersWithGPS.length} arrêt${ordersWithGPS.length !== 1 ? 's' : ''} restant${ordersWithGPS.length !== 1 ? 's' : ''}` : 'Localisation…'}
+              {isTracking ? `${ordersWithGPS.length} ${t('driver.map.stop').toLowerCase()}${ordersWithGPS.length !== 1 ? 's' : ''} ${t('financial.remaining').toLowerCase()}` : `${t('common.loading')}…`}
             </Text>
           </View>
         </View>
@@ -260,8 +264,8 @@ export default function MapScreen() {
         {ordersWithGPS.length === 0 ? (
           <View style={styles.emptySheet}>
             <Feather name="truck" size={36} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>Aucune Livraison</Text>
-            <Text style={styles.emptySubtitle}>Toutes les livraisons sont terminées ou aucune commande n'est prête.</Text>
+            <Text style={styles.emptyTitle}>{t('driver.dashboard.no_missions')}</Text>
+            <Text style={styles.emptySubtitle}>{t('driver.dashboard.no_missions')}</Text>
           </View>
         ) : (
           <BottomSheet
@@ -273,63 +277,63 @@ export default function MapScreen() {
           >
             <BottomSheetView style={styles.sheetContent}>
 
-              <View style={styles.stopNav}>
+              <View style={[styles.stopNav, isArabic && { flexDirection: 'row-reverse' }]}>
                 <TouchableOpacity
                   style={[styles.navBtn, activeIndex === 0 && styles.navBtnDisabled]}
                   onPress={() => setActiveIndex(i => Math.max(0, i - 1))}
                   disabled={activeIndex === 0}
                 >
-                  <Feather name="chevron-left" size={18} color={activeIndex === 0 ? '#D1D5DB' : Colors.primary} />
+                  <Feather name={isArabic ? "chevron-right" : "chevron-left"} size={18} color={activeIndex === 0 ? '#D1D5DB' : Colors.primary} />
                 </TouchableOpacity>
-                <Text style={styles.stopLabel}>ARRÊT {activeIndex + 1} / {ordersWithGPS.length}</Text>
+                <Text style={styles.stopLabel}>{t('driver.map.stop').toUpperCase()} {activeIndex + 1} / {ordersWithGPS.length}</Text>
                 <TouchableOpacity
                   style={[styles.navBtn, activeIndex === ordersWithGPS.length - 1 && styles.navBtnDisabled]}
                   onPress={() => setActiveIndex(i => Math.min(ordersWithGPS.length - 1, i + 1))}
                   disabled={activeIndex === ordersWithGPS.length - 1}
                 >
-                  <Feather name="chevron-right" size={18} color={activeIndex === ordersWithGPS.length - 1 ? '#D1D5DB' : Colors.primary} />
+                  <Feather name={isArabic ? "chevron-left" : "chevron-right"} size={18} color={activeIndex === ordersWithGPS.length - 1 ? '#D1D5DB' : Colors.primary} />
                 </TouchableOpacity>
               </View>
 
               {route && route.durationMin > 0 && (
-                <View style={styles.etaRow}>
-                  <View style={styles.etaChip}>
+                <View style={[styles.etaRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.etaChip, isArabic && { flexDirection: 'row-reverse' }]}>
                     <Feather name="clock" size={14} color={Colors.primary} />
                     <Text style={styles.etaText}>{route.durationMin} min</Text>
                   </View>
-                  <View style={styles.etaChip}>
+                  <View style={[styles.etaChip, isArabic && { flexDirection: 'row-reverse' }]}>
                     <Feather name="map" size={14} color={Colors.primary} />
                     <Text style={styles.etaText}>{route.distanceKm} km</Text>
                   </View>
                 </View>
               )}
 
-              <Text style={styles.clientName}>{clientName}</Text>
+              <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{clientName}</Text>
               {addr?.address && (
-                <View style={styles.infoRow}>
+                <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Feather name="map-pin" size={14} color={Colors.textMuted} />
-                  <Text style={styles.infoText} numberOfLines={2}>{addr.address}</Text>
+                  <Text style={[styles.infoText, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{addr.address}</Text>
                 </View>
               )}
               {phone && (
-                <View style={styles.infoRow}>
+                <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Feather name="phone" size={14} color={Colors.textMuted} />
-                  <Text style={styles.infoText}>{phone}</Text>
+                  <Text style={[styles.infoText, isArabic && { textAlign: 'right' }]}>{phone}</Text>
                 </View>
               )}
 
-              <View style={styles.amountRow}>
-                <Text style={styles.amountLabel}>Montant à encaisser</Text>
-                <Text style={styles.amountValue}>{activeOrder?.montantTotal} DH</Text>
+              <View style={[styles.amountRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Text style={styles.amountLabel}>{t('delivery.collected_amount')}</Text>
+                <Text style={styles.amountValue}>{activeOrder?.montantTotal} {t('common.dh')}</Text>
               </View>
 
               {isProcessing ? (
-                <View style={styles.processingRow}>
+                <View style={[styles.processingRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <ActivityIndicator color={Colors.primary} />
-                  <Text style={styles.processingText}>Traitement…</Text>
+                  <Text style={styles.processingText}>{t('common.loading')}…</Text>
                 </View>
               ) : (
-                <View style={styles.actions}>
+                <View style={[styles.actions, isArabic && { flexDirection: 'row-reverse' }]}>
                   <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
                     <Feather name="phone" size={20} color={Colors.primary} />
                   </TouchableOpacity>
@@ -339,9 +343,9 @@ export default function MapScreen() {
                   <TouchableOpacity style={styles.actionBtn} onPress={handleCancel}>
                     <Feather name="x" size={20} color={Colors.danger} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.deliveredBtn} onPress={() => setPaymentVisible(true)}>
+                  <TouchableOpacity style={[styles.deliveredBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={() => setPaymentVisible(true)}>
                     <Feather name="check-circle" size={18} color="white" />
-                    <Text style={styles.deliveredText}>LIVRÉ</Text>
+                    <Text style={styles.deliveredText}>{t('status.DELIVERED').toUpperCase()}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -357,22 +361,22 @@ export default function MapScreen() {
               <View style={styles.modalIcon}>
                 <Feather name="credit-card" size={28} color={Colors.primary} />
               </View>
-              <Text style={styles.modalTitle}>Encaisser le paiement</Text>
-              <View style={styles.modalSummary}>
+              <Text style={styles.modalTitle}>{t('delivery.confirm_title')}</Text>
+              <View style={[styles.modalSummary, isArabic && { flexDirection: 'row-reverse' }]}>
                 <Text style={styles.modalRef}>#{activeOrder?.numeroCommande}</Text>
-                <Text style={styles.modalAmount}>{activeOrder?.montantTotal} DH</Text>
+                <Text style={styles.modalAmount}>{activeOrder?.montantTotal} {t('common.dh')}</Text>
               </View>
-              <Text style={styles.modalSubtitle}>Mode de paiement</Text>
-              <View style={styles.payGrid}>
-                {paymentTypes.map((t: any) => (
-                  <TouchableOpacity key={t.id} style={styles.payChip} onPress={() => handleConfirmPayment(t.id)}>
-                    <Feather name={t.code === 'especes' ? 'dollar-sign' : 'credit-card'} size={22} color={Colors.primary} />
-                    <Text style={styles.payChipText}>{t.label}</Text>
+              <Text style={[styles.modalSubtitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.summary.payment_mode')}</Text>
+              <View style={[styles.payGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+                {paymentTypes.map((t_item: any) => (
+                  <TouchableOpacity key={t_item.id} style={styles.payChip} onPress={() => handleConfirmPayment(t_item.id)}>
+                    <Feather name={t_item.code === 'especes' ? 'dollar-sign' : 'credit-card'} size={22} color={Colors.primary} />
+                    <Text style={styles.payChipText}>{t_item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setPaymentVisible(false)}>
-                <Text style={styles.cancelText}>Annuler</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -1,11 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { useTranslation } from 'react-i18next';
 
 export default function CreateOrderEntry() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
   const { setMode, clearOrder } = useOrderCreation();
 
   const handleSelectMode = (mode: 'immediate' | 'scheduled') => {
@@ -19,65 +24,65 @@ export default function CreateOrderEntry() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
+          <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nouvelle commande</Text>
+        <Text style={styles.headerTitle}>{t('dashboard.create_order')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Quel type de commande ?</Text>
-        <Text style={styles.subtitle}>Choisissez comment la commande sera traitée</Text>
+        <Text style={[styles.title, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.question')}</Text>
+        <Text style={[styles.subtitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.subtitle')}</Text>
 
         <TouchableOpacity 
-          style={[styles.card, styles.immediateCard]} 
+          style={[styles.card, styles.immediateCard, isArabic && { alignItems: 'flex-end' }]} 
           onPress={() => handleSelectMode('immediate')}
           activeOpacity={0.9}
         >
           <View style={[styles.iconCircle, { backgroundColor: AdminColors.primary100 }]}>
             <Text style={{ fontSize: 28 }}>🏪</Text>
           </View>
-          <Text style={styles.cardTitle}>Client présent</Text>
-          <Text style={styles.cardDesc}>
-            Le client est au local. La commande est prise en charge immédiatement.
+          <Text style={styles.cardTitle}>{t('admin.orders.create.mode_immediate')}</Text>
+          <Text style={[styles.cardDesc, isArabic && { textAlign: 'right' }]}>
+            {t('admin.orders.create.mode_immediate_desc')}
           </Text>
-          <View style={styles.tagRow}>
+          <View style={[styles.tagRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={styles.tag}>
-              <Text style={styles.tagText}>📍 Au local</Text>
+              <Text style={styles.tagText}>📍 {t('admin.orders.create.tags.on_site')}</Text>
             </View>
             <View style={styles.tag}>
-              <Text style={styles.tagText}>⚡ Immédiat</Text>
+              <Text style={styles.tagText}>⚡ {t('admin.orders.create.tags.immediate')}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.cardBtn} onPress={() => handleSelectMode('immediate')}>
-            <Text style={styles.cardBtnText}>Commencer →</Text>
+            <Text style={styles.cardBtnText}>{t('admin.orders.create.start')} {isArabic ? '←' : '→'}</Text>
           </TouchableOpacity>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.card, styles.scheduledCard]} 
+          style={[styles.card, styles.scheduledCard, isArabic && { alignItems: 'flex-end' }]} 
           onPress={() => handleSelectMode('scheduled')}
           activeOpacity={0.9}
         >
           <View style={[styles.iconCircle, { backgroundColor: AdminColors.accent100 }]}>
             <Text style={{ fontSize: 28 }}>📞</Text>
           </View>
-          <Text style={styles.cardTitle}>Commande téléphonique</Text>
-          <Text style={styles.cardDesc}>
-            Le client a appelé. Un livreur récupérera la commande ultérieurement.
+          <Text style={styles.cardTitle}>{t('admin.orders.create.mode_scheduled')}</Text>
+          <Text style={[styles.cardDesc, isArabic && { textAlign: 'right' }]}>
+            {t('admin.orders.create.mode_scheduled_desc')}
           </Text>
-          <View style={styles.tagRow}>
+          <View style={[styles.tagRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={[styles.tag, { backgroundColor: AdminColors.accent100, borderColor: AdminColors.accent }]}>
-              <Text style={[styles.tagText, { color: AdminColors.accent }]}>🚚 Collecte prévue</Text>
+              <Text style={[styles.tagText, { color: AdminColors.accent }]}>🚚 {t('admin.orders.create.tags.pickup')}</Text>
             </View>
             <View style={[styles.tag, { backgroundColor: AdminColors.accent100, borderColor: AdminColors.accent }]}>
-              <Text style={[styles.tagText, { color: AdminColors.accent }]}>📅 Planifié</Text>
+              <Text style={[styles.tagText, { color: AdminColors.accent }]}>📅 {t('admin.orders.create.tags.scheduled')}</Text>
             </View>
           </View>
           <TouchableOpacity style={[styles.cardBtn, { backgroundColor: AdminColors.accent }]} onPress={() => handleSelectMode('scheduled')}>
-            <Text style={[styles.cardBtnText, { color: '#0D1B2A' }]}>Commencer →</Text>
+            <Text style={[styles.cardBtnText, { color: '#0D1B2A' }]}>{t('admin.orders.create.start')} {isArabic ? '←' : '→'}</Text>
           </TouchableOpacity>
         </TouchableOpacity>
       </ScrollView>

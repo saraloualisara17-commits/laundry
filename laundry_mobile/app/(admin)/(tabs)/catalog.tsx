@@ -13,10 +13,10 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Platform,
   Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
@@ -34,7 +34,22 @@ const PRICING_METHODS: Record<string, { label: string, color: string, icon: any 
 
 const ICONS = ['🧺', '🛋️', '👕', '🛏️', '🪟', '🧸', '📦', '🧣', '🧤', '🧦'];
 
+import { useTranslation } from 'react-i18next';
+
 export default function CatalogScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+
+  const PRICING_METHODS: Record<string, { label: string, color: string, icon: any }> = {
+    PER_M2: { label: t('admin.catalog.pricing.per_m2'), color: AdminColors.primary, icon: 'square-outline' },
+    PER_UNIT: { label: t('admin.catalog.pricing.per_unit'), color: '#3B82F6', icon: 'list-outline' },
+    PER_KG: { label: t('admin.catalog.pricing.per_kg'), color: '#F59E0B', icon: 'scale-outline' },
+    PER_LINEAR_M: { label: t('admin.catalog.pricing.per_linear_m'), color: '#8B5CF6', icon: 'ruler-outline' },
+    CUSTOM: { label: t('admin.catalog.pricing.custom'), color: AdminColors.textMuted, icon: 'create-outline' },
+  };
+
+  const ICONS = ['🧺', '🛋️', '👕', '🛏️', '🪟', '🧸', '📦', '🧣', '🧤', '🧦'];
+
   const [categories, setCategories] = useState<any[]>([]);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +66,7 @@ export default function CatalogScreen() {
     description: '', 
     pricingMethod: 'PER_UNIT', 
     prixUnitaire: '', 
-    uniteLabel: 'pièce',
+    uniteLabel: t('admin.catalog.unit_piece', { defaultValue: 'pièce' }),
     processingDays: 2,
     imageUrl: ''
   });
@@ -83,7 +98,7 @@ export default function CatalogScreen() {
       await adminApi.toggleCategory(id);
       fetchData();
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer le statut');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
@@ -92,7 +107,7 @@ export default function CatalogScreen() {
       await adminApi.toggleProduct(id);
       fetchData();
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer le statut');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
@@ -128,7 +143,7 @@ export default function CatalogScreen() {
         }
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Échec de l\'envoi de l\'image');
+      Alert.alert(t('common.error'), t('admin.items.photo_error', { defaultValue: 'Échec de l\'envoi de l\'image' }));
     } finally {
       setIsUploading(false);
     }
@@ -136,7 +151,7 @@ export default function CatalogScreen() {
 
   const saveCategory = async () => {
     try {
-      if (!catForm.nom) return Alert.alert('Erreur', 'Le nom est obligatoire');
+      if (!catForm.nom) return Alert.alert(t('common.error'), t('admin.catalog.category_name_required', { defaultValue: 'Le nom est obligatoire' }));
       
       if (categoryModal.data) {
         await adminApi.updateCategory(categoryModal.data.id, catForm);
@@ -147,13 +162,13 @@ export default function CatalogScreen() {
       setCategoryModal({ open: false, data: null });
       fetchData();
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer la catégorie');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
   const saveProduct = async () => {
     try {
-      if (!prodForm.nom || !prodForm.prixUnitaire) return Alert.alert('Erreur', 'Nom et prix obligatoires');
+      if (!prodForm.nom || !prodForm.prixUnitaire) return Alert.alert(t('common.error'), t('admin.catalog.product_required_fields', { defaultValue: 'Nom et prix obligatoires' }));
       
       const payload = {
         ...prodForm,
@@ -169,14 +184,14 @@ export default function CatalogScreen() {
       setProductModal({ open: false, categoryId: null, data: null });
       fetchData();
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer le produit');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
   const renderProduct = (product: any) => {
     const method = PRICING_METHODS[product.pricingMethod] || PRICING_METHODS.PER_UNIT;
     return (
-      <View key={product.id} style={[styles.productRow, !product.isActive && { opacity: 0.6 }]}>
+      <View key={product.id} style={[styles.productRow, !product.isActive && { opacity: 0.6 }, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={styles.productIconBox}>
           {product.imageUrl ? (
             <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${product.imageUrl}` }} style={styles.productImg} />
@@ -185,15 +200,15 @@ export default function CatalogScreen() {
           )}
         </View>
 
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>{product.nom}</Text>
+        <View style={[styles.productInfo, isArabic && { alignItems: 'flex-end' }]}>
+          <Text style={[styles.productName, isArabic && { textAlign: 'right' }]}>{product.nom}</Text>
           <View style={[styles.pricingBadge, { backgroundColor: method.color + '15' }]}>
             <Text style={[styles.pricingBadgeText, { color: method.color }]}>{method.label.toUpperCase()}</Text>
           </View>
         </View>
         
-        <Text style={styles.productPrice}>
-          {product.pricingMethod === 'CUSTOM' ? 'Prix libre' : `${product.prixUnitaire} DH/${product.pricingMethod === 'PER_UNIT' ? product.uniteLabel : product.pricingMethod === 'PER_M2' ? 'm²' : product.pricingMethod === 'PER_KG' ? 'kg' : 'm'}`}
+        <Text style={[styles.productPrice, isArabic && { textAlign: 'right' }]}>
+          {product.pricingMethod === 'CUSTOM' ? t('admin.catalog.pricing.custom') : `${product.prixUnitaire} ${t('common.dh')}/${product.pricingMethod === 'PER_UNIT' ? product.uniteLabel : product.pricingMethod === 'PER_M2' ? 'm²' : product.pricingMethod === 'PER_KG' ? 'kg' : 'm'}`}
         </Text>
 
         <Switch 
@@ -210,7 +225,7 @@ export default function CatalogScreen() {
             description: product.description || '',
             pricingMethod: product.pricingMethod,
             prixUnitaire: product.prixUnitaire?.toString() || '',
-            uniteLabel: product.uniteLabel || 'pièce',
+            uniteLabel: product.uniteLabel || t('admin.catalog.unit_piece', { defaultValue: 'pièce' }),
             processingDays: product.processingDays || 2,
             imageUrl: product.imageUrl || ''
           });
@@ -228,7 +243,7 @@ export default function CatalogScreen() {
     return (
       <View style={styles.categoryContainer}>
         <TouchableOpacity 
-          style={styles.categoryHeader}
+          style={[styles.categoryHeader, isArabic && { flexDirection: 'row-reverse' }]}
           onPress={() => toggleExpand(item.id)}
           activeOpacity={0.8}
         >
@@ -240,12 +255,12 @@ export default function CatalogScreen() {
             )}
           </View>
           
-          <View style={{ flex: 1 }}>
-            <Text style={styles.catName}>{item.nom}</Text>
-            <Text style={styles.catCount}>{item.products?.length || item.productCount || 0} produits</Text>
+          <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.catName, isArabic && { textAlign: 'right' }]}>{isArabic && item.nomAr ? item.nomAr : item.nom}</Text>
+            <Text style={[styles.catCount, isArabic && { textAlign: 'right' }]}>{item.products?.length || item.productCount || 0} {t('admin.catalog.products_count', { defaultValue: 'produits' })}</Text>
           </View>
 
-          <View style={styles.catActions}>
+          <View style={[styles.catActions, isArabic && { flexDirection: 'row-reverse' }]}>
             <Switch 
               value={item.isActive}
               onValueChange={() => handleToggleCategory(item.id, item.isActive)}
@@ -267,13 +282,13 @@ export default function CatalogScreen() {
             {(item.products || []).map(renderProduct)}
             
             <TouchableOpacity 
-              style={styles.addProductBtn}
+              style={[styles.addProductBtn, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={() => {
-                setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: 'pièce', processingDays: 2, imageUrl: '' });
+                setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: t('admin.catalog.unit_piece', { defaultValue: 'pièce' }), processingDays: 2, imageUrl: '' });
                 setProductModal({ open: true, categoryId: item.id, data: null });
               }}
             >
-              <Text style={styles.addProductText}>+ Ajouter un produit</Text>
+              <Text style={styles.addProductText}>+ {t('admin.catalog.add_product')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -284,17 +299,17 @@ export default function CatalogScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Catalogue</Text>
+        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.headerTitle}>{t('admin.catalog.title')}</Text>
           <TouchableOpacity 
-            style={styles.addCatBtn}
+            style={[styles.addCatBtn, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => {
               setCatForm({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
               setCategoryModal({ open: true, data: null });
             }}
           >
             <Ionicons name="add" size={18} color="white" />
-            <Text style={styles.addCatBtnText}>Catégorie</Text>
+            <Text style={styles.addCatBtnText}>{t('admin.catalog.add_category')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -311,7 +326,7 @@ export default function CatalogScreen() {
               {Array(4).fill(0).map((_, i) => <SkeletonCard key={i} />)}
             </View>
           ) : (
-            <EmptyState icon="🏷️" title="Catalogue vide" subtitle="Créez votre première catégorie de services" />
+            <EmptyState icon="🏷️" title={t('admin.catalog.empty_title')} subtitle={t('admin.catalog.empty_subtitle')} />
           )
         }
       />
@@ -319,8 +334,8 @@ export default function CatalogScreen() {
       {/* Category Modal */}
       <Modal visible={categoryModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{categoryModal.data ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</Text>
+          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Text style={styles.modalTitle}>{categoryModal.data ? t('admin.catalog.edit_category') : t('admin.catalog.new_category')}</Text>
             <TouchableOpacity onPress={() => setCategoryModal({ open: false, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -328,7 +343,7 @@ export default function CatalogScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={styles.label}>Image de la catégorie (Optionnel)</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_image')}</Text>
               <View style={styles.imagePickerContainer}>
                 {catForm.imageUrl ? (
                   <View style={styles.imagePreviewContainer}>
@@ -344,7 +359,7 @@ export default function CatalogScreen() {
                     ) : (
                       <>
                         <Ionicons name="camera-outline" size={32} color={AdminColors.textMuted} />
-                        <Text style={styles.pickImageText}>Ajouter une image</Text>
+                        <Text style={styles.pickImageText}>{t('common.add_image')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -353,17 +368,17 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Nom de la catégorie</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_name')}</Text>
               <TextInput 
-                style={styles.input} 
+                style={[styles.input, isArabic && { textAlign: 'right' }]} 
                 value={catForm.nom} 
                 onChangeText={t => setCatForm({...catForm, nom: t})}
-                placeholder="Ex: Tapis, Rideaux..."
+                placeholder={t('admin.catalog.search_placeholder', { defaultValue: 'Ex: Tapis, Rideaux...' })}
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Nom en arabe</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_name_ar')}</Text>
               <TextInput 
                 style={[styles.input, { textAlign: 'right' }]} 
                 value={catForm.nomAr} 
@@ -372,8 +387,8 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Icône (si pas d'image)</Text>
-              <View style={styles.iconGrid}>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_icon')}</Text>
+              <View style={[styles.iconGrid, isArabic && { flexDirection: 'row-reverse' }]}>
                 {ICONS.map(icon => (
                   <TouchableOpacity 
                     key={icon} 
@@ -387,7 +402,7 @@ export default function CatalogScreen() {
             </View>
 
             <TouchableOpacity style={styles.primaryBtn} onPress={saveCategory}>
-              <Text style={styles.primaryBtnText}>Enregistrer</Text>
+              <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -396,8 +411,8 @@ export default function CatalogScreen() {
       {/* Product Modal */}
       <Modal visible={productModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{productModal.data ? 'Modifier le produit' : 'Nouveau produit'}</Text>
+          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Text style={styles.modalTitle}>{productModal.data ? t('admin.catalog.edit_product') : t('admin.catalog.new_product')}</Text>
             <TouchableOpacity onPress={() => setProductModal({ open: false, categoryId: null, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -405,7 +420,7 @@ export default function CatalogScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={styles.label}>Image du produit (Optionnel)</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.product_image')}</Text>
               <View style={styles.imagePickerContainer}>
                 {prodForm.imageUrl ? (
                   <View style={styles.imagePreviewContainer}>
@@ -421,7 +436,7 @@ export default function CatalogScreen() {
                     ) : (
                       <>
                         <Ionicons name="camera-outline" size={32} color={AdminColors.textMuted} />
-                        <Text style={styles.pickImageText}>Ajouter une image</Text>
+                        <Text style={styles.pickImageText}>{t('common.add_image')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -430,18 +445,18 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Nom du produit</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.product_name')}</Text>
               <TextInput 
-                style={styles.input} 
+                style={[styles.input, isArabic && { textAlign: 'right' }]} 
                 value={prodForm.nom} 
                 onChangeText={t => setProdForm({...prodForm, nom: t})}
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Description</Text>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.description')}</Text>
               <TextInput 
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
+                style={[styles.input, { height: 80, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]} 
                 multiline 
                 value={prodForm.description} 
                 onChangeText={t => setProdForm({...prodForm, description: t})}
@@ -449,8 +464,8 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Méthode de tarification</Text>
-              <View style={styles.methodGrid}>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing_method')}</Text>
+              <View style={[styles.methodGrid, isArabic && { flexDirection: 'row-reverse' }]}>
                 {Object.entries(PRICING_METHODS).map(([key, m]) => (
                   <TouchableOpacity 
                     key={key} 
@@ -465,11 +480,11 @@ export default function CatalogScreen() {
             </View>
 
             {prodForm.pricingMethod !== 'CUSTOM' && (
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[styles.formField, { flex: 1 }]}>
-                  <Text style={styles.label}>Prix (DH)</Text>
+                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.price_dh')}</Text>
                   <TextInput 
-                    style={styles.input} 
+                    style={[styles.input, isArabic && { textAlign: 'right' }]} 
                     keyboardType="numeric" 
                     value={prodForm.prixUnitaire}
                     onChangeText={t => setProdForm({...prodForm, prixUnitaire: t})}
@@ -477,9 +492,9 @@ export default function CatalogScreen() {
                 </View>
                 {prodForm.pricingMethod === 'PER_UNIT' && (
                   <View style={[styles.formField, { flex: 1, marginLeft: 12 }]}>
-                    <Text style={styles.label}>Unité</Text>
+                    <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.unit')}</Text>
                     <TextInput 
-                      style={styles.input} 
+                      style={[styles.input, isArabic && { textAlign: 'right' }]} 
                       value={prodForm.uniteLabel}
                       onChangeText={t => setProdForm({...prodForm, uniteLabel: t})}
                     />
@@ -489,8 +504,8 @@ export default function CatalogScreen() {
             )}
 
             <View style={styles.formField}>
-              <Text style={styles.label}>Délai (jours)</Text>
-              <View style={styles.stepper}>
+              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.delay_days')}</Text>
+              <View style={[styles.stepper, isArabic && { flexDirection: 'row-reverse' }]}>
                 <TouchableOpacity 
                   style={styles.stepBtn} 
                   onPress={() => setProdForm({...prodForm, processingDays: Math.max(1, prodForm.processingDays - 1)})}
@@ -508,7 +523,7 @@ export default function CatalogScreen() {
             </View>
 
             <TouchableOpacity style={styles.primaryBtn} onPress={saveProduct}>
-              <Text style={styles.primaryBtnText}>Enregistrer</Text>
+              <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
             </TouchableOpacity>
             
             <View style={{ height: 40 }} />

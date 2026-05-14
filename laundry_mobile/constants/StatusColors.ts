@@ -21,17 +21,17 @@ export const StatusColors: Record<string, { bg: string, border: string, text: st
     label: 'En traitement'
   },
   READY_FOR_DELIVERY: {
-    bg: 'rgba(201,168,76,0.10)',
-    border: 'rgba(201,168,76,0.25)',
-    text: '#92400E',
-    dot: '#C9A84C',
-    label: 'Prête'
-  },
-  DELIVERED: {
     bg: 'rgba(16,185,129,0.10)',
     border: 'rgba(16,185,129,0.20)',
     text: '#065F46',
     dot: '#10B981',
+    label: 'Prête'
+  },
+  DELIVERED: {
+    bg: 'rgba(107,114,128,0.10)',
+    border: 'rgba(107,114,128,0.20)',
+    text: '#4B5563',
+    dot: '#6B7280',
     label: 'Livrée'
   },
   CANCELLED: {
@@ -41,4 +41,22 @@ export const StatusColors: Record<string, { bg: string, border: string, text: st
     dot: '#EF4444',
     label: 'Annulée'
   },
+}
+
+export const STATUS_COLORS: Record<string, string> = {
+  PENDING_PICKUP: '#F59E0B',
+  PICKED_UP: '#3B82F6',
+  IN_PROCESS: '#0D7377',
+  READY_FOR_DELIVERY: '#10B981',
+  DELIVERED: '#6B7280',
+  CANCELLED: '#EF4444',
+}
+
+export const STATUS_LABELS: Record<string, string> = {
+  PENDING_PICKUP: 'En attente',
+  PICKED_UP: 'Récupérée',
+  IN_PROCESS: 'En traitement',
+  READY_FOR_DELIVERY: 'Prête',
+  DELIVERED: 'Livrée',
+  CANCELLED: 'Annulée',
 }

@@ -1,11 +1,28 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors } from '../../../constants/AdminColors';
 import { View, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../src/store/store';
+import { useEffect } from 'react';
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  // Guard: employees and livreurs should never be in the admin TABS — redirect to their zone
+  useEffect(() => {
+    const role = user?.role?.toLowerCase();
+    if (role === 'employe') {
+      router.replace('/(employe)');
+    } else if (role === 'livreur') {
+      router.replace('/(livreur)');
+    }
+  }, [user]);
 
   return (
     <Tabs
@@ -20,6 +37,7 @@ export default function AdminTabsLayout() {
           height: 72 + (Platform.OS === 'ios' ? insets.bottom : 10),
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
           paddingTop: 12,
+          flexDirection: isArabic ? 'row-reverse' : 'row',
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -31,8 +49,8 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Dashboard',
+          title: t('tabs.dashboard'),
+          tabBarLabel: t('tabs.dashboard'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
@@ -44,8 +62,8 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: 'Commandes',
-          tabBarLabel: 'Commandes',
+          title: t('tabs.orders'),
+          tabBarLabel: t('tabs.orders'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
@@ -57,8 +75,8 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="clients"
         options={{
-          title: 'Clients',
-          tabBarLabel: 'Clients',
+          title: t('tabs.clients'),
+          tabBarLabel: t('tabs.clients'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
@@ -70,8 +88,8 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="catalog"
         options={{
-          title: 'Catalogue',
-          tabBarLabel: 'Catalogue',
+          title: t('tabs.catalog'),
+          tabBarLabel: t('tabs.catalog'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
@@ -83,8 +101,8 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="users"
         options={{
-          title: 'Équipe',
-          tabBarLabel: 'Équipe',
+          title: t('tabs.team'),
+          tabBarLabel: t('tabs.team'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}

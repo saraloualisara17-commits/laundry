@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 
-export const BASE_URL = 'http://192.168.1.105:8080'; // The backend IP
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.105:8080';
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
@@ -36,12 +36,20 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 403) {
-      const { store } = require('../store/store');
-      const { logOut } = require('../store/authSlice');
-      // Handle forbidden / suspended account
-      store.dispatch(logOut());
-      await SecureStore.deleteItemAsync('refreshToken');
-      await SecureStore.deleteItemAsync('user');
+      // Only force-logout on account suspension signals, NOT on regular access-denied (role restriction)
+      const errorData = error.response?.data;
+      const isAccountDisabled =
+        errorData?.error === 'ACCOUNT_DISABLED' ||
+        errorData?.message?.includes('désactivé');
+
+      if (isAccountDisabled) {
+        const { store } = require('../store/store');
+        const { logOut } = require('../store/authSlice');
+        store.dispatch(logOut());
+        await SecureStore.deleteItemAsync('refreshToken');
+        await SecureStore.deleteItemAsync('user');
+      }
+      // For regular 403 (role restriction), just reject without logging out
       return Promise.reject(error);
     }
 

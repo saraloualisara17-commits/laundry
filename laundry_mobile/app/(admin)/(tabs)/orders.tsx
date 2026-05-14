@@ -24,19 +24,25 @@ import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router } from 'expo-router';
 
+import { useTranslation } from 'react-i18next';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
 const { width } = Dimensions.get('window');
 
-const TABS = [
-  { id: 'Toutes', label: 'Toutes' },
-  { id: 'PENDING_PICKUP', label: 'En attente' },
-  { id: 'PICKED_UP', label: 'Validée' },
-  { id: 'IN_PROCESS', label: 'En traitement' },
-  { id: 'READY_FOR_DELIVERY', label: 'Prête' },
-  { id: 'DELIVERED', label: 'Livrée' },
-  { id: 'CANCELLED', label: 'Annulée' },
-];
-
 export default function OrdersScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+
+  const TABS = [
+    { id: 'Toutes', label: t('common.all') },
+    { id: 'PENDING_PICKUP', label: t('status.PENDING_PICKUP') },
+    { id: 'PICKED_UP', label: t('status.PICKED_UP') },
+    { id: 'IN_PROCESS', label: t('status.IN_PROCESS') },
+    { id: 'READY_FOR_DELIVERY', label: t('status.READY_FOR_DELIVERY') },
+    { id: 'DELIVERED', label: t('status.DELIVERED') },
+    { id: 'CANCELLED', label: t('status.CANCELLED') },
+  ];
+
   const [activeTab, setActiveTab] = useState('Toutes');
   const [search, setSearch] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
@@ -69,7 +75,9 @@ export default function OrdersScreen() {
         status: activeTab === 'Toutes' ? undefined : activeTab,
         search: search.length > 2 ? search : undefined,
         page: pageNum,
-        limit: 20
+        limit: 20,
+        dateDebut: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
+        dateFin: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined
       };
 
       const res = await adminApi.getOrders(params);
@@ -94,7 +102,7 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     fetchOrders(0, true);
-  }, [activeTab, search]);
+  }, [activeTab, search, selectedDate]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -110,20 +118,27 @@ export default function OrdersScreen() {
     }
   };
 
+  const onDateChange = (event: any, date?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
   const handleValidateOrder = (id: number) => {
     Alert.alert(
-      'Valider la commande',
-      'Voulez-vous valider cette commande pour traitement ?',
+      t('admin.orders.change_status'),
+      `${t('admin.orders.change_status_msg')} ${t('status.PICKED_UP')} ?`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Valider',
+          text: t('common.confirm'),
           onPress: async () => {
             try {
               await adminApi.updateOrderStatus(id, 'PICKED_UP');
               onRefresh();
             } catch (error) {
-              Alert.alert('Erreur', 'Impossible de valider la commande');
+              Alert.alert(t('common.error'), t('common.error_msg'));
             }
           }
         }
@@ -155,6 +170,17 @@ export default function OrdersScreen() {
     });
   }, [orders, selectedDriver, selectedDate]);
 
+  // Generate last 14 days
+  const dateOptions = Array.from({ length: 14 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    let label = d.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR', { weekday: 'short' });
+    let dayNum = d.getDate();
+    if (i === 0) label = t('common.today');
+    if (i === 1) label = t('common.yesterday');
+    return { date: d, label, dayNum };
+  });
+
   const renderStatsBanner = () => {
     const totalOrders = filteredOrders.length;
     const totalAmount = filteredOrders.reduce((sum, o) => sum + (o.montantTotal || 0), 0);
@@ -163,20 +189,20 @@ export default function OrdersScreen() {
     return (
       <View style={styles.statsBanner}>
         <View style={styles.statsDecoCircle} />
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{totalOrders}</Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statLabel}>{t('common.all')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalAmount} <Text style={{fontSize: 14}}>DH</Text></Text>
-            <Text style={styles.statLabel}>Montant</Text>
+            <Text style={styles.statValue}>{totalAmount} <Text style={{fontSize: 14}}>{t('common.dh')}</Text></Text>
+            <Text style={styles.statLabel}>{t('common.total')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{totalPending}</Text>
-            <Text style={styles.statLabel}>En attente</Text>
+            <Text style={styles.statLabel}>{t('status.PENDING_PICKUP')}</Text>
           </View>
         </View>
       </View>
@@ -201,48 +227,48 @@ export default function OrdersScreen() {
         onPress={() => router.push(`/order/${item.id}`)}
         activeOpacity={0.7}
       >
-        <View style={[styles.statusAccent, { backgroundColor: statusCfg.dot }]} />
+        <View style={[isArabic ? styles.statusAccentAr : styles.statusAccent, { backgroundColor: statusCfg.dot }]} />
 
-        <View style={styles.cardTop}>
+        <View style={[styles.cardTop, isArabic && { flexDirection: 'row-reverse' }]}>
           <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
           {isReady ? (
-            <View style={styles.readyBadge}>
+            <View style={[styles.readyBadge, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.readyDot} />
-              <Text style={styles.readyText}>Prête 🎉</Text>
+              <Text style={styles.readyText}>{t('admin.orders.ready')}</Text>
             </View>
           ) : (
             <StatusBadge status={item.status} />
           )}
         </View>
 
-        <Text style={styles.clientName}>{item.client?.name || item.clientNom}</Text>
+        <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
 
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
+        <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="cube-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{item.commandeTapis?.length || 0} articles</Text>
+            <Text style={styles.infoText}>{item.commandeTapis?.length || 0} {t('dashboard.orders_count')}</Text>
           </View>
-          <View style={styles.infoItem}>
+          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="calendar-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString()}</Text>
+            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
           </View>
           
           {totalArea > 0 && (
-            <View style={styles.areaChip}>
+            <View style={[styles.areaChip, isArabic && { flexDirection: 'row-reverse' }]}>
               <Ionicons name="grid-outline" size={12} color="#0284C7" />
               <Text style={styles.areaText}>{totalArea.toFixed(2)} m²</Text>
             </View>
           )}
         </View>
 
-        <View style={styles.cardBottom}>
-          <View>
-            <Text style={styles.amountText}>{item.montantTotal} DH</Text>
+        <View style={[styles.cardBottom, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={isArabic && { alignItems: 'flex-end' }}>
+            <Text style={styles.amountText}>{item.montantTotal} {t('common.dh')}</Text>
             {(item.montantPaye > 0 || item.resteAPayer > 0) && (
-              <View style={styles.financialRow}>
-                <Text style={styles.payeText}>Payé: {item.montantPaye || 0} DH</Text>
+              <View style={[styles.financialRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Text style={styles.payeText}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
                 {item.resteAPayer > 0 && (
-                  <Text style={styles.resteText}>Reste: {item.resteAPayer} DH</Text>
+                  <Text style={styles.resteText}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
                 )}
               </View>
             )}
@@ -250,10 +276,10 @@ export default function OrdersScreen() {
 
           {item.status === 'PENDING_PICKUP' && (
             <TouchableOpacity
-              style={styles.validateBtnInline}
+              style={[styles.validateBtnInline, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={() => handleValidateOrder(item.id)}
             >
-              <Text style={styles.validateBtnTextInline}>Valider →</Text>
+              <Text style={styles.validateBtnTextInline}>{t('admin.orders.validate')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -261,28 +287,19 @@ export default function OrdersScreen() {
     );
   };
 
-  // Generate last 14 days
-  const dateOptions = Array.from({ length: 14 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    let label = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-    if (i === 0) label = "Aujourd'hui";
-    if (i === 1) label = "Hier";
-    return { date: d, label };
-  });
-
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Commandes</Text>
+        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={styles.headerTitle}>{t('admin.orders.title')}</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{totalCount} total</Text>
+            <Text style={styles.countText}>{totalCount} {t('common.all')}</Text>
           </View>
         </View>
 
         <FlatList
           horizontal
+          inverted={isArabic}
           data={TABS}
           keyExtractor={item => item.id}
           showsHorizontalScrollIndicator={false}
@@ -299,11 +316,11 @@ export default function OrdersScreen() {
           )}
         />
 
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Rechercher client ou référence..."
+            style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
+            placeholder={t('admin.orders.search_placeholder')}
             placeholderTextColor={AdminColors.textMuted}
             value={search}
             onChangeText={setSearch}
@@ -328,35 +345,61 @@ export default function OrdersScreen() {
           <>
             {renderStatsBanner()}
             
-            <View style={styles.filterRow}>
-              <TouchableOpacity style={styles.filterBtn} onPress={() => setShowDriverPicker(true)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+            <View style={[styles.filterRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <TouchableOpacity style={[styles.filterBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={() => setShowDriverPicker(true)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, ...(isArabic && { flexDirection: 'row-reverse' }) }}>
                   <Feather name="chevron-down" size={14} color={AdminColors.textMuted} />
-                  <Text style={selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText} numberOfLines={1}>
-                    {selectedDriver ? selectedDriver.name : "Livreur"}
+                  <Text style={[selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                    {selectedDriver ? selectedDriver.name : t('admin.orders.filter_driver')}
                   </Text>
                 </View>
                 {selectedDriver && (
-                  <TouchableOpacity onPress={() => setSelectedDriver(null)} style={{ padding: 4 }}>
+                  <TouchableOpacity 
+                    onPress={(e) => { e.stopPropagation(); setSelectedDriver(null); }} 
+                    style={{ padding: 4 }}
+                  >
                     <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.filterBtn} onPress={() => setShowDatePicker(true)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <TouchableOpacity style={[styles.filterBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={() => setSelectedDate(null)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, ...(isArabic && { flexDirection: 'row-reverse' }) }}>
                   <Ionicons name="calendar-outline" size={14} color={AdminColors.textMuted} />
-                  <Text style={selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText} numberOfLines={1}>
-                    {selectedDate ? selectedDate.toLocaleDateString() : "Date"}
+                  <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                    {selectedDate ? selectedDate.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR') : t('common.all_dates', { defaultValue: 'Toutes les dates' })}
                   </Text>
                 </View>
                 {selectedDate && (
-                  <TouchableOpacity onPress={() => setSelectedDate(null)} style={{ padding: 4 }}>
-                    <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
-                  </TouchableOpacity>
+                   <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
                 )}
               </TouchableOpacity>
             </View>
+
+            <ScrollView 
+              horizontal 
+              inverted={isArabic}
+              showsHorizontalScrollIndicator={false} 
+              style={{ marginBottom: 16 }}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+            >
+              {dateOptions.map((opt, i) => {
+                const isActive = selectedDate && sameDay(selectedDate, opt.date);
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[
+                      styles.dateCard,
+                      isActive ? styles.dateCardActive : styles.dateCardInactive
+                    ]}
+                    onPress={() => setSelectedDate(opt.date)}
+                  >
+                    <Text style={[styles.dateDayLabel, isActive && styles.dateTextActive]}>{opt.label}</Text>
+                    <Text style={[styles.dateDayNum, isActive && styles.dateTextActive]}>{opt.dayNum}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </>
         )}
         ListEmptyComponent={
@@ -367,8 +410,8 @@ export default function OrdersScreen() {
           ) : (
             <EmptyState
               icon="📋"
-              title="Aucune commande"
-              subtitle={activeTab === 'Toutes' ? "Commencez par créer une commande" : `Aucune commande trouvée`}
+              title={t('admin.orders.empty_title')}
+              subtitle={activeTab === 'Toutes' ? t('admin.orders.empty_subtitle', { defaultValue: t('admin.orders.empty_title') }) : t('common.no_data')}
             />
           )
         }
@@ -381,20 +424,20 @@ export default function OrdersScreen() {
           <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDriverPicker(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Filtrer par Livreur</Text>
+            <Text style={styles.modalTitle}>{t('admin.orders.filter_driver')}</Text>
             <ScrollView style={{ maxHeight: 300 }}>
               <TouchableOpacity 
-                style={styles.modalItem}
+                style={[styles.modalItem, isArabic && { flexDirection: 'row-reverse' }]}
                 onPress={() => { setSelectedDriver(null); setShowDriverPicker(false); }}
               >
-                <Text style={[styles.modalItemText, !selectedDriver && styles.modalItemTextActive]}>Tous les livreurs</Text>
+                <Text style={[styles.modalItemText, !selectedDriver && styles.modalItemTextActive]}>{t('admin.orders.all_drivers')}</Text>
                 {!selectedDriver && <Ionicons name="checkmark-circle" size={20} color={AdminColors.primary} />}
               </TouchableOpacity>
               
               {drivers.map(d => (
                 <TouchableOpacity 
                   key={d.id}
-                  style={styles.modalItem}
+                  style={[styles.modalItem, isArabic && { flexDirection: 'row-reverse' }]}
                   onPress={() => { setSelectedDriver(d); setShowDriverPicker(false); }}
                 >
                   <Text style={[styles.modalItemText, selectedDriver?.id === d.id && styles.modalItemTextActive]}>{d.name}</Text>
@@ -406,33 +449,45 @@ export default function OrdersScreen() {
         </View>
       </Modal>
 
-      {/* Date Modal */}
-      <Modal visible={showDatePicker} transparent animationType="fade">
+      {/* Date Modal (Calendar Grid) */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+      >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Filtrer par Date</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              <TouchableOpacity 
-                style={styles.modalItem}
-                onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}
-              >
-                <Text style={[styles.modalItemText, !selectedDate && styles.modalItemTextActive]}>Toutes les dates</Text>
-                {!selectedDate && <Ionicons name="checkmark-circle" size={20} color={AdminColors.primary} />}
+            <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text style={styles.modalTitle}>{t('admin.orders.filter_date')}</Text>
+              <TouchableOpacity onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}>
+                 <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>
               </TouchableOpacity>
-              
-              {dateOptions.map((d, i) => (
-                <TouchableOpacity 
-                  key={i}
-                  style={styles.modalItem}
-                  onPress={() => { setSelectedDate(d.date); setShowDatePicker(false); }}
-                >
-                  <Text style={[styles.modalItemText, selectedDate && sameDay(selectedDate, d.date) && styles.modalItemTextActive]}>{d.label}</Text>
-                  {selectedDate && sameDay(selectedDate, d.date) && <Ionicons name="checkmark-circle" size={20} color={AdminColors.primary} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            </View>
+            
+            <DateTimePicker
+              value={selectedDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              onChange={(event, date) => {
+                if (Platform.OS === 'android') {
+                  setShowDatePicker(false);
+                  if (event.type === 'set' && date) setSelectedDate(date);
+                } else {
+                  if (date) setSelectedDate(date);
+                }
+              }}
+            />
+            
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity 
+                style={[styles.validateBtnInline, { marginTop: 20, height: 48 }]} 
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.validateBtnTextInline}>{t('common.confirm')}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -612,6 +667,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 4,
   },
+  statusAccentAr: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -771,5 +833,36 @@ const styles = StyleSheet.create({
   modalItemTextActive: {
     color: AdminColors.primary,
     fontWeight: '700',
+  },
+  dateCard: {
+    width: 60,
+    height: 70,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...AdminShadows.shadowSmall,
+  },
+  dateCardInactive: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  dateCardActive: {
+    backgroundColor: AdminColors.primary,
+  },
+  dateDayLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: AdminColors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  dateDayNum: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: AdminColors.primary,
+  },
+  dateTextActive: {
+    color: 'white',
   },
 });

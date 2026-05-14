@@ -55,6 +55,7 @@ interface OrderCreationContextType {
   scheduledDate: string | null;
   items: OrderItem[];
   orderNotes: string;
+  orderImages: string[];
   paymentMethod: string | null;
   paidAmount: number;
   pendingLocation: PendingLocation | null;
@@ -69,6 +70,7 @@ interface OrderCreationContextType {
   removeItem: (cartId: string) => void;
   updateItem: (cartId: string, item: OrderItem) => void;
   setOrderNotes: (notes: string) => void;
+  setOrderImages: (images: string[]) => void;
   setPaymentMethod: (method: string | null) => void;
   setPaidAmount: (amount: number) => void;
   setPendingLocation: (loc: PendingLocation | null) => void;
@@ -93,6 +95,7 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
+  const [orderImages, setOrderImages] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [paidAmount, setPaidAmount] = useState(0);
   const [pendingLocation, setPendingLocation] = useState<PendingLocation | null>(null);
@@ -131,6 +134,7 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setLivreur(order.livreur?.id || null);
     setScheduledDate(order.scheduledPickupDate);
     setOrderNotes(order.notes || '');
+    setOrderImages((order.images || []).filter((img: any) => !img.tapisId).map((img: any) => img.imageUrl));
     setPaymentMethod(order.modePaiement);
     setPaidAmount(parseFloat(order.montantPaye || 0));
     
@@ -164,6 +168,7 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setScheduledDate(null);
     setItems([]);
     setOrderNotes('');
+    setOrderImages([]);
     setPaymentMethod(null);
     setPaidAmount(0);
     setPendingLocation(null);
@@ -171,9 +176,9 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const value = {
-    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, paymentMethod, paidAmount, pendingLocation, editingOrderId,
+    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId,
     setMode, setClient, setDeliveryType, setLivreur, setScheduledDate,
-    addItem, removeItem, updateItem, setOrderNotes, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId,
+    addItem, removeItem, updateItem, setOrderNotes, setOrderImages, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId,
     loadOrderForEditing, clearOrder,
     totalAmount, itemCount, totalArea, totalCarpets, remainingAmount
   };

@@ -7,18 +7,21 @@ import {
   ScrollView, 
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
-  Linking
+  Linking,
+  Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { adminApi } from '../../src/services/adminApi';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import AddPaymentModal from '../../components/admin/AddPaymentModal';
-import { Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 export default function ClientDebtDetailScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const { clientId, clientName } = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,29 +58,33 @@ export default function ClientDebtDetailScreen() {
   const openWhatsApp = async () => {
     if (!clientData?.clientPhone) return;
     
-    // Format phone for WhatsApp wa.me (digits only)
     let waPhone = clientData.clientPhone.replace(/\D/g, '');
     if (clientData.clientPhone.startsWith('0')) {
       waPhone = '212' + clientData.clientPhone.slice(1).replace(/\D/g, '');
     }
     
-    const text = `Bonjour ${clientData.clientName},\nVous avez un solde restant de ${clientData.totalRemaining} DH sur ${clientData.orderCount} commande(s).\nMerci de régulariser votre situation.`;
+    const text = t('admin.unpaid.whatsapp_msg', { 
+      name: clientData.clientName, 
+      amount: clientData.totalRemaining, 
+      count: clientData.orderCount,
+      defaultValue: `Bonjour ${clientData.clientName},\nVous avez un solde restant de ${clientData.totalRemaining} DH sur ${clientData.orderCount} commande(s).\nMerci de régulariser votre situation.`
+    });
     const encodedText = encodeURIComponent(text);
     
     try {
       await Linking.openURL(`https://wa.me/${waPhone}?text=${encodedText}`);
     } catch (e) {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
+      Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error'));
     }
   };
 
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
     Alert.alert(
-      'Paiement enregistré',
-      'Le solde a été mis à jour avec succès.'
+      t('common.success'),
+      t('admin.unpaid.payment_recorded_msg', { defaultValue: 'Le solde a été mis à jour avec succès.' })
     );
-    fetchData(); // Refresh data to recalculate remaining amounts
+    fetchData();
   };
 
   const getDebtColorLevel = (amount: number) => {
@@ -97,10 +104,7 @@ export default function ClientDebtDetailScreen() {
   if (!clientData) {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text>Données introuvables.</Text>
-        <TouchableOpacity style={{ marginTop: 20 }} onPress={() => router.back()}>
-          <Text style={{ color: AdminColors.primary }}>Retour</Text>
-        </TouchableOpacity>
+        <Text>{t('common.no_data')}</Text>
       </SafeAreaView>
     );
   }
@@ -108,125 +112,130 @@ export default function ClientDebtDetailScreen() {
   const debtColor = getDebtColorLevel(clientData.totalRemaining);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{clientName}</Text>
-        {clientData.clientPhone ? (
-          <TouchableOpacity style={styles.waIconBtn} onPress={openWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+    <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <View style={[styles.headerTop, isArabic && { flexDirection: 'row-reverse' }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
-        ) : <View style={{ width: 40 }} />}
-      </View>
+          <Text style={styles.headerTitle}>{t('admin.unpaid.client_details', { defaultValue: 'Détail Créances' })}</Text>
+          <TouchableOpacity onPress={openWhatsApp}>
+            <Ionicons name="logo-whatsapp" size={26} color="#25D366" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.clientProfileBox}>
+           <View style={[styles.profileMain, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.avatar, { backgroundColor: debtColor.bg, borderColor: debtColor.main }]}>
+                <Text style={[styles.avatarText, { color: debtColor.main }]}>{clientData.clientName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={[styles.profileInfo, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 16 }]}>
+                <Text style={styles.clientNameLarge}>{clientData.clientName}</Text>
+                <Text style={styles.clientPhoneLarge}>{clientData.clientPhone || t('admin.clients.no_phone')}</Text>
+              </View>
+           </View>
+
+           <View style={[styles.debtStatsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={styles.debtStat}>
+                <Text style={[styles.debtStatValue, { color: debtColor.main }]}>{clientData.totalRemaining} {t('common.dh')}</Text>
+                <Text style={styles.debtStatLabel}>{t('financial.remaining')}</Text>
+              </View>
+              <View style={styles.debtStatDivider} />
+              <View style={styles.debtStat}>
+                <Text style={styles.debtStatValue}>{clientData.orderCount}</Text>
+                <Text style={styles.debtStatLabel}>{t('dashboard.orders')}</Text>
+              </View>
+           </View>
+        </View>
+      </SafeAreaView>
 
       <ScrollView 
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <View style={styles.clientInfoCard}>
-          <View style={[styles.avatarLarge, { backgroundColor: debtColor.bg, borderColor: debtColor.main }]}>
-            <Text style={[styles.avatarTextLarge, { color: debtColor.main }]}>
-              {clientData.clientName?.charAt(0)?.toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.clientNameLarge}>{clientData.clientName}</Text>
-          {clientData.clientPhone && (
-            <Text style={styles.clientPhoneText}>{clientData.clientPhone}</Text>
-          )}
-        </View>
-
-        <View style={styles.debtSummaryCard}>
-          <Text style={styles.debtLabel}>DETTE TOTALE</Text>
-          <Text style={styles.debtAmountLarge}>{clientData.totalRemaining} DH</Text>
-          
-          <View style={styles.debtDetailsRow}>
-            <Text style={styles.debtDetailText}>{clientData.orderCount} commandes</Text>
-            <View style={styles.dot} />
-            <Text style={styles.debtDetailText}>{clientData.totalAmount} DH facturé</Text>
-            <View style={styles.dot} />
-            <Text style={styles.debtDetailText}>{clientData.totalPaid} DH encaissé</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Commandes impayées</Text>
-
-        {clientData.orders?.map((order: any) => (
+        <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>{t('admin.unpaid.unpaid_orders_list', { defaultValue: 'Commandes impayées' })}</Text>
+        
+        {clientData.orders?.map((order: any, index: number) => (
           <TouchableOpacity 
-            key={order.orderId} 
-            style={styles.orderMiniCard}
+            key={order.orderId?.toString() || `order-${index}`} 
+            style={styles.orderCard}
             onPress={() => router.push(`/order/${order.orderId}`)}
+            activeOpacity={0.7}
           >
-            <View style={styles.orderTopRow}>
-              <Text style={styles.orderRef}>#{order.reference}</Text>
+            <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View>
+                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{order.reference}</Text>
+                <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>{new Date(order.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
+              </View>
               <StatusBadge status={order.status} />
             </View>
-            <Text style={styles.orderDate}>
-              {new Date(order.dateCreation).toLocaleDateString()}
-            </Text>
-            
-            <View style={styles.finRow}>
-              <View style={styles.finCol}>
-                <Text style={styles.finLabel}>Total</Text>
-                <Text style={styles.finValue}>{order.montantTotal} DH</Text>
-              </View>
-              <View style={styles.finCol}>
-                <Text style={styles.finLabel}>Payé</Text>
-                <Text style={styles.finValueSuccess}>{order.montantPaye} DH</Text>
-              </View>
-              <View style={styles.finCol}>
-                <Text style={styles.finLabel}>Reste</Text>
-                <Text style={styles.finValueDanger}>{order.montantRestant} DH</Text>
-              </View>
+
+            <View style={[styles.financialBar, isArabic && { flexDirection: 'row-reverse' }]}>
+               <View style={styles.finItem}>
+                 <Text style={styles.finLabel}>{t('common.total')}</Text>
+                 <Text style={styles.finValue}>{order.montantTotal} {t('common.dh')}</Text>
+               </View>
+               <View style={styles.finItem}>
+                 <Text style={styles.finLabel}>{t('financial.paid')}</Text>
+                 <Text style={[styles.finValue, { color: '#059669' }]}>{order.montantPaye || 0} {t('common.dh')}</Text>
+               </View>
+               <View style={styles.finItem}>
+                 <Text style={styles.finLabel}>{t('financial.remaining')}</Text>
+                 <Text style={[styles.finValue, { color: AdminColors.danger }]}>{order.montantRestant} {t('common.dh')}</Text>
+               </View>
             </View>
 
-            <View style={styles.actionRow}>
-              <View style={{ flex: 1 }} />
-              <TouchableOpacity 
-                style={styles.payBtn}
-                onPress={() => {
-                  setSelectedOrderId(order.orderId);
-                  setSelectedOrderAmount(order.montantTotal);
-                  setSelectedOrderRestant(order.montantRestant);
-                  setShowPaymentModal(true);
-                }}
-              >
-                <Text style={styles.payBtnText}>💰 Payer</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              style={[styles.payBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedOrderId(order.orderId);
+                setSelectedOrderAmount(order.montantTotal);
+                setSelectedOrderRestant(order.montantRestant);
+                setShowPaymentModal(true);
+              }}
+            >
+              <Ionicons name="card-outline" size={18} color="white" />
+              <Text style={styles.payBtnText}>{t('admin.unpaid.pay')}</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Payment Modal */}
       {selectedOrderId && (
         <AddPaymentModal
           visible={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
           orderId={selectedOrderId}
           totalAmount={selectedOrderAmount}
-          onSuccess={handlePaymentSuccess}
+          remainingAmount={selectedOrderRestant}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'white',
   },
   header: {
+    backgroundColor: 'white',
+    ...AdminShadows.shadowSmall,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
-    ...AdminShadows.shadowSmall,
-    zIndex: 10,
   },
   backBtn: {
     padding: 4,
@@ -235,162 +244,144 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: AdminColors.textPrimary,
-    flex: 1,
-    textAlign: 'center',
   },
-  waIconBtn: {
-    padding: 8,
-    backgroundColor: 'rgba(37,211,102,0.1)',
-    borderRadius: 12,
+  clientProfileBox: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  clientInfoCard: {
+  profileMain: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
   },
-  avatarLarge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    marginBottom: 12,
   },
-  avatarTextLarge: {
-    fontSize: 24,
+  avatarText: {
+    fontSize: 28,
     fontWeight: '800',
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: 16,
   },
   clientNameLarge: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: AdminColors.textPrimary,
   },
-  clientPhoneText: {
-    fontSize: 14,
-    color: AdminColors.textSecondary,
+  clientPhoneLarge: {
+    fontSize: 15,
+    color: AdminColors.textMuted,
+    marginTop: 2,
+  },
+  debtStatsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  debtStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  debtStatValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: AdminColors.textPrimary,
+  },
+  debtStatLabel: {
+    fontSize: 11,
+    color: AdminColors.textMuted,
+    fontWeight: '600',
+    textTransform: 'uppercase',
     marginTop: 4,
   },
-  debtSummaryCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+  debtStatDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#E2E8F0',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 20,
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(239,68,68,0.3)',
-    ...AdminShadows.shadowSmall,
-  },
-  debtLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: AdminColors.danger,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  debtAmountLarge: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: AdminColors.danger,
-    marginBottom: 12,
-  },
-  debtDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  debtDetailText: {
-    fontSize: 11,
-    color: AdminColors.textSecondary,
-    fontWeight: '500',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: AdminColors.textMuted,
-    marginHorizontal: 8,
+    paddingBottom: 40,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: AdminColors.textPrimary,
-    marginBottom: 12,
-    marginLeft: 4,
+    color: AdminColors.textSecondary,
+    marginBottom: 16,
   },
-  orderMiniCard: {
+  orderCard: {
     backgroundColor: 'white',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     ...AdminShadows.shadowSmall,
   },
-  orderTopRow: {
+  orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   orderRef: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AdminColors.textMuted,
+    fontSize: 15,
+    fontWeight: '700',
+    color: AdminColors.textPrimary,
   },
   orderDate: {
     fontSize: 12,
     color: AdminColors.textMuted,
-    marginTop: 6,
+    marginTop: 2,
   },
-  finRow: {
+  financialBar: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
   },
-  finCol: {
+  finItem: {
     flex: 1,
     alignItems: 'center',
   },
   finLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: AdminColors.textMuted,
-    marginBottom: 2,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   finValue: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: AdminColors.textPrimary,
   },
-  finValueSuccess: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: AdminColors.success,
-  },
-  finValueDanger: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: AdminColors.danger,
-  },
-  actionRow: {
+  payBtn: {
+    backgroundColor: AdminColors.primary,
+    borderRadius: 12,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-  },
-  payBtn: {
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    ...AdminShadows.shadowTeal,
   },
   payBtnText: {
-    fontSize: 12,
+    color: 'white',
+    fontSize: 15,
     fontWeight: '700',
-    color: AdminColors.success,
   },
 });

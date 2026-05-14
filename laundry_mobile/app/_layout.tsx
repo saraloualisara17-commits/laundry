@@ -7,6 +7,7 @@ import { setCredentials } from '../src/store/authSlice';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { OrderCreationProvider } from '../src/context/OrderCreationContext';
+import '../src/i18n';
 
 function RootLayoutNav() {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -46,17 +47,23 @@ function RootLayoutNav() {
         router.replace('/(auth)/login');
       }
     } else {
-      const isLivreur = user.role?.toLowerCase() === 'livreur';
+      const role = user.role?.toLowerCase();
+      const isLivreur  = role === 'livreur';
+      const isEmploye  = role === 'employe';
       const rootSegment = segments[0];
-      
+
       const inLivreurGroup = rootSegment === '(livreur)';
-      const inAdminGroup = rootSegment === '(admin)';
+      const inAdminGroup   = rootSegment === '(admin)';
+      const inEmployeGroup = rootSegment === '(employe)';
+      // Employees can visit (admin) for the shared order-creation flow
       const isSharedRoute = ['order', 'client', 'modal'].includes(rootSegment);
 
       if (!isSharedRoute) {
         if (isLivreur && !inLivreurGroup) {
           router.replace('/(livreur)');
-        } else if (!isLivreur && !inAdminGroup) {
+        } else if (isEmploye && !inEmployeGroup && !inAdminGroup) {
+          router.replace('/(employe)');
+        } else if (!isLivreur && !isEmploye && !inAdminGroup) {
           router.replace('/(admin)');
         }
       }
@@ -75,6 +82,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(admin)" />
+      <Stack.Screen name="(employe)" />
       <Stack.Screen name="(livreur)" />
     </Stack>
   );

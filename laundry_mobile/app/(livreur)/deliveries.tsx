@@ -10,9 +10,14 @@ import { fetchReadyDeliveries, fetchPaymentTypes, confirmPayment, cancelDelivery
 import { RootState, AppDispatch } from '../../src/store/store';
 import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
 
+import { useTranslation } from 'react-i18next';
+
 export default function DeliveriesScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
   const dispatch = useDispatch<AppDispatch>();
-  const { readyDeliveries, paymentTypes, loading } = useSelector((state: RootState) => state.livreur);
+  const { readyDeliveries, loading } = useSelector((state: RootState) => state.livreur);
   const [refreshing, setRefreshing] = useState(false);
   const [deliveryModal, setDeliveryModal] = useState<{ visible: boolean; order: any | null }>({ visible: false, order: null });
   const [collectedAmount, setCollectedAmount] = useState('0');
@@ -31,7 +36,6 @@ export default function DeliveriesScreen() {
     await dispatch(fetchReadyDeliveries());
     setRefreshing(false);
   };
-
   const handleOpenMaps = (order: any) => {
     const addr = order.client?.addresses?.[0];
     const lat = addr?.latitude;
@@ -46,7 +50,7 @@ export default function DeliveriesScreen() {
     } else if (address) {
       url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     } else {
-      Alert.alert('Pas de localisation', 'Aucun GPS ou adresse disponible pour cette commande.');
+      Alert.alert(t('common.error'), t('admin.map.empty_title'));
       return;
     }
     Linking.openURL(url);
@@ -57,34 +61,64 @@ export default function DeliveriesScreen() {
     if (phone) {
       Linking.openURL(`tel:${phone}`);
     } else {
-      Alert.alert('Pas de numéro', 'Aucun numéro de téléphone disponible.');
+      Alert.alert(t('common.error'), t('admin.clients.no_phone'));
+    }
+  };
+
+  const handleShareReceipt = async (orderId: number) => {
+    try {
+      const { adminApi } = require('../../src/services/adminApi');
+      const res = await adminApi.getDeliveryReceipt(orderId);
+      const { phone, message } = res.data.data;
+      const encoded = encodeURIComponent(message);
+      const waUrl = phone 
+        ? `whatsapp://send?phone=${phone.replace(/\D/g, '')}&text=${encoded}`
+        : `whatsapp://send?text=${encoded}`;
+      
+      const canOpen = await Linking.canOpenURL(waUrl);
+      if (canOpen) {
+        await Linking.openURL(waUrl);
+      } else {
+        await Linking.openURL(`https://wa.me/${phone?.replace(/\D/g, '')}?text=${encoded}`);
+      }
+    } catch (e) {
+      Alert.alert(t('common.error'), t('common.error_msg'));
     }
   };
 
   const handleConfirmDelivery = async () => {
     if (!deliveryModal.order) return;
+    const orderId = deliveryModal.order.id;
     const amount = parseFloat(collectedAmount) || 0;
     if (isNaN(amount) || amount < 0) {
-      Alert.alert('Erreur', 'Veuillez saisir un montant valide.');
+      Alert.alert(t('common.error'), t('admin.unpaid.enter_valid_amount'));
       return;
     }
     if (amount > parseFloat(deliveryModal.order.montantTotal)) {
-      Alert.alert('Erreur', 'Le montant collecté ne peut pas dépasser le total.');
+      Alert.alert(t('common.error'), t('common.error_msg'));
       return;
     }
 
     setConfirmingDelivery(true);
     try {
-      // Use adminApi to update status with payment
       const { adminApi } = require('../../src/services/adminApi');
-      await adminApi.updateOrderStatus(deliveryModal.order.id, 'DELIVERED', {
+      await adminApi.updateOrderStatus(orderId, 'DELIVERED', {
         montantCollecte: amount
       });
       setDeliveryModal({ visible: false, order: null });
-      Alert.alert('✅ Livré', 'La livraison a été confirmée !');
+      
+      Alert.alert(
+        t('delivery.delivery_success'),
+        t('delivery.send_receipt_prompt'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: '📱 WhatsApp', onPress: () => handleShareReceipt(orderId) }
+        ]
+      );
+
       loadData();
     } catch (err: any) {
-      Alert.alert('Erreur', 'Échec de la confirmation de livraison.');
+      Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {
       setConfirmingDelivery(false);
     }
@@ -92,19 +126,19 @@ export default function DeliveriesScreen() {
 
   const handleCancel = (order: any) => {
     Alert.alert(
-      'Annuler la livraison',
-      `Êtes-vous sûr de vouloir annuler la livraison pour ${order.client?.nom || order.client?.name || 'ce client'} ?`,
+      t('common.cancel'),
+      `${t('common.confirm_msg')} (${order.client?.nom || order.client?.name || t('tabs.clients')}) ?`,
       [
-        { text: 'Garder', style: 'cancel' },
+        { text: t('common.back'), style: 'cancel' },
         {
-          text: 'Annuler la livraison', style: 'destructive',
+          text: t('common.supprimer'), style: 'destructive',
           onPress: async () => {
             setProcessingId(order.id);
             try {
               await dispatch(cancelDelivery(order.id)).unwrap();
-              Alert.alert('Annulée', 'La livraison a été annulée.');
+              Alert.alert(t('status.CANCELLED'), t('delivery.delivery_cancelled'));
             } catch (err: any) {
-              Alert.alert('Erreur', typeof err === 'string' ? err : 'Échec de l\'annulation.');
+              Alert.alert(t('common.error'), typeof err === 'string' ? err : t('common.error_msg'));
             } finally {
               setProcessingId(null);
               loadData();
@@ -117,57 +151,57 @@ export default function DeliveriesScreen() {
 
   const renderItem = ({ item: order }: { item: any }) => {
     const addr = order.client?.addresses?.[0];
-    const clientName = order.client?.nom || order.client?.name || 'Client';
+    const clientName = order.client?.nom || order.client?.name || t('tabs.clients');
     const phone = order.client?.phones?.[0]?.phoneNumber;
     const totalItems = order.commandeTapis?.length || 0;
     const isProcessing = processingId === order.id;
 
     return (
       <View style={styles.card}>
-        <View style={styles.cardTop}>
+        <View style={[styles.cardTop, isArabic && { flexDirection: 'row-reverse' }]}>
           <Text style={styles.orderRef}>#{order.numeroCommande}</Text>
-          <View style={styles.statusBadge}>
+          <View style={[styles.statusBadge, isArabic && { flexDirection: 'row-reverse' }]}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>PRÊTE</Text>
+            <Text style={styles.statusText}>{t('status.READY_FOR_DELIVERY').toUpperCase()}</Text>
           </View>
         </View>
 
-        <Text style={styles.clientName}>{clientName}</Text>
+        <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{clientName}</Text>
 
         {addr?.address && (
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="map-pin" size={14} color={Colors.primary} />
-            <Text style={styles.infoText} numberOfLines={2}>{addr.address}</Text>
+            <Text style={[styles.infoText, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{addr.address}</Text>
           </View>
         )}
 
         {phone && (
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <Feather name="phone" size={14} color={Colors.success} />
-            <Text style={styles.infoText}>{phone}</Text>
+            <Text style={[styles.infoText, isArabic && { textAlign: 'right' }]}>{phone}</Text>
           </View>
         )}
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>TAPIS</Text>
+        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.statBox, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={styles.statLabel}>{t('admin.catalog.title').toUpperCase()}</Text>
             <Text style={styles.statValue}>{totalItems}</Text>
           </View>
-          <View style={[styles.statBox, styles.statBoxHighlight]}>
-            <Text style={[styles.statLabel, { color: Colors.primary }]}>TOTAL</Text>
-            <Text style={[styles.statValue, { color: Colors.primary }]}>{order.montantTotal} <Text style={styles.currencyText}>DH</Text></Text>
+          <View style={[styles.statBox, styles.statBoxHighlight, isArabic && { alignItems: 'flex-end' }]}>
+            <Text style={[styles.statLabel, { color: Colors.primary }]}>{t('financial.total').toUpperCase()}</Text>
+            <Text style={[styles.statValue, { color: Colors.primary }]}>{order.montantTotal} <Text style={styles.currencyText}>{t('common.dh')}</Text></Text>
           </View>
         </View>
 
         <View style={styles.cardDivider} />
 
         {isProcessing ? (
-          <View style={styles.processingRow}>
+          <View style={[styles.processingRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <ActivityIndicator color={Colors.primary} />
-            <Text style={styles.processingText}>Traitement...</Text>
+            <Text style={styles.processingText}>{t('common.loading')}</Text>
           </View>
         ) : (
-          <View style={styles.actionsRow}>
+          <View style={[styles.actionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: Colors.primary }]} onPress={() => handleOpenMaps(order)}>
               <Feather name="navigation" size={20} color="white" />
             </TouchableOpacity>
@@ -177,14 +211,14 @@ export default function DeliveriesScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.payBtn}
+              style={[styles.payBtn, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={() => {
                 setCollectedAmount('0');
                 setDeliveryModal({ visible: true, order });
               }}
             >
               <Feather name="truck" size={18} color={Colors.primary} />
-              <Text style={styles.payBtnText}>LIVRER</Text>
+              <Text style={styles.payBtnText}>{t('driver.dashboard.delivery').toUpperCase()}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.iconBtn, { backgroundColor: Colors.danger }]} onPress={() => handleCancel(order)}>
@@ -198,10 +232,10 @@ export default function DeliveriesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.headerTitle}>Livraisons</Text>
-          <Text style={styles.headerSubtitle}>{readyDeliveries.length} commandes prêtes</Text>
+      <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={isArabic && { alignItems: 'flex-end' }}>
+          <Text style={styles.headerTitle}>{t('driver.dashboard.deliveries')}</Text>
+          <Text style={styles.headerSubtitle}>{readyDeliveries.length} {t('status.READY_FOR_DELIVERY').toLowerCase()}</Text>
         </View>
         <View style={styles.countChip}>
           <Feather name="package" size={14} color={Colors.primary} />
@@ -223,8 +257,8 @@ export default function DeliveriesScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Feather name="truck" size={60} color="#D1D5DB" />
-              <Text style={styles.emptyTitle}>Aucune livraison</Text>
-              <Text style={styles.emptySubtitle}>Toutes les commandes ont été livrées ou ne sont pas encore prêtes.</Text>
+              <Text style={styles.emptyTitle}>{t('driver.dashboard.no_missions')}</Text>
+              <Text style={styles.emptySubtitle}>{t('driver.dashboard.no_missions')}</Text>
             </View>
           }
         />
@@ -239,29 +273,29 @@ export default function DeliveriesScreen() {
           <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={() => setDeliveryModal({ visible: false, order: null })} />
           <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
             <View style={styles.modalHandle} />
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ width: '100%' }}>
               <View style={styles.modalIconContainer}>
                 <Feather name="truck" size={32} color={Colors.primary} />
               </View>
-              <Text style={styles.modalTitle}>Confirmer la livraison</Text>
+              <Text style={styles.modalTitle}>{t('delivery.confirm_title')}</Text>
               <Text style={{ fontSize: 14, color: Colors.textSecondary, marginBottom: 20, textAlign: 'center' }}>
-                Déclarez le montant encaissé pour la commande #{deliveryModal.order?.numeroCommande}
+                {t('delivery.declare_amount')} (#{deliveryModal.order?.numeroCommande})
               </Text>
 
-              <View style={styles.modalSummary}>
-                <View>
-                  <Text style={styles.modalSummaryLabel}>CLIENT</Text>
+              <View style={[styles.modalSummary, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={isArabic && { alignItems: 'flex-end' }}>
+                  <Text style={styles.modalSummaryLabel}>{t('tabs.clients').toUpperCase()}</Text>
                   <Text style={styles.modalSummaryValue}>{deliveryModal.order?.client?.name}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.modalSummaryLabel}>TOTAL À PAYER</Text>
+                <View style={{ alignItems: isArabic ? 'flex-start' : 'flex-end' }}>
+                  <Text style={styles.modalSummaryLabel}>{t('financial.total').toUpperCase()}</Text>
                   <Text style={[styles.modalSummaryValue, { color: Colors.primary, fontSize: 24 }]}>
-                    {deliveryModal.order?.montantTotal} DH
+                    {deliveryModal.order?.montantTotal} {t('common.dh')}
                   </Text>
                 </View>
               </View>
 
-              <Text style={styles.modalSectionLabel}>Montant encaissé (DH)</Text>
+              <Text style={[styles.modalSectionLabel, isArabic && { alignSelf: 'flex-end' }]}>{t('delivery.collected_amount')}</Text>
               <TextInput
                 style={{
                   width: '100%',
@@ -283,18 +317,18 @@ export default function DeliveriesScreen() {
                 autoFocus
               />
 
-              <View style={{ flexDirection: 'row', gap: 8, width: '100%', marginBottom: 20 }}>
+              <View style={[styles.paymentGrid, isArabic && { flexDirection: 'row-reverse' }]}>
                 <TouchableOpacity 
                   style={{ flex: 1, height: 40, borderRadius: 10, backgroundColor: Colors.primary100, justifyContent: 'center', alignItems: 'center' }}
                   onPress={() => setCollectedAmount('0')}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>0 DH</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>0 {t('common.dh')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={{ flex: 1, height: 40, borderRadius: 10, backgroundColor: Colors.primary100, justifyContent: 'center', alignItems: 'center' }}
                   onPress={() => setCollectedAmount(deliveryModal.order?.montantTotal.toString())}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>{deliveryModal.order?.montantTotal} DH</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.primary }}>{deliveryModal.order?.montantTotal} {t('common.dh')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -311,9 +345,10 @@ export default function DeliveriesScreen() {
                 <Text style={{ 
                   fontSize: 14, 
                   fontWeight: '600', 
-                  color: parseFloat(collectedAmount) === 0 ? Colors.danger : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '#D97706' : Colors.success 
+                  color: parseFloat(collectedAmount) === 0 ? Colors.danger : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '#D97706' : Colors.success,
+                  textAlign: isArabic ? 'right' : 'left'
                 }}>
-                  {parseFloat(collectedAmount) === 0 ? '⚠️ Commande non payée' : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? '⚡ Paiement partiel' : '✅ Paiement complet'}
+                  {parseFloat(collectedAmount) === 0 ? `⚠️ ${t('delivery.unpaid_warning')}` : parseFloat(collectedAmount) < parseFloat(deliveryModal.order?.montantTotal || 0) ? `⚡ ${t('delivery.partial_payment')}` : `✅ ${t('delivery.full_payment')}`}
                 </Text>
               </View>
 
@@ -326,7 +361,7 @@ export default function DeliveriesScreen() {
                   <ActivityIndicator color="white" />
                 ) : (
                   <Text style={{ color: 'white', fontSize: 16, fontWeight: '700' }}>
-                    🚚 CONFIRMER LA LIVRAISON
+                    🚚 {t('delivery.confirm_btn').toUpperCase()}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -335,7 +370,7 @@ export default function DeliveriesScreen() {
                 style={[styles.cancelBtn, { width: '100%', marginBottom: 20 }]}
                 onPress={() => setDeliveryModal({ visible: false, order: null })}
               >
-                <Text style={styles.cancelBtnText}>Annuler</Text>
+                <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

@@ -10,7 +10,12 @@ import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
 
 const { height } = Dimensions.get('window');
 
+import { useTranslation } from 'react-i18next';
+
 export default function LoginScreen() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +23,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(t('common.error'), t('driver.register_client.toasts.required_fields'));
       return;
     }
 
@@ -49,7 +54,7 @@ export default function LoginScreen() {
       
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Échec de la connexion', extractErrorMessage(error));
+      Alert.alert(t('auth.login.error'), extractErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -64,15 +69,15 @@ export default function LoginScreen() {
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>De retour ?</Text>
-          <Text style={styles.subtitle}>Connectez-vous à votre compte laundry</Text>
+          <Text style={styles.title}>{t('auth.login.title')}</Text>
+          <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>EMAIL</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('auth.login.email').toUpperCase()}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isArabic && { textAlign: 'right' }]}
               placeholder="votre@email.com"
               placeholderTextColor={Colors.textMuted}
               value={email}
@@ -83,9 +88,9 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>MOT DE PASSE</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('auth.login.password').toUpperCase()}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isArabic && { textAlign: 'right' }]}
               placeholder="••••••••"
               placeholderTextColor={Colors.textMuted}
               value={password}
@@ -103,15 +108,15 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.buttonText}>Se connecter</Text>
+              <Text style={styles.buttonText}>{t('auth.login.submit')}</Text>
             )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Problème de connexion ?</Text>
+          <Text style={styles.footerText}>{t('auth.login.problem')}</Text>
           <TouchableOpacity>
-            <Text style={styles.footerLink}>Contactez l'administrateur</Text>
+            <Text style={styles.footerLink}>{t('auth.login.contact_admin')}</Text>
           </TouchableOpacity>
         </View>
       </View>

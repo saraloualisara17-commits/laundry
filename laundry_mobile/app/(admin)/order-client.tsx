@@ -124,7 +124,7 @@ export default function OrderClientScreen() {
       const res = await adminApi.getUsers();
       const allUsers = res.data?.data || res.data || [];
       const livreurs = allUsers.filter(
-        (u: any) => u.role?.toUpperCase() === 'LIVREUR'
+        (u: any) => ['LIVREUR', 'ADMIN', 'EMPLOYE'].includes(u.role?.toUpperCase())
       );
       setDrivers(livreurs);
     } catch (error) {

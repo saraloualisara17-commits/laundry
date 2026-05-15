@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { logOut } from '../../src/store/authSlice';
-import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchReadyOrders } from '../../src/store/livreurThunks';
+import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -40,7 +40,7 @@ export default function LivreurProfile() {
   useFocusEffect(useCallback(() => {
     dispatch(fetchLivreurDashboardStats());
     dispatch(fetchReadyDeliveries());
-    dispatch(fetchReadyOrders());
+    dispatch(fetchPendingPickups());
   }, [dispatch]));
 
   const onRefresh = () => {
@@ -48,7 +48,7 @@ export default function LivreurProfile() {
     Promise.all([
       dispatch(fetchLivreurDashboardStats()),
       dispatch(fetchReadyDeliveries()),
-      dispatch(fetchReadyOrders()),
+      dispatch(fetchPendingPickups()),
     ]).finally(() => setRefreshing(false));
   };
 

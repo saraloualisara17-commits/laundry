@@ -8,7 +8,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
-import { fetchReadyDeliveries, fetchReadyOrders } from '../../src/store/livreurThunks';
+import { fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 
 const C = {
@@ -44,7 +44,7 @@ export default function MapViewScreen() {
 
   useFocusEffect(useCallback(() => {
     dispatch(fetchReadyDeliveries());
-    dispatch(fetchReadyOrders());
+    dispatch(fetchPendingPickups());
   }, [dispatch]));
 
   const allMissions = useMemo(() => {

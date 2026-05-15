@@ -81,16 +81,16 @@ export const adminApi = {
     search?: string
     page?: number
     limit?: number
-  }) => api.get('/admin/clients', { params }),
+  }) => api.get('/api/clients', { params }),
 
   getClient: (id: number | string) =>
-    api.get(`/admin/client/${id}`),
+    api.get(`/api/clients/${id}`),
 
   createClient: (data: any) =>
-    api.post('/admin/clients', data),
+    api.post('/api/clients', data),
 
   updateClient: (id: number | string, data: any) =>
-    api.put(`/admin/clients/${id}`, data),
+    api.put(`/api/clients/${id}`, data),
 
   // Catalog
   getCategories: () =>

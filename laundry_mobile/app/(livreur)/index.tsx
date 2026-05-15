@@ -9,7 +9,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { logOut } from '../../src/store/authSlice';
-import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchReadyOrders } from '../../src/store/livreurThunks';
+import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import * as SecureStore from 'expo-secure-store';
 import { api } from '../../src/api/axios';
 
@@ -64,7 +64,7 @@ export default function LivreurDashboard() {
   const loadData = useCallback(() => {
     dispatch(fetchLivreurDashboardStats());
     dispatch(fetchReadyDeliveries());
-    dispatch(fetchReadyOrders());
+    dispatch(fetchPendingPickups());
   }, [dispatch]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));

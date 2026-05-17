@@ -19,7 +19,8 @@ import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { compressImage, compressMultipleImages } from '../../src/utils/imageCompression';
+import { uploadManager } from '../../src/services/uploads';
+import { compressImage } from '../../src/utils/imageCompression';
 
 export default function OrderSummaryScreen() {
   const { t, i18n } = useTranslation();

@@ -11,7 +11,7 @@ import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups }
 import { RootState, AppDispatch } from '../../src/store/store';
 import { useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { api } from '../../src/api/axios';
+import { authApi } from '../../src/services/api';
 import { changeLanguage } from '../../src/i18n';
 import { useTranslation } from 'react-i18next';
 
@@ -58,7 +58,7 @@ export default function LivreurProfile() {
       {
         text: 'Déconnecter', style: 'destructive',
         onPress: async () => {
-          try { await api.post('/auth/logout'); } catch {}
+          try { await authApi.logout(); } catch {}
           await SecureStore.deleteItemAsync('user');
           await SecureStore.deleteItemAsync('accessToken');
           await SecureStore.deleteItemAsync('refreshToken');

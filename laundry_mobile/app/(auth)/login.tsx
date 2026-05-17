@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../src/store/authSlice';
-import { api } from '../../src/api/axios';
-import { extractErrorMessage } from '../../src/utils/errorUtils';
+import { authApi } from '../../src/services/api';
+import { showError } from '../../src/services/errors/errorHandler';
 import * as SecureStore from 'expo-secure-store';
+
 import { jwtDecode } from 'jwt-decode';
 import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
 
@@ -29,7 +30,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await authApi.login({ email, password });
       
       const { token, refreshToken } = response.data;
       
@@ -53,8 +54,7 @@ export default function LoginScreen() {
       dispatch(setCredentials({ user, token }));
       
     } catch (error: any) {
-      console.error(error);
-      Alert.alert(t('auth.login.error'), extractErrorMessage(error));
+      showError(error, t('auth.login.error'));
     } finally {
       setIsLoading(false);
     }

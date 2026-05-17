@@ -11,7 +11,6 @@ import { RootState, AppDispatch } from '../../src/store/store';
 import { logOut } from '../../src/store/authSlice';
 import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import * as SecureStore from 'expo-secure-store';
-import { api } from '../../src/api/axios';
 
 const C = {
   primary: '#0D7377',
@@ -77,7 +76,7 @@ export default function LivreurDashboard() {
       {
         text: 'Déconnecter', style: 'destructive',
         onPress: async () => {
-          try { await api.post('/auth/logout'); } catch { }
+          try { await authApi.logout(); } catch { }
           await SecureStore.deleteItemAsync('user');
           await SecureStore.deleteItemAsync('accessToken');
           await SecureStore.deleteItemAsync('refreshToken');

@@ -31,7 +31,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
-import { BASE_URL } from '../../src/api/axios';
+import { BASE_URL } from '../../src/services/api/client';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

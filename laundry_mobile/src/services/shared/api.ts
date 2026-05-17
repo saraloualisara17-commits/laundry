@@ -1,5 +1,5 @@
-import { api as axiosInstance } from '../../api/axios';
+import client from '../api/client';
 
-export const api = axiosInstance;
+export const api = client;
 
-export default api;
+export default client;

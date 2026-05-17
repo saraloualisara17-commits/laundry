@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import statisticsApi from '../services/statistics/statisticsApi';
 import ordersApi from '../services/orders/ordersApi';
+import catalogApi from '../services/api/catalogApi';
 import { handleApiError } from '../services/shared/errorHandler';
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -68,6 +69,39 @@ export const fetchCanceledDeliveries = createAsyncThunk(
 );
 
 // ── ORDER ACTIONS ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetches all carpet types (products) for order creation.
+ */
+export const fetchCarpetTypes = createAsyncThunk(
+  'livreur/fetchCarpetTypes',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await catalogApi.getCategories();
+      // Flatten products from categories
+      const categories = response.data.data || response.data;
+      const allProducts = categories.flatMap((c: any) => c.products || []);
+      return allProducts;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
+
+/**
+ * Creates a new order.
+ */
+export const createOrder = createAsyncThunk(
+  'livreur/createOrder',
+  async (orderData: any, { rejectWithValue }) => {
+    try {
+      const response = await ordersApi.createOrder(orderData);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(handleApiError(error));
+    }
+  }
+);
 
 /**
  * Cancels a delivery (sets status to CANCELLED).

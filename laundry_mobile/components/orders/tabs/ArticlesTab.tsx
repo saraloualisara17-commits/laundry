@@ -1,0 +1,239 @@
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Colors, Shadows } from '../../../constants/theme';
+
+interface ArticlesTabProps {
+  order: any;
+  isArabic: boolean;
+  t: (key: string, options?: any) => string;
+  setViewImage: (url: string) => void;
+  BASE_URL: string;
+}
+
+const ArticlesTab: React.FC<ArticlesTabProps> = ({
+  order,
+  isArabic,
+  t,
+  setViewImage,
+  BASE_URL,
+}) => {
+  return (
+    <View>
+      <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+        <Text style={styles.sectionTitle}>
+          {t('admin.orders.title').toUpperCase()} ({order.commandeTapis?.length || 0})
+        </Text>
+      </View>
+
+      {order.commandeTapis?.map((item: any, index: number) => {
+        const area = item.largeur && (item.hauteur || item.longueur)
+          ? (parseFloat(item.largeur) * parseFloat(item.hauteur || item.longueur)).toFixed(2)
+          : null;
+
+        return (
+          <View key={item.id} style={styles.itemCard}>
+            <View style={[styles.itemHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.itemTitleRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={styles.tagBadge}>
+                  <Text style={styles.tagText}>TAG-{String(index + 1).padStart(3, '0')}</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.itemName,
+                    isArabic && { textAlign: 'right', marginRight: 10, marginLeft: 0 },
+                  ]}
+                >
+                  {isArabic && item.productNomAr ? item.productNomAr : item.productNom || 'Tapis'}
+                </Text>
+              </View>
+              <Text style={styles.itemPrice}>
+                {parseFloat(item.prixFinal || 0).toFixed(2)} {t('common.dh')}
+              </Text>
+            </View>
+
+            {item.images && item.images.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 12 }}
+                contentContainerStyle={[
+                  isArabic && { flexDirection: 'row-reverse' },
+                  { gap: 8 },
+                ]}
+              >
+                {item.images.map((img: any, i: number) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setViewImage(`${BASE_URL}${img.imageUrl}`)}
+                  >
+                    <Image
+                      source={{ uri: `${BASE_URL}${img.imageUrl}` }}
+                      style={styles.itemGalleryImg}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            {item.modeTarification === 'PER_M2' && (
+              <View style={[styles.chipsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={styles.chipLabel}>
+                    {t('admin.orders.create.items.dimensions').toUpperCase()}
+                  </Text>
+                  <Text style={styles.chipValue}>
+                    {item.largeur || '—'} × {item.hauteur || item.longueur || '—'} m
+                  </Text>
+                </View>
+                <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={styles.chipLabel}>
+                    {t('admin.orders.create.items.area').toUpperCase()}
+                  </Text>
+                  <Text style={styles.chipValue}>{area ? `${area} m²` : '— m²'}</Text>
+                </View>
+              </View>
+            )}
+
+            {item.modeTarification === 'PER_UNIT' && (
+              <View
+                style={[
+                  styles.dimensionChip,
+                  { marginTop: 12, alignSelf: isArabic ? 'flex-end' : 'flex-start' },
+                  isArabic && { alignItems: 'flex-end' },
+                ]}
+              >
+                <Text style={styles.chipLabel}>
+                  {t('admin.orders.create.items.pieces').toUpperCase()}
+                </Text>
+                <Text style={styles.chipValue}>{item.quantite}</Text>
+              </View>
+            )}
+
+            {item.notes && (
+              <View style={[styles.noteContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Feather
+                  name="info"
+                  size={14}
+                  color={Colors.textSecondary}
+                  style={{ marginTop: 2 }}
+                />
+                <Text
+                  style={[
+                    styles.itemNotes,
+                    isArabic && { textAlign: 'right', marginRight: 0, marginLeft: 8 },
+                    !isArabic && { marginLeft: 8 },
+                  ]}
+                >
+                  {item.notes}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  itemCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    padding: 16,
+    ...Shadows.sm,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  tagBadge: {
+    backgroundColor: Colors.primary50,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tagText: {
+    color: Colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  itemPrice: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  itemGalleryImg: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  dimensionChip: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  chipLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    marginBottom: 2,
+  },
+  chipValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  noteContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  itemNotes: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+});
+
+export default React.memo(ArticlesTab);

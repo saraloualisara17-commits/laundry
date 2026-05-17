@@ -11,7 +11,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "laundrymobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.smlouali.laundrymobile"
     },
     "web": {
       "output": "static",
@@ -42,11 +43,14 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-localization",
-      "expo-updates"
+      "expo-updates",
+      "expo-secure-store"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f81f325d-b523-433e-849e-a8fe1aa005d5"
+      }
     }
   }
 }

@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
+import client from '../../../src/services/api/client';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router, useFocusEffect } from 'expo-router';
@@ -67,7 +68,7 @@ export default function UsersScreen() {
     try {
       const [activeRes, inactiveRes] = await Promise.all([
         adminApi.getUsers(),
-        require('../../../src/api/axios').api.get('/admin/inactive-users')
+        client.get('/admin/inactive-users')
       ]);
       
       const allUsers = [
@@ -130,7 +131,7 @@ export default function UsersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await require('../../../src/api/axios').api.delete(`/admin/delete-user/${user.id}`);
+              await client.delete(`/admin/delete-user/${user.id}`);
               fetchUsers();
               Alert.alert(t('common.success'), t('admin.users.user_deleted', { defaultValue: 'Membre supprimé avec succès' }));
             } catch (error: any) {
@@ -170,7 +171,7 @@ export default function UsersScreen() {
 
   const resetPassword = async () => {
     try {
-      if (!newPass || newPass.length < 6) return Alert.alert(t('common.error'), t('admin.users.password_min_length', { defaultValue: 'Minimum 6 caractères' }));
+      if (!newPass || newPass.length < 8) return Alert.alert(t('common.error'), t('admin.users.password_min_length', { defaultValue: 'Minimum 8 caractères' }));
       if (passModal.userId) {
         await adminApi.resetPassword(passModal.userId, newPass);
         Alert.alert(t('common.success'), t('admin.users.password_updated', { defaultValue: 'Mot de passe réinitialisé' }));

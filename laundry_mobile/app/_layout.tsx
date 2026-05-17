@@ -7,6 +7,13 @@ import { setCredentials } from '../src/store/authSlice';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { OrderCreationProvider } from '../src/context/OrderCreationContext';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/services/query/queryClient';
+import { AppErrorBoundary } from '../components/ui/AppErrorBoundary';
+import { syncManager } from '../src/services/offline';
+import { uploadManager } from '../src/services/uploads';
+import { socketClient } from '../src/services/realtime';
+import { pushNotificationService } from '../src/services/notifications/pushNotificationService';
 import '../src/i18n';
 
 function RootLayoutNav() {
@@ -35,6 +42,22 @@ function RootLayoutNav() {
     };
     loadUser();
   }, [dispatch]);
+
+  useEffect(() => {
+    if (user?.id) {
+      socketClient.connect(user.id);
+      pushNotificationService.registerForPushNotificationsAsync(user.id);
+    } else {
+      socketClient.disconnect();
+    }
+
+    const removeHandlers = pushNotificationService.initHandlers();
+
+    return () => {
+      removeHandlers();
+      // Disconnect only on full unmount if needed, or keep it managed by user state
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -90,12 +113,16 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Provider store={store}>
-        <OrderCreationProvider>
-          <RootLayoutNav />
-        </OrderCreationProvider>
-      </Provider>
-    </GestureHandlerRootView>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <Provider store={store}>
+            <OrderCreationProvider>
+              <RootLayoutNav />
+            </OrderCreationProvider>
+          </Provider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }

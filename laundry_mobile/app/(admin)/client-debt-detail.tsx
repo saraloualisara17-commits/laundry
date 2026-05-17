@@ -38,8 +38,19 @@ export default function ClientDebtDetailScreen() {
       setLoading(true);
       const res = await adminApi.getClientDebtDetail(clientId as string);
       setClientData(res.data);
-    } catch (error) {
-      console.error('Error fetching client debt detail:', error);
+    } catch (error: any) {
+      // If we get a 404, it means the client no longer has any debt
+      // which is a success state in this context.
+      if (error?.status === 404) {
+        setClientData(null);
+        Alert.alert(
+          t('common.success'),
+          t('admin.unpaid.all_settled_msg', { defaultValue: 'Toutes les créances ont été réglées!' }),
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        console.error('Error fetching client debt detail:', error);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

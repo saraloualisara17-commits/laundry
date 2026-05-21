@@ -11,6 +11,8 @@ import { RootState, AppDispatch } from '../../src/store/store';
 import { logOut } from '../../src/store/authSlice';
 import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import * as SecureStore from 'expo-secure-store';
+import { useTranslation } from 'react-i18next';
+import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
 
 const C = {
   primary: '#0D7377',
@@ -44,6 +46,7 @@ function openMapsNavigation(lat?: number, lng?: number, address?: string) {
 }
 
 export default function LivreurDashboard() {
+  const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
   const { dashboardStats, readyDeliveries, readyOrders, loading } = useSelector((s: RootState) => s.livreur);
@@ -71,10 +74,10 @@ export default function LivreurDashboard() {
   const onRefresh = () => { setRefreshing(true); loadData(); setTimeout(() => setRefreshing(false), 1200); };
 
   const handleLogout = async () => {
-    Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('common.logout_confirm_title'), t('common.logout_confirm_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Déconnecter', style: 'destructive',
+        text: t('common.logout_btn'), style: 'destructive',
         onPress: async () => {
           try { await authApi.logout(); } catch { }
           await SecureStore.deleteItemAsync('user');
@@ -86,14 +89,17 @@ export default function LivreurDashboard() {
     ]);
   };
 
+  // Filter delivery orders to only those due today or overdue — not future-scheduled
+  const visibleDeliveries = (readyDeliveries || []).filter((o: any) => isVisibleToday(o.scheduledDeliveryDate));
+
   // Build "next mission" from existing data
-  const allMissions = [...(readyDeliveries || []), ...(readyOrders || [])];
-  const deliveryCount = readyDeliveries?.length || 0;
+  const allMissions = [...visibleDeliveries, ...(readyOrders || [])];
+  const deliveryCount = visibleDeliveries.length;
   const pickupCount = readyOrders?.length || 0;
   const totalCollected = dashboardStats?.totalCollectedToday || 0;
 
   const nextMission = allMissions.length > 0 ? (() => {
-    const first = readyDeliveries?.[0] || readyOrders?.[0];
+    const first = visibleDeliveries[0] || readyOrders?.[0];
     const isDelivery = readyDeliveries?.length > 0;
     const addr = first?.client?.addresses?.[0];
     return first ? {
@@ -123,8 +129,8 @@ export default function LivreurDashboard() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <View>
-              <Text style={styles.greeting}>Bonjour,</Text>
-              <Text style={styles.userName}>{user?.name || 'Livreur'}</Text>
+              <Text style={styles.greeting}>{t('livreur.greeting')}</Text>
+              <Text style={styles.userName}>{user?.name || t('livreur.driver_fallback')}</Text>
             </View>
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color="white" />
@@ -138,18 +144,18 @@ export default function LivreurDashboard() {
                 <Animated.View style={[styles.dot, { backgroundColor: C.success, opacity: pulseAnim }]} />
                 <Text style={styles.chipNumber}>{deliveryCount}</Text>
               </View>
-              <Text style={styles.chipLabel}>livraisons</Text>
+              <Text style={styles.chipLabel}>{t('livreur.deliveries')}</Text>
             </View>
             <View style={styles.statChip}>
               <View style={styles.chipRow}>
                 <Animated.View style={[styles.dot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
                 <Text style={styles.chipNumber}>{pickupCount}</Text>
               </View>
-              <Text style={styles.chipLabel}>collectes</Text>
+              <Text style={styles.chipLabel}>{t('livreur.pickups')}</Text>
             </View>
             <View style={styles.statChip}>
               <Text style={styles.chipAmount}>{totalCollected} DH</Text>
-              <Text style={styles.chipLabel}>encaissé</Text>
+              <Text style={styles.chipLabel}>{t('livreur.collected')}</Text>
             </View>
           </View>
         </View>
@@ -170,10 +176,10 @@ export default function LivreurDashboard() {
               <View style={styles.missionTop}>
                 <View style={styles.missionBadge}>
                   <Text style={[styles.missionBadgeText, { color: missionTextColor }]}>
-                    {nextMission.type === 'delivery' ? '🚚 LIVRAISON' : '📦 COLLECTE'}
+                    {nextMission.type === 'delivery' ? t('livreur.delivery_badge') : t('livreur.pickup_badge')}
                   </Text>
                 </View>
-                <Text style={styles.missionLabel}>PROCHAINE MISSION</Text>
+                <Text style={styles.missionLabel}>{t('livreur.next_mission')}</Text>
               </View>
 
               <Text style={[styles.missionClientName, { color: 'white' }]}>{nextMission.clientName}</Text>
@@ -192,19 +198,19 @@ export default function LivreurDashboard() {
               {nextMission.type === 'delivery' && (
                 <View style={styles.financialRow}>
                   <View>
-                    <Text style={styles.finLabel}>Total</Text>
+                    <Text style={styles.finLabel}>{t('common.total')}</Text>
                     <Text style={styles.finValue}>{nextMission.montantTotal} DH</Text>
                   </View>
                   <View style={styles.finDivider} />
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.finLabel}>Reste à encaisser</Text>
+                    <Text style={styles.finLabel}>{t('livreur.remaining_to_collect')}</Text>
                     <Text style={[styles.finValue, { fontSize: 18 }]}>{nextMission.montantRestant} DH</Text>
                   </View>
                 </View>
               )}
 
               {nextMission.type === 'pickup' && (
-                <Text style={styles.itemsText}>{nextMission.itemCount} article(s) à collecter</Text>
+                <Text style={styles.itemsText}>{nextMission.itemCount} {t('livreur.items_to_collect')}</Text>
               )}
 
               <View style={styles.missionActions}>
@@ -214,7 +220,7 @@ export default function LivreurDashboard() {
                     onPress={() => Linking.openURL(`tel:${nextMission.clientPhone}`)}
                   >
                     <Ionicons name="call" size={16} color="white" />
-                    <Text style={styles.callBtnText}>Appeler</Text>
+                    <Text style={styles.callBtnText}>{t('common.call')}</Text>
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity
@@ -225,7 +231,7 @@ export default function LivreurDashboard() {
                   })}
                 >
                   <Text style={[styles.startBtnText, { color: missionBg }]}>
-                    Démarrer la mission →
+                    {t('livreur.start_mission')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -234,9 +240,9 @@ export default function LivreurDashboard() {
             <View style={[styles.missionCard, { backgroundColor: C.primary, alignItems: 'center', paddingVertical: 32 }]}>
               <Text style={{ fontSize: 28 }}>✅</Text>
               <Text style={{ fontSize: 18, fontWeight: '700', color: 'white', marginTop: 10, textAlign: 'center' }}>
-                Toutes les missions sont terminées!
+                {t('livreur.all_done')}
               </Text>
-              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>Bonne journée</Text>
+              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>{t('livreur.good_day')}</Text>
             </View>
           )}
         </View>
@@ -251,7 +257,7 @@ export default function LivreurDashboard() {
             <View style={styles.quickIcon}>
               <Text style={{ fontSize: 26 }}>🗺️</Text>
             </View>
-            <Text style={styles.quickLabel}>Voir la carte</Text>
+            <Text style={styles.quickLabel}>{t('livreur.view_map')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -262,7 +268,7 @@ export default function LivreurDashboard() {
             <View style={[styles.quickIcon, { backgroundColor: C.successBg }]}>
               <Text style={{ fontSize: 26 }}>🚚</Text>
             </View>
-            <Text style={styles.quickLabel}>Livraisons</Text>
+            <Text style={styles.quickLabel}>{t('livreur.deliveries_tab')}</Text>
             {deliveryCount > 0 && (
               <View style={[styles.quickBadge, { backgroundColor: C.success }]}>
                 <Text style={styles.quickBadgeText}>{deliveryCount}</Text>
@@ -278,7 +284,7 @@ export default function LivreurDashboard() {
             <View style={[styles.quickIcon, { backgroundColor: C.warningBg }]}>
               <Text style={{ fontSize: 26 }}>📦</Text>
             </View>
-            <Text style={styles.quickLabel}>Collectes</Text>
+            <Text style={styles.quickLabel}>{t('livreur.pickups_tab')}</Text>
             {pickupCount > 0 && (
               <View style={[styles.quickBadge, { backgroundColor: C.warning }]}>
                 <Text style={styles.quickBadgeText}>{pickupCount}</Text>
@@ -291,14 +297,14 @@ export default function LivreurDashboard() {
         {previewMissions.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Missions du jour</Text>
+              <Text style={styles.sectionTitle}>{t('livreur.missions_today')}</Text>
               <TouchableOpacity onPress={() => router.push('/(livreur)/missions')}>
-                <Text style={styles.seeAll}>Voir tout →</Text>
+                <Text style={styles.seeAll}>{t('livreur.see_all')}</Text>
               </TouchableOpacity>
             </View>
 
             {previewMissions.map((mission: any, idx: number) => {
-              const isDelivery = readyDeliveries?.some((d: any) => d.id === mission.id);
+              const isDelivery = visibleDeliveries.some((d: any) => d.id === mission.id);
               const addr = mission.client?.addresses?.[0];
               return (
                 <TouchableOpacity
@@ -321,7 +327,7 @@ export default function LivreurDashboard() {
                     <Text style={[styles.miniAmount, { color: C.success }]}>{mission.montantTotal} DH</Text>
                   ) : (
                     <Text style={[styles.miniAmount, { color: C.warning }]}>
-                      {mission.commandeTapis?.length || 0} art.
+                      {t('livreur.items_count', { count: mission.commandeTapis?.length || 0 })}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -334,7 +340,7 @@ export default function LivreurDashboard() {
                 onPress={() => router.push('/(livreur)/missions')}
               >
                 <Text style={{ fontSize: 13, fontWeight: '600', color: C.primary }}>
-                  + {allMissions.length - 3} autres missions
+                  {t('livreur.more_missions', { count: allMissions.length - 3 })}
                 </Text>
               </TouchableOpacity>
             )}

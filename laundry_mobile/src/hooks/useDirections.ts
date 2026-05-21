@@ -61,7 +61,7 @@ export function useDirections() {
   const lastRequestRef = useRef<string>('');
 
   const calculateRoute = useCallback(async (waypoints: RoutePoint[]) => {
-    if (waypoints.length < 2) return;
+    if (!Array.isArray(waypoints) || waypoints.length < 2) return;
 
     // Deduplicate — only fetch if waypoints actually changed meaningfully
     const key = waypoints.map(w => `${w.latitude.toFixed(4)},${w.longitude.toFixed(4)}`).join('|');

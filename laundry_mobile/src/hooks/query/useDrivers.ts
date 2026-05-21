@@ -8,7 +8,10 @@ import { queryKeys } from '../../services/query/queryKeys';
 export const useDriversList = () => {
   return useQuery({
     queryKey: queryKeys.users.drivers(),
-    queryFn: () => adminApi.getUsers().then(res => res.data.filter((u: any) => u.role?.toLowerCase() === 'livreur')),
+    queryFn: () => adminApi.getUsers().then(res => res.data.filter((u: any) => {
+      const r = u.role?.toLowerCase();
+      return r === 'livreur' || r === 'admin';
+    })),
   });
 };
 
@@ -18,8 +21,8 @@ export const useDriversList = () => {
 export const useAssignDeliveryDriver = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, driverId }: { id: string | number; driverId: string | number }) => 
-      adminApi.assignDeliveryDriver(String(id), String(driverId)),
+    mutationFn: ({ id, driverId, scheduledDeliveryDate }: { id: string | number; driverId: string | number; scheduledDeliveryDate?: string }) =>
+      adminApi.assignDeliveryDriver(String(id), String(driverId), scheduledDeliveryDate),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
     },

@@ -17,6 +17,7 @@ import { adminApi } from '../../src/services/adminApi';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
+import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 
 export default function UnpaidOrdersScreen() {
   const { t, i18n } = useTranslation();
@@ -68,18 +69,13 @@ export default function UnpaidOrdersScreen() {
       waPhone = '212' + phone.slice(1).replace(/\D/g, '');
     }
     
-    const text = t('admin.unpaid.whatsapp_msg', { 
-      name: clientName, 
-      amount: amount, 
-      count: orderCount,
-      defaultValue: `Bonjour ${clientName},\nVous avez un solde restant de ${amount} DH sur ${orderCount} commande(s).\nMerci de régulariser votre situation.`
-    });
+    const text = t('admin.unpaid.whatsapp_msg', { clientName, amount, orderCount });
     const encodedText = encodeURIComponent(text);
     
     try {
       await Linking.openURL(`https://wa.me/${waPhone}?text=${encodedText}`);
     } catch (e) {
-      Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error', { defaultValue: 'Impossible d\'ouvrir WhatsApp' }));
+      Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error'));
     }
   };
 
@@ -129,7 +125,7 @@ export default function UnpaidOrdersScreen() {
             onPress={() => openWhatsApp(item.clientPhone, item.clientName, item.totalRemaining, item.orderCount)}
           >
             <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-            <Text style={styles.actionBtnText}>{t('admin.unpaid.remind', { defaultValue: 'Relancer' })}</Text>
+            <Text style={styles.actionBtnText}>{t('admin.unpaid.remind')}</Text>
           </TouchableOpacity>
           
           <View style={styles.footerDivider} />
@@ -146,39 +142,48 @@ export default function UnpaidOrdersScreen() {
     );
   };
 
-  const renderOrderCard = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.orderCard}
-      onPress={() => router.push(`/order/${item.orderId}`)}
-    >
-      <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-        <View>
-          <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference}</Text>
-          <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
+  const renderOrderCard = ({ item }: { item: any }) => {
+    const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
+
+    return (
+      <TouchableOpacity 
+        style={styles.orderCard}
+        onPress={() => router.push(`/order/${item.orderId || item.id}`)}
+      >
+        <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View>
+            <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference || item.numeroCommande}</Text>
+            <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.clientName || item.clientNom || item.client?.name}</Text>
+          </View>
+          <StatusBadge status={item.status} />
         </View>
-        <StatusBadge status={item.status} />
-      </View>
-      
-      <View style={[styles.orderFinancials, isArabic && { flexDirection: 'row-reverse' }]}>
-        <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('common.total')}</Text>
-          <Text style={styles.finValue}>{item.montantTotal} {t('common.dh')}</Text>
+
+        <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse', justifyContent: 'flex-start' }]}>
+          <Ionicons name="cube-outline" size={14} color={AdminColors.textMuted} />
+          <Text style={styles.infoText}>{itemsSummary}</Text>
         </View>
-        <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('financial.paid')}</Text>
-          <Text style={[styles.finValue, { color: '#059669' }]}>{item.montantPaye || 0} {t('common.dh')}</Text>
+        
+        <View style={[styles.orderFinancials, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={styles.finCol}>
+            <Text style={styles.finLabel}>{t('common.total')}</Text>
+            <Text style={styles.finValue}>{item.montantTotal} {t('common.dh')}</Text>
+          </View>
+          <View style={styles.finCol}>
+            <Text style={styles.finLabel}>{t('financial.paid')}</Text>
+            <Text style={[styles.finValue, { color: '#059669' }]}>{item.montantPaye || 0} {t('common.dh')}</Text>
+          </View>
+          <View style={styles.finCol}>
+            <Text style={styles.finLabel}>{t('financial.remaining')}</Text>
+            <Text style={[styles.finValue, styles.orderFinDanger]}>{item.montantRestant || item.resteAPayer} {t('common.dh')}</Text>
+          </View>
         </View>
-        <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('financial.remaining')}</Text>
-          <Text style={[styles.finValue, styles.orderFinDanger]}>{item.montantRestant} {t('common.dh')}</Text>
-        </View>
-      </View>
-      
-      <Text style={[styles.orderDate, isArabic && { textAlign: 'left' }]}>
-        {new Date(item.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}
-      </Text>
-    </TouchableOpacity>
-  );
+        
+        <Text style={[styles.orderDate, isArabic && { textAlign: 'left' }]}>
+          {new Date(item.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -232,7 +237,7 @@ export default function UnpaidOrdersScreen() {
             <View style={styles.emptyContainer}>
               <Text style={{ fontSize: 48 }}>🎉</Text>
               <Text style={styles.emptyTitle}>{t('dashboard.all_settled')}</Text>
-              <Text style={styles.emptySubtitle}>{t('admin.unpaid.no_unpaid_msg', { defaultValue: 'Toutes les créances sont régularisées.' })}</Text>
+              <Text style={styles.emptySubtitle}>{t('admin.unpaid.no_unpaid_msg')}</Text>
             </View>
           )
         }

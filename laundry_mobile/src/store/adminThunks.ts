@@ -92,7 +92,7 @@ export const fetchClientById = createAsyncThunk('admin/fetchClientById', async (
 
 export const fetchClientCommandes = createAsyncThunk('admin/fetchClientCommandes', async (clientId: number | string, { rejectWithValue }) => {
   try {
-    const response = await clientsApi.getClient(clientId);
+    const response = await clientsApi.getClientCommandes(clientId);
     return response.data;
   } catch (error: any) {
     return rejectWithValue(handleApiError(error));

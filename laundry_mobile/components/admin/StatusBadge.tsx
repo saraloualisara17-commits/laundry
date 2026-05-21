@@ -12,10 +12,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const config = StatusColors[status] || StatusColors.PENDING_PICKUP;
 
   return (
-    <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.border }]}>
-      <View style={[styles.dot, { backgroundColor: config.dot }]} />
-      <Text style={[styles.text, { color: config.text }]}>
-        {t(`status.${status}`).toUpperCase()}
+    <View style={[styles.container, { backgroundColor: config.dot }]}>
+      <View style={styles.dot} />
+      <Text style={styles.text}>
+        {t(`status.${status}`)}
       </Text>
     </View>
   );
@@ -26,19 +26,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 999,
-    borderWidth: 1,
     gap: 5,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   text: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    color: 'white',
   },
 });

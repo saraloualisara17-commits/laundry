@@ -31,7 +31,7 @@ const C = {
 };
 
 export default function LivreurProfile() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
   const { dashboardStats, readyDeliveries, readyOrders } = useSelector((s: RootState) => s.livreur);
@@ -53,10 +53,10 @@ export default function LivreurProfile() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('common.logout_confirm_title'), t('common.logout_confirm_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Déconnecter', style: 'destructive',
+        text: t('common.logout_btn'), style: 'destructive',
         onPress: async () => {
           try { await authApi.logout(); } catch {}
           await SecureStore.deleteItemAsync('user');
@@ -77,7 +77,7 @@ export default function LivreurProfile() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: C.primary }}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mon Profil</Text>
+          <Text style={styles.headerTitle}>{t('livreur.profile_title')}</Text>
         </View>
       </SafeAreaView>
 
@@ -94,34 +94,34 @@ export default function LivreurProfile() {
           {user?.email && <Text style={styles.userEmail}>{user.email}</Text>}
           <View style={styles.roleBadge}>
             <Ionicons name="car-outline" size={13} color={C.primary} />
-            <Text style={styles.roleText}>LIVREUR</Text>
+            <Text style={styles.roleText}>{t('livreur.role')}</Text>
           </View>
         </View>
 
         {/* Today's summary */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>📊 Résumé du jour</Text>
+          <Text style={styles.cardTitle}>📊 {t('livreur.daily_summary')}</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryVal, { color: C.success }]}>{deliveriesCount}</Text>
-              <Text style={styles.summaryLabel}>Livraisons</Text>
+              <Text style={styles.summaryLabel}>{t('livreur.deliveries')}</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryVal, { color: C.warning }]}>{pickupsCount}</Text>
-              <Text style={styles.summaryLabel}>Collectes</Text>
+              <Text style={styles.summaryLabel}>{t('livreur.pickups')}</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryVal, { color: C.primary }]}>{totalCollected} DH</Text>
-              <Text style={styles.summaryLabel}>Encaissé</Text>
+              <Text style={styles.summaryLabel}>{t('livreur.collected')}</Text>
             </View>
           </View>
         </View>
 
         {/* Language */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>🌐 Langue</Text>
+          <Text style={styles.cardTitle}>🌐 {t('livreur.language')}</Text>
           <View style={styles.langRow}>
             <TouchableOpacity
               style={[styles.langBtn, i18n.language === 'fr' && styles.langBtnActive]}
@@ -141,7 +141,7 @@ export default function LivreurProfile() {
         {/* Info rows */}
         {user?.email && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>ℹ️ Informations</Text>
+            <Text style={styles.cardTitle}>ℹ️ {t('livreur.info')}</Text>
             <View style={styles.infoRow}>
               <Ionicons name="mail-outline" size={16} color={C.textMuted} />
               <Text style={styles.infoText}>{user.email}</Text>
@@ -158,7 +158,7 @@ export default function LivreurProfile() {
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={C.danger} />
-          <Text style={styles.logoutText}>Déconnexion</Text>
+          <Text style={styles.logoutText}>{t('common.logout')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

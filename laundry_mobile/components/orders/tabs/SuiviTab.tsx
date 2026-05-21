@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Colors, Shadows } from '../../../constants/theme';
 import Timeline from '../timeline/Timeline';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
 
 interface SuiviTabProps {
   order: any;
@@ -30,6 +31,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
   canAddPayment,
   setShowPaymentModal,
 }) => {
+  const f = useFormStyles();
   return (
     <View>
       <View
@@ -42,7 +44,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
           },
         ]}
       >
-        <Text style={styles.sectionTitle}>{t('financial.details').toUpperCase()}</Text>
+        <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('financial.details')}</Text>
         {canAddPayment ? (
           <TouchableOpacity onPress={() => setShowPaymentModal(true)}>
             <Text style={styles.addPaymentLink}>+ {t('common.new')}</Text>
@@ -119,7 +121,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
       </View>
 
       <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-        <Text style={styles.sectionTitle}>{t('admin.orders.history').toUpperCase()}</Text>
+        <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('admin.orders.history')}</Text>
       </View>
       <Timeline items={history} isArabic={isArabic} t={t} />
     </View>
@@ -138,7 +140,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Colors.textPrimary,
-    letterSpacing: 0.5,
   },
   addPaymentLink: {
     fontSize: 14,

@@ -20,8 +20,8 @@ export default function EmployeTabsLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: 68 + (Platform.OS === 'ios' ? insets.bottom : 10),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          height: 68 + insets.bottom,
+          paddingBottom: insets.bottom + 10,
           paddingTop: 10,
           flexDirection: isArabic ? 'row-reverse' : 'row',
         },
@@ -61,7 +61,7 @@ export default function EmployeTabsLayout() {
       <Tabs.Screen
         name="unpaid"
         options={{
-          tabBarLabel: t('dashboard.unpaid_balance', { defaultValue: 'Impayés' }),
+          tabBarLabel: t('dashboard.unpaid_balance'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrap}>
               {focused && <View style={styles.dot} />}

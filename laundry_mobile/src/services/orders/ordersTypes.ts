@@ -19,6 +19,9 @@ export interface AdminOrdersResponseDTO {
   totalElements: number;
   totalPages: number;
   currentPage: number;
+  totalValue?: number;
+  totalUnpaid?: number;
+  totalVolumes?: number;
 }
 
 export interface OrderDetails extends OrderDTO {
@@ -29,6 +32,9 @@ export interface OrderDetails extends OrderDTO {
 
 export interface OrderFilters {
   status?: string;
+  mode?: string;
+  activeOnly?: boolean;
+  paidDebts?: boolean;
   search?: string;
   page?: number;
   size?: number;

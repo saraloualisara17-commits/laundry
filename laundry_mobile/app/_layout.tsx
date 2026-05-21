@@ -4,6 +4,7 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 import { store, RootState } from '../src/store/store';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials } from '../src/store/authSlice';
+import { fetchSettings } from '../src/store/settingsSlice';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { OrderCreationProvider } from '../src/context/OrderCreationContext';
@@ -14,7 +15,15 @@ import { syncManager } from '../src/services/offline';
 import { uploadManager } from '../src/services/uploads';
 import { socketClient } from '../src/services/realtime';
 import { pushNotificationService } from '../src/services/notifications/pushNotificationService';
-import '../src/i18n';
+import { initI18n } from '../src/i18n';
+import {
+  Cairo_400Regular,
+  Cairo_500Medium,
+  Cairo_600SemiBold,
+  Cairo_700Bold,
+  Cairo_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/cairo';
 
 function RootLayoutNav() {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -26,12 +35,19 @@ function RootLayoutNav() {
   useEffect(() => {
     const loadUser = async () => {
       try {
+        // Init i18n first so language is correct before any screen renders
+        await initI18n();
+
+        // Fetch system settings (branding)
+        // @ts-ignore
+        dispatch(fetchSettings());
+
         const storedUser = await SecureStore.getItemAsync('user');
         const storedToken = await SecureStore.getItemAsync('accessToken');
         if (storedUser && storedToken) {
-          dispatch(setCredentials({ 
-            user: JSON.parse(storedUser), 
-            token: storedToken 
+          dispatch(setCredentials({
+            user: JSON.parse(storedUser),
+            token: storedToken
           }));
         }
       } catch (e) {
@@ -112,6 +128,22 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Cairo_400Regular,
+    Cairo_500Medium,
+    Cairo_600SemiBold,
+    Cairo_700Bold,
+    Cairo_800ExtraBold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0D7377" />
+      </View>
+    );
+  }
+
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>

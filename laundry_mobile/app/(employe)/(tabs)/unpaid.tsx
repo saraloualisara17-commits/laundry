@@ -10,10 +10,12 @@ import { adminApi } from '../../../src/services/adminApi';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
 
 export default function EmployeUnpaidScreen() {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t } = useTranslation();
+  const f = useFormStyles();
+  const isArabic = f.isArabic;
   const [activeTab, setActiveTab] = useState<'client' | 'commande'>('client');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,11 +50,11 @@ export default function EmployeUnpaidScreen() {
   const openWhatsApp = async (phone: string, name: string, amount: number, count: number) => {
     if (!phone) return;
     let waPhone = phone.startsWith('0') ? '212' + phone.slice(1).replace(/\D/g, '') : phone.replace(/\D/g, '');
-    const text = `Bonjour ${name},\nVous avez un solde restant de ${amount} DH sur ${count} commande(s).\nMerci de régulariser votre situation.`;
+    const text = t('admin.unpaid.whatsapp_msg', { clientName: name, amount, orderCount: count });
     try {
       await Linking.openURL(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`);
     } catch {
-      Alert.alert(t('common.error'), 'Impossible d\'ouvrir WhatsApp');
+      Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error'));
     }
   };
 
@@ -97,7 +99,7 @@ export default function EmployeUnpaidScreen() {
             onPress={() => openWhatsApp(item.clientPhone, item.clientName, item.totalRemaining, item.orderCount)}
           >
             <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-            <Text style={styles.actionText}>{t('admin.unpaid.remind', { defaultValue: 'Relancer' })}</Text>
+            <Text style={styles.actionText}>{t('admin.unpaid.remind')}</Text>
           </TouchableOpacity>
           <View style={styles.footerDiv} />
           <TouchableOpacity
@@ -123,15 +125,15 @@ export default function EmployeUnpaidScreen() {
       </View>
       <View style={[styles.financials, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('common.total')}</Text>
+          <Text style={[styles.finLabel, f.chipLabel]}>{t('common.total')}</Text>
           <Text style={styles.finValue}>{item.montantTotal} {t('common.dh')}</Text>
         </View>
         <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('financial.paid')}</Text>
+          <Text style={[styles.finLabel, f.chipLabel]}>{t('financial.paid')}</Text>
           <Text style={[styles.finValue, { color: AdminColors.success }]}>{item.montantPaye || 0} {t('common.dh')}</Text>
         </View>
         <View style={styles.finCol}>
-          <Text style={styles.finLabel}>{t('financial.remaining')}</Text>
+          <Text style={[styles.finLabel, f.chipLabel]}>{t('financial.remaining')}</Text>
           <Text style={[styles.finValue, { color: AdminColors.danger }]}>{item.montantRestant} {t('common.dh')}</Text>
         </View>
       </View>
@@ -146,12 +148,12 @@ export default function EmployeUnpaidScreen() {
         <View style={[styles.summaryBox, isArabic && { flexDirection: 'row-reverse' }]}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{overview?.totalRemaining || 0} <Text style={{ fontSize: 14 }}>{t('common.dh')}</Text></Text>
-            <Text style={styles.summaryLabel}>{t('dashboard.unpaid_balance')}</Text>
+            <Text style={[styles.summaryLabel, f.statLabel]}>{t('dashboard.unpaid_balance')}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{overview?.clientsWithDebt || 0}</Text>
-            <Text style={styles.summaryLabel}>{t('tabs.clients')}</Text>
+            <Text style={[styles.summaryLabel, f.statLabel]}>{t('tabs.clients')}</Text>
           </View>
         </View>
 
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
   },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: { fontSize: 20, fontWeight: '800', color: 'white', marginBottom: 4 },
-  summaryLabel: { fontSize: 10, color: 'rgba(255,255,255,0.75)', fontWeight: '600', textTransform: 'uppercase' },
+  summaryLabel: { fontSize: 10, color: 'rgba(255,255,255,0.75)', fontWeight: '600' },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)' },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 8 },
   tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 10, backgroundColor: '#F1F5F9' },
@@ -229,7 +231,7 @@ const styles = StyleSheet.create({
   orderClient: { fontSize: 12, color: AdminColors.textMuted, marginTop: 2 },
   financials: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, gap: 10 },
   finCol: { flex: 1 },
-  finLabel: { fontSize: 9, color: AdminColors.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 3 },
+  finLabel: { fontSize: 9, color: AdminColors.textMuted, fontWeight: '600', marginBottom: 3 },
   finValue: { fontSize: 13, fontWeight: '700', color: AdminColors.textPrimary },
   emptyBox: { alignItems: 'center', marginTop: 70, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary },

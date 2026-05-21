@@ -9,7 +9,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { STATUS_COLORS } from '../../constants/StatusColors';
+import { useTranslation } from 'react-i18next';
 
 const C = {
   primary: '#0D7377',
@@ -35,6 +37,7 @@ function openNav(lat?: any, lng?: any, address?: string) {
 }
 
 export default function MapViewScreen() {
+  const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { readyDeliveries, readyOrders, loading } = useSelector((s: RootState) => s.livreur);
 
@@ -55,24 +58,58 @@ export default function MapViewScreen() {
     return [...deliveries, ...pickups];
   }, [readyDeliveries, readyOrders, filter]);
 
-  const gpsOrders = useMemo(() => allMissions.filter((o: any) => {
+  // Resolve lat/lng for an order: prefer snapshotted delivery coords, fall back to client profile
+  const resolveCoords = (o: any) => {
+    if (o.deliveryLatitude != null && o.deliveryLongitude != null) {
+      return { lat: parseFloat(o.deliveryLatitude), lng: parseFloat(o.deliveryLongitude) };
+    }
     const addr = o.client?.addresses?.[0];
-    return addr?.latitude && addr?.longitude;
-  }), [allMissions]);
+    if (addr?.latitude && addr?.longitude) {
+      return { lat: parseFloat(addr.latitude), lng: parseFloat(addr.longitude) };
+    }
+    return null;
+  };
+
+  const resolveAddress = (o: any): string =>
+    o.deliveryAddress ?? o.client?.addresses?.[0]?.address ?? '—';
+
+  const gpsOrders = useMemo(() => allMissions.filter((o: any) => resolveCoords(o) !== null), [allMissions]);
+
+  const markers = useMemo(() => {
+    return gpsOrders.map((order: any) => {
+      const coords = resolveCoords(order)!;
+      const isDelivery = order._type === 'delivery';
+      const status = isDelivery ? 'READY_FOR_DELIVERY' : 'PENDING_PICKUP';
+      return (
+        <Marker
+          key={order.id}
+          coordinate={{ latitude: coords.lat, longitude: coords.lng }}
+          pinColor={STATUS_COLORS[status] || (isDelivery ? C.success : C.warning)}
+          onPress={() => setSelected(order)}
+        />
+      );
+    });
+  }, [gpsOrders, selected]);
 
   useEffect(() => {
-    if (gpsOrders.length > 0 && mapRef.current) {
-      const coords = gpsOrders.map((o: any) => ({
-        latitude: parseFloat(o.client.addresses[0].latitude),
-        longitude: parseFloat(o.client.addresses[0].longitude),
-      }));
-      setTimeout(() => {
+    if (gpsOrders.length === 0 || !mapRef.current) return;
+    const coords = gpsOrders.map((o: any) => {
+      const c = resolveCoords(o)!;
+      return { latitude: c.lat, longitude: c.lng };
+    });
+    setTimeout(() => {
+      if (coords.length === 1) {
+        mapRef.current?.animateToRegion(
+          { latitude: coords[0].latitude, longitude: coords[0].longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 },
+          600
+        );
+      } else {
         mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 120, right: 40, bottom: 280, left: 40 },
+          edgePadding: { top: 120, right: 60, bottom: 300, left: 60 },
           animated: true,
         });
-      }, 600);
-    }
+      }
+    }, 600);
   }, [gpsOrders.length]);
 
   if (loading && allMissions.length === 0) {
@@ -88,37 +125,21 @@ export default function MapViewScreen() {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
-        provider={PROVIDER_DEFAULT}
+        provider={PROVIDER_GOOGLE}
         showsUserLocation
         showsMyLocationButton={false}
         initialRegion={{ latitude: 33.5731, longitude: -7.5898, latitudeDelta: 0.5, longitudeDelta: 0.5 }}
       >
-        {gpsOrders.map((order: any) => {
-          const addr = order.client.addresses[0];
-          const isDelivery = order._type === 'delivery';
-          return (
-            <Marker
-              key={order.id}
-              coordinate={{ latitude: parseFloat(addr.latitude), longitude: parseFloat(addr.longitude) }}
-              onPress={() => setSelected(order)}
-            >
-              <View style={[styles.pin, { backgroundColor: isDelivery ? C.success : C.warning }]}>
-                <Text style={{ color: isDelivery ? 'white' : C.textPrimary, fontSize: 12 }}>
-                  {isDelivery ? '🚚' : '📦'}
-                </Text>
-              </View>
-            </Marker>
-          );
-        })}
+        {markers}
       </MapView>
 
-      {/* Header */}
-      <SafeAreaView edges={['top']} pointerEvents="box-none">
-        <View style={styles.mapHeader}>
+      {/* Floating Header Actions */}
+      <View style={[styles.floatingHeader, { top: 50 }]}>
+        <View style={[styles.mapHeader, { marginTop: 0 }]}>
           <TouchableOpacity style={styles.backCircle} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={C.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.mapTitle}>Carte des missions</Text>
+          <Text style={styles.mapTitle}>{t('livreur.map_title')}</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -131,12 +152,12 @@ export default function MapViewScreen() {
               onPress={() => { setFilter(f); setSelected(null); }}
             >
               <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-                {f === 'all' ? 'Tous' : f === 'delivery' ? 'Livraisons' : 'Collectes'}
+                {f === 'all' ? t('livreur.filter_all') : f === 'delivery' ? t('livreur.filter_deliveries') : t('livreur.filter_pickups')}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* My location FAB */}
       <TouchableOpacity
@@ -151,7 +172,8 @@ export default function MapViewScreen() {
 
       {/* Selected order mini card */}
       {selected && (() => {
-        const addr = selected.client?.addresses?.[0];
+        const coords = resolveCoords(selected);
+        const address = resolveAddress(selected);
         const phone = selected.client?.phones?.[0]?.phoneNumber;
         const isDelivery = selected._type === 'delivery';
         return (
@@ -159,11 +181,11 @@ export default function MapViewScreen() {
             <View style={[styles.miniAccent, { backgroundColor: isDelivery ? C.success : C.warning }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.miniClient}>{selected.client?.name || selected.clientNom}</Text>
-              <Text style={styles.miniAddress} numberOfLines={1}>{addr?.address || '—'}</Text>
+              <Text style={styles.miniAddress} numberOfLines={1}>{address}</Text>
               {isDelivery && <Text style={[styles.miniAmount, { color: C.primary }]}>{selected.montantTotal} DH</Text>}
             </View>
             <View style={styles.miniActions}>
-              <TouchableOpacity style={styles.miniFab} onPress={() => openNav(addr?.latitude, addr?.longitude, addr?.address)}>
+              <TouchableOpacity style={styles.miniFab} onPress={() => openNav(coords?.lat, coords?.lng, address)}>
                 <Ionicons name="navigate" size={18} color={C.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.miniFab} onPress={() => router.push(`/order/${selected.id}`)}>
@@ -180,9 +202,9 @@ export default function MapViewScreen() {
       {gpsOrders.length === 0 && (
         <View style={styles.emptyMap}>
           <Text style={{ fontSize: 48 }}>🗺️</Text>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.textPrimary, marginTop: 12 }}>Aucune mission sur la carte</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.textPrimary, marginTop: 12 }}>{t('livreur.no_missions_map')}</Text>
           <Text style={{ fontSize: 13, color: C.textMuted, marginTop: 4, textAlign: 'center' }}>
-            Les missions sans coordonnées GPS ne s'affichent pas
+            {t('livreur.no_missions_map_sub')}
           </Text>
         </View>
       )}
@@ -237,6 +259,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   miniClose: { position: 'absolute', top: 8, right: 8, padding: 4 },
+  floatingHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   emptyMap: {
     position: 'absolute', bottom: 40, left: 16, right: 16,
     backgroundColor: 'white', borderRadius: 20, padding: 32,

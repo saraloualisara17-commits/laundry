@@ -107,7 +107,10 @@ export default function OrderSummaryScreen() {
         paymentMethod: 'especes',
         montantPaye: paidAmount,
         notes: orderNotes,
-        source: 'ADMIN_APP'
+        source: 'ADMIN_APP',
+        deliveryAddress: client?.address || client?.quartier || null,
+        deliveryLatitude: client?.latitude ?? null,
+        deliveryLongitude: client?.longitude ?? null,
       };
 
       let res;
@@ -212,7 +215,7 @@ export default function OrderSummaryScreen() {
             </View>
           ) : (
             <View style={[{ marginTop: 4 }, isArabic && { alignItems: 'flex-end' }]}>
-               <Text style={styles.clientInfo}>{t('admin.orders.create.pickup_date')}: {new Date(scheduledDate!).toLocaleString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
+               <Text style={styles.clientInfo}>{t('admin.orders.create.pickup_date')}: {new Date(scheduledDate!).toLocaleString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
                <Text style={styles.clientInfo}>{t('admin.orders.create.mode_scheduled')}</Text>
             </View>
           )}

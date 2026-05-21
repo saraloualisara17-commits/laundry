@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../../constants/theme';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
 
 interface ArticlesTabProps {
   order: any;
@@ -18,14 +19,9 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
   setViewImage,
   BASE_URL,
 }) => {
+  const f = useFormStyles();
   return (
     <View>
-      <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-        <Text style={styles.sectionTitle}>
-          {t('admin.orders.title').toUpperCase()} ({order.commandeTapis?.length || 0})
-        </Text>
-      </View>
-
       {order.commandeTapis?.map((item: any, index: number) => {
         const area = item.largeur && (item.hauteur || item.longueur)
           ? (parseFloat(item.largeur) * parseFloat(item.hauteur || item.longueur)).toFixed(2)
@@ -44,7 +40,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                     isArabic && { textAlign: 'right', marginRight: 10, marginLeft: 0 },
                   ]}
                 >
-                  {isArabic && item.productNomAr ? item.productNomAr : item.productNom || 'Tapis'}
+                  {isArabic && item.productNomAr ? item.productNomAr : item.productNom || t('admin.items.default_item_name')}
                 </Text>
               </View>
               <Text style={styles.itemPrice}>
@@ -79,16 +75,16 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
             {item.modeTarification === 'PER_M2' && (
               <View style={[styles.chipsRow, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.chipLabel}>
-                    {t('admin.orders.create.items.dimensions').toUpperCase()}
+                  <Text style={[styles.chipLabel, f.chipLabel]}>
+                    {t('admin.orders.create.items.dimensions')}
                   </Text>
                   <Text style={styles.chipValue}>
                     {item.largeur || '—'} × {item.hauteur || item.longueur || '—'} m
                   </Text>
                 </View>
                 <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.chipLabel}>
-                    {t('admin.orders.create.items.area').toUpperCase()}
+                  <Text style={[styles.chipLabel, f.chipLabel]}>
+                    {t('admin.orders.create.items.area')}
                   </Text>
                   <Text style={styles.chipValue}>{area ? `${area} m²` : '— m²'}</Text>
                 </View>
@@ -103,8 +99,8 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                   isArabic && { alignItems: 'flex-end' },
                 ]}
               >
-                <Text style={styles.chipLabel}>
-                  {t('admin.orders.create.items.pieces').toUpperCase()}
+                <Text style={[styles.chipLabel, f.chipLabel]}>
+                  {t('admin.orders.create.items.pieces')}
                 </Text>
                 <Text style={styles.chipValue}>{item.quantite}</Text>
               </View>
@@ -148,7 +144,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Colors.textPrimary,
-    letterSpacing: 0.5,
   },
   itemCard: {
     backgroundColor: 'white',

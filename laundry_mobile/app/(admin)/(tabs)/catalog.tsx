@@ -8,7 +8,6 @@ import {
   TouchableOpacity, 
   Switch, 
   Modal, 
-  TextInput, 
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -23,21 +22,14 @@ import { adminApi } from '../../../src/services/adminApi';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 
-const PRICING_METHODS: Record<string, { label: string, color: string, icon: any }> = {
-  PER_M2: { label: 'par m²', color: AdminColors.primary, icon: 'square-outline' },
-  PER_UNIT: { label: "à l'unité", color: '#3B82F6', icon: 'list-outline' },
-  PER_KG: { label: 'au kg', color: '#F59E0B', icon: 'scale-outline' },
-  PER_LINEAR_M: { label: 'au mètre', color: '#8B5CF6', icon: 'ruler-outline' },
-  CUSTOM: { label: 'prix libre', color: AdminColors.textMuted, icon: 'create-outline' },
-};
-
-const ICONS = ['🧺', '🛋️', '👕', '🛏️', '🪟', '🧸', '📦', '🧣', '🧤', '🧦'];
-
 import { useTranslation } from 'react-i18next';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import AppInput from '../../../components/ui/AppInput';
 
 export default function CatalogScreen() {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t } = useTranslation();
+  const f = useFormStyles();
+  const isArabic = f.isArabic;
 
   const PRICING_METHODS: Record<string, { label: string, color: string, icon: any }> = {
     PER_M2: { label: t('admin.catalog.pricing.per_m2'), color: AdminColors.primary, icon: 'square-outline' },
@@ -50,7 +42,7 @@ export default function CatalogScreen() {
   const ICONS = ['🧺', '🛋️', '👕', '🛏️', '🪟', '🧸', '📦', '🧣', '🧤', '🧦'];
 
   const [categories, setCategories] = useState<any[]>([]);
-  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -65,7 +57,7 @@ export default function CatalogScreen() {
     description: '', 
     pricingMethod: 'PER_UNIT', 
     prixUnitaire: '', 
-    uniteLabel: t('admin.catalog.unit_piece', { defaultValue: 'pièce' }),
+    uniteLabel: t('admin.catalog.unit_piece'),
     processingDays: 2,
     imageUrl: ''
   });
@@ -73,7 +65,11 @@ export default function CatalogScreen() {
   const fetchData = async () => {
     try {
       const res = await adminApi.getCategories();
-      setCategories(res.data.data || res.data);
+      const fetchedCategories = res.data.data || res.data;
+      setCategories(fetchedCategories);
+      if (fetchedCategories.length > 0 && selectedCategoryId === null) {
+        setSelectedCategoryId(fetchedCategories[0].id);
+      }
     } catch (error) {
       console.error('Fetch catalog error:', error);
     } finally {
@@ -85,12 +81,6 @@ export default function CatalogScreen() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const toggleExpand = (id: number) => {
-    setExpandedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
 
   const handleToggleCategory = async (id: number, current: boolean) => {
     try {
@@ -133,7 +123,8 @@ export default function CatalogScreen() {
         type: 'image/jpeg'
       }]);
       
-      const imageUrl = res.data[0]?.imageUrl;
+      // The backend returns a List<String>, so res.data[0] is the path
+      const imageUrl = res.data[0];
       if (imageUrl) {
         if (type === 'category') {
           setCatForm(prev => ({ ...prev, imageUrl }));
@@ -142,7 +133,7 @@ export default function CatalogScreen() {
         }
       }
     } catch (error) {
-      Alert.alert(t('common.error'), t('admin.items.photo_error', { defaultValue: 'Échec de l\'envoi de l\'image' }));
+      Alert.alert(t('common.error'), t('admin.items.photo_error'));
     } finally {
       setIsUploading(false);
     }
@@ -150,7 +141,7 @@ export default function CatalogScreen() {
 
   const saveCategory = async () => {
     try {
-      if (!catForm.nom) return Alert.alert(t('common.error'), t('admin.catalog.category_name_required', { defaultValue: 'Le nom est obligatoire' }));
+      if (!catForm.nom) return Alert.alert(t('common.error'), t('admin.catalog.category_name_required'));
       
       if (categoryModal.data) {
         await adminApi.updateCategory(categoryModal.data.id, catForm);
@@ -167,7 +158,7 @@ export default function CatalogScreen() {
 
   const saveProduct = async () => {
     try {
-      if (!prodForm.nom || !prodForm.prixUnitaire) return Alert.alert(t('common.error'), t('admin.catalog.product_required_fields', { defaultValue: 'Nom et prix obligatoires' }));
+      if (!prodForm.nom || !prodForm.prixUnitaire) return Alert.alert(t('common.error'), t('admin.catalog.product_required_fields'));
       
       const payload = {
         ...prodForm,
@@ -202,98 +193,60 @@ export default function CatalogScreen() {
         <View style={[styles.productInfo, isArabic && { alignItems: 'flex-end' }]}>
           <Text style={[styles.productName, isArabic && { textAlign: 'right' }]}>{product.nom}</Text>
           <View style={[styles.pricingBadge, { backgroundColor: method.color + '15' }]}>
-            <Text style={[styles.pricingBadgeText, { color: method.color }]}>{method.label.toUpperCase()}</Text>
+            <Text style={[styles.pricingBadgeText, { color: method.color }]}>{isArabic ? method.label : method.label.toUpperCase()}</Text>
           </View>
         </View>
         
-        <Text style={[styles.productPrice, isArabic && { textAlign: 'right' }]}>
-          {product.pricingMethod === 'CUSTOM' ? t('admin.catalog.pricing.custom') : `${product.prixUnitaire} ${t('common.dh')}/${product.pricingMethod === 'PER_UNIT' ? product.uniteLabel : product.pricingMethod === 'PER_M2' ? 'm²' : product.pricingMethod === 'PER_KG' ? 'kg' : 'm'}`}
-        </Text>
+        <View style={[styles.productRight, isArabic && { flexDirection: 'row-reverse' }]}>
+          <Text style={[styles.productPrice, isArabic && { textAlign: 'right' }]}>
+            {product.pricingMethod === 'CUSTOM' ? t('admin.catalog.pricing.custom') : `${product.prixUnitaire} ${t('common.dh')}`}
+          </Text>
 
-        <Switch 
-          value={product.isActive}
-          onValueChange={() => handleToggleProduct(product.id)}
-          trackColor={{ false: '#D1D5DB', true: AdminColors.primary }}
-          thumbColor="white"
-          style={{ transform: [{ scale: 0.8 }] }}
-        />
-        
-        <TouchableOpacity onPress={() => {
-          setProdForm({
-            nom: product.nom,
-            description: product.description || '',
-            pricingMethod: product.pricingMethod,
-            prixUnitaire: product.prixUnitaire?.toString() || '',
-            uniteLabel: product.uniteLabel || t('admin.catalog.unit_piece', { defaultValue: 'pièce' }),
-            processingDays: product.processingDays || 2,
-            imageUrl: product.imageUrl || ''
-          });
-          setProductModal({ open: true, categoryId: null, data: product });
-        }}>
-          <Ionicons name="pencil" size={16} color={AdminColors.textMuted} />
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.editProductIcon} onPress={() => {
+            setProdForm({
+              nom: product.nom,
+              description: product.description || '',
+              pricingMethod: product.pricingMethod,
+              prixUnitaire: product.prixUnitaire?.toString() || '',
+              uniteLabel: product.uniteLabel || t('admin.catalog.unit_piece'),
+              processingDays: product.processingDays || 2,
+              imageUrl: product.imageUrl || ''
+            });
+            setProductModal({ open: true, categoryId: null, data: product });
+          }}>
+            <Ionicons name="pencil" size={16} color={AdminColors.textMuted} />
+          </TouchableOpacity>
+
+          <Switch 
+            value={product.isActive}
+            onValueChange={() => handleToggleProduct(product.id)}
+            trackColor={{ false: '#D1D5DB', true: AdminColors.primary }}
+            thumbColor="white"
+            style={{ transform: [{ scale: 0.8 }] }}
+          />
+        </View>
       </View>
     );
   };
 
-  const renderCategory = ({ item }: { item: any }) => {
-    const isExpanded = expandedIds.includes(item.id);
-
+  const renderCategoryTab = ({ item }: { item: any }) => {
+    const isActive = selectedCategoryId === item.id;
     return (
-      <View style={styles.categoryContainer}>
-        <TouchableOpacity 
-          style={[styles.categoryHeader, isArabic && { flexDirection: 'row-reverse' }]}
-          onPress={() => toggleExpand(item.id)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.catIconBox}>
-            {item.imageUrl ? (
-              <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${item.imageUrl}` }} style={styles.catImg} />
-            ) : (
-              <Text style={{ fontSize: 22 }}>{item.icon || '📦'}</Text>
-            )}
-          </View>
-          
-          <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={[styles.catName, isArabic && { textAlign: 'right' }]}>{isArabic && item.nomAr ? item.nomAr : item.nom}</Text>
-            <Text style={[styles.catCount, isArabic && { textAlign: 'right' }]}>{item.products?.length || item.productCount || 0} {t('admin.catalog.products_count', { defaultValue: 'produits' })}</Text>
-          </View>
-
-          <View style={[styles.catActions, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Switch 
-              value={item.isActive}
-              onValueChange={() => handleToggleCategory(item.id, item.isActive)}
-              trackColor={{ false: '#D1D5DB', true: AdminColors.primary }}
-              thumbColor="white"
-            />
-            <TouchableOpacity onPress={() => {
-              setCatForm({ nom: item.nom, nomAr: item.nomAr || '', icon: item.icon || '🧺', imageUrl: item.imageUrl || '' });
-              setCategoryModal({ open: true, data: item });
-            }}>
-              <Ionicons name="pencil" size={18} color={AdminColors.textMuted} />
-            </TouchableOpacity>
-            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={AdminColors.textMuted} />
-          </View>
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View style={styles.productsList}>
-            {(item.products || []).map(renderProduct)}
-            
-            <TouchableOpacity 
-              style={[styles.addProductBtn, isArabic && { flexDirection: 'row-reverse' }]}
-              onPress={() => {
-                setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: t('admin.catalog.unit_piece', { defaultValue: 'pièce' }), processingDays: 2, imageUrl: '' });
-                setProductModal({ open: true, categoryId: item.id, data: null });
-              }}
-            >
-              <Text style={styles.addProductText}>+ {t('admin.catalog.add_product')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      <TouchableOpacity 
+        key={item.id}
+        style={[styles.categoryTab, isActive && styles.activeCategoryTab, isArabic && { flexDirection: 'row-reverse' }]}
+        onPress={() => setSelectedCategoryId(item.id)}
+      >
+        <Text style={[styles.categoryTabIcon, isActive && styles.activeCategoryTabText]}>{item.icon || '📦'}</Text>
+        <Text style={[styles.categoryTabText, isActive && styles.activeCategoryTabText]}>
+          {isArabic && item.nomAr ? item.nomAr : item.nom}
+        </Text>
+      </TouchableOpacity>
     );
   };
+
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+  const productsToShow = selectedCategory?.products || [];
 
   return (
     <View style={styles.container}>
@@ -301,24 +254,62 @@ export default function CatalogScreen() {
         <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
           <Text style={styles.headerTitle}>{t('admin.catalog.title')}</Text>
           <TouchableOpacity 
-            style={[styles.addCatBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.editCatBtn, isArabic && { flexDirection: 'row-reverse' }]}
             onPress={() => {
-              setCatForm({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
-              setCategoryModal({ open: true, data: null });
+              if (selectedCategory) {
+                setCatForm({ nom: selectedCategory.nom, nomAr: selectedCategory.nomAr || '', icon: selectedCategory.icon || '🧺', imageUrl: selectedCategory.imageUrl || '' });
+                setCategoryModal({ open: true, data: selectedCategory });
+              }
             }}
           >
-            <Ionicons name="add" size={18} color="white" />
-            <Text style={styles.addCatBtnText}>{t('admin.catalog.add_category')}</Text>
+            <Ionicons name="settings-outline" size={18} color={AdminColors.primary} />
           </TouchableOpacity>
+        </View>
+        
+        <View style={styles.tabsContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={[styles.tabsScroll, isArabic && { flexDirection: 'row-reverse' }]}
+          >
+            {categories.map(cat => renderCategoryTab({ item: cat }))}
+            <TouchableOpacity 
+              style={[styles.addTabBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              onPress={() => {
+                setCatForm({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
+                setCategoryModal({ open: true, data: null });
+              }}
+            >
+              <Ionicons name="add" size={20} color={AdminColors.primary} />
+              <Text style={styles.addTabText}>{t('common.add')}</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </SafeAreaView>
 
       <FlatList
-        data={categories}
-        renderItem={renderCategory}
+        data={productsToShow}
+        renderItem={({ item }) => renderProduct(item)}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={AdminColors.primary} />}
+        ListHeaderComponent={
+          selectedCategory && (
+            <View style={[styles.categoryOverview, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.categoryStatus, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Text style={styles.categoryInfoTitle}>{isArabic && selectedCategory.nomAr ? selectedCategory.nomAr : selectedCategory.nom}</Text>
+                <Switch 
+                  value={selectedCategory.isActive}
+                  onValueChange={() => handleToggleCategory(selectedCategory.id, selectedCategory.isActive)}
+                  trackColor={{ false: '#D1D5DB', true: AdminColors.primary }}
+                  thumbColor="white"
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+              </View>
+              <Text style={styles.productCountText}>{productsToShow.length} {t('admin.catalog.products_count')}</Text>
+            </View>
+          )
+        }
         ListEmptyComponent={
           loading ? (
             <View style={{ padding: 16 }}>
@@ -329,6 +320,18 @@ export default function CatalogScreen() {
           )
         }
       />
+
+      {selectedCategoryId && (
+        <TouchableOpacity 
+          style={styles.fab}
+          onPress={() => {
+            setProdForm({ nom: '', description: '', pricingMethod: 'PER_UNIT', prixUnitaire: '', uniteLabel: t('admin.catalog.unit_piece'), processingDays: 2, imageUrl: '' });
+            setProductModal({ open: true, categoryId: selectedCategoryId, data: null });
+          }}
+        >
+          <Ionicons name="add" size={30} color="white" />
+        </TouchableOpacity>
+      )}
 
       {/* Category Modal */}
       <Modal visible={categoryModal.open} animationType="slide" presentationStyle="pageSheet">
@@ -342,7 +345,7 @@ export default function CatalogScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_image')}</Text>
+              <Text style={[styles.label, f.label]}>{t('admin.catalog.category_image')}</Text>
               <View style={styles.imagePickerContainer}>
                 {catForm.imageUrl ? (
                   <View style={styles.imagePreviewContainer}>
@@ -367,26 +370,26 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_name')}</Text>
-              <TextInput 
-                style={[styles.input, isArabic && { textAlign: 'right' }]} 
-                value={catForm.nom} 
-                onChangeText={t => setCatForm({...catForm, nom: t})}
-                placeholder={t('admin.catalog.search_placeholder', { defaultValue: 'Ex: Tapis, Rideaux...' })}
+              <AppInput
+                label={t('admin.catalog.category_name')}
+                value={catForm.nom}
+                onChangeText={v => setCatForm({...catForm, nom: v})}
+                placeholder={t('admin.catalog.search_placeholder')}
+                lang="fr"
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_name_ar')}</Text>
-              <TextInput 
-                style={[styles.input, { textAlign: 'right' }]} 
-                value={catForm.nomAr} 
-                onChangeText={t => setCatForm({...catForm, nomAr: t})}
+              <AppInput
+                label={t('admin.catalog.category_name_ar')}
+                value={catForm.nomAr}
+                onChangeText={v => setCatForm({...catForm, nomAr: v})}
+                lang="ar"
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.category_icon')}</Text>
+              <Text style={[styles.label, f.label]}>{t('admin.catalog.category_icon')}</Text>
               <View style={[styles.iconGrid, isArabic && { flexDirection: 'row-reverse' }]}>
                 {ICONS.map(icon => (
                   <TouchableOpacity 
@@ -419,7 +422,7 @@ export default function CatalogScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.product_image')}</Text>
+              <Text style={[styles.label, f.label]}>{t('admin.catalog.product_image')}</Text>
               <View style={styles.imagePickerContainer}>
                 {prodForm.imageUrl ? (
                   <View style={styles.imagePreviewContainer}>
@@ -444,26 +447,26 @@ export default function CatalogScreen() {
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.product_name')}</Text>
-              <TextInput 
-                style={[styles.input, isArabic && { textAlign: 'right' }]} 
-                value={prodForm.nom} 
-                onChangeText={t => setProdForm({...prodForm, nom: t})}
+              <AppInput
+                label={t('admin.catalog.category_name_ar')}
+                value={catForm.nomAr}
+                onChangeText={v => setCatForm({...catForm, nomAr: v})}
+                lang="ar"
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.description')}</Text>
-              <TextInput 
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]} 
-                multiline 
-                value={prodForm.description} 
-                onChangeText={t => setProdForm({...prodForm, description: t})}
+              <AppInput
+                label={t('admin.catalog.description')}
+                value={prodForm.description}
+                onChangeText={v => setProdForm({...prodForm, description: v})}
+                multiline
+                inputStyle={{ height: 80, textAlignVertical: 'top' }}
               />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing_method')}</Text>
+              <Text style={[styles.label, f.label]}>{t('admin.catalog.pricing_method')}</Text>
               <View style={[styles.methodGrid, isArabic && { flexDirection: 'row-reverse' }]}>
                 {Object.entries(PRICING_METHODS).map(([key, m]) => (
                   <TouchableOpacity 
@@ -481,21 +484,20 @@ export default function CatalogScreen() {
             {prodForm.pricingMethod !== 'CUSTOM' && (
               <View style={[styles.formRow, isArabic && { flexDirection: 'row-reverse' }]}>
                 <View style={[styles.formField, { flex: 1 }]}>
-                  <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.price_dh')}</Text>
-                  <TextInput 
-                    style={[styles.input, isArabic && { textAlign: 'right' }]} 
-                    keyboardType="numeric" 
+                  <AppInput
+                    label={t('admin.catalog.price_dh')}
+                    keyboardType="numeric"
                     value={prodForm.prixUnitaire}
-                    onChangeText={t => setProdForm({...prodForm, prixUnitaire: t})}
+                    onChangeText={v => setProdForm({...prodForm, prixUnitaire: v})}
+                    forceDir="ltr"
                   />
                 </View>
                 {prodForm.pricingMethod === 'PER_UNIT' && (
                   <View style={[styles.formField, { flex: 1, marginLeft: 12 }]}>
-                    <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.unit')}</Text>
-                    <TextInput 
-                      style={[styles.input, isArabic && { textAlign: 'right' }]} 
+                    <AppInput
+                      label={t('admin.catalog.unit')}
                       value={prodForm.uniteLabel}
-                      onChangeText={t => setProdForm({...prodForm, uniteLabel: t})}
+                      onChangeText={v => setProdForm({...prodForm, uniteLabel: v})}
                     />
                   </View>
                 )}
@@ -503,8 +505,8 @@ export default function CatalogScreen() {
             )}
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.delay_days')}</Text>
-              <View style={[styles.stepper, isArabic && { flexDirection: 'row-reverse' }]}>
+              <Text style={[styles.label, f.label]}>{t('admin.catalog.delay_days')}</Text>
+              <View style={[styles.stepper, f.row]}>
                 <TouchableOpacity 
                   style={styles.stepBtn} 
                   onPress={() => setProdForm({...prodForm, processingDays: Math.max(1, prodForm.processingDays - 1)})}
@@ -548,93 +550,107 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: AdminColors.textPrimary,
   },
-  addCatBtn: {
-    backgroundColor: AdminColors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  editCatBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: AdminColors.primary100,
+  },
+  tabsContainer: {
+    paddingBottom: 8,
+  },
+  tabsScroll: {
+    paddingHorizontal: 16,
+    gap: 10,
+    alignItems: 'center',
+  },
+  categoryTab: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: AdminColors.surface2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    gap: 6,
+  },
+  activeCategoryTab: {
+    backgroundColor: AdminColors.primary,
+    borderColor: AdminColors.primary,
+  },
+  categoryTabIcon: {
+    fontSize: 16,
+  },
+  categoryTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AdminColors.textSecondary,
+  },
+  activeCategoryTabText: {
+    color: 'white',
+  },
+  addTabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: AdminColors.primary,
+    borderStyle: 'dashed',
     gap: 4,
   },
-  addCatBtnText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
+  addTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AdminColors.primary,
   },
   listContent: {
     padding: 16,
-    gap: 12,
+    paddingBottom: 100,
   },
-  categoryContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...AdminShadows.shadowSmall,
+  categoryOverview: {
+    marginBottom: 16,
   },
-  categoryHeader: {
+  categoryStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  catIconBox: {
+  categoryInfoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: AdminColors.textPrimary,
+  },
+  productCountText: {
+    fontSize: 12,
+    color: AdminColors.textMuted,
+    fontWeight: '500',
+  },
+  productRow: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    ...AdminShadows.shadowSmall,
+  },
+  productIconBox: {
     width: 44,
     height: 44,
     borderRadius: 12,
     backgroundColor: AdminColors.primary100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  catImg: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  catName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
-  },
-  catCount: {
-    fontSize: 12,
-    color: AdminColors.textMuted,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  catActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  productsList: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  productRow: {
-    backgroundColor: AdminColors.surface2,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  productIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: AdminColors.primary50,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -648,7 +664,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: AdminColors.textPrimary,
     marginBottom: 4,
@@ -656,32 +672,38 @@ const styles = StyleSheet.create({
   pricingBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 999,
   },
   pricingBadgeText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
   },
+  productRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   productPrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: AdminColors.primary,
   },
-  addProductBtn: {
-    marginTop: 8,
-    backgroundColor: AdminColors.primary50,
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: AdminColors.primary200,
-    borderStyle: 'dashed',
-    alignItems: 'center',
+  editProductIcon: {
+    padding: 6,
   },
-  addProductText: {
-    color: AdminColors.primary,
-    fontSize: 13,
-    fontWeight: '600',
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: AdminColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...AdminShadows.shadowTeal,
+    elevation: 5,
   },
   modalContainer: {
     flex: 1,
@@ -714,9 +736,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: AdminColors.textSecondary,
-    textTransform: 'uppercase',
     marginBottom: 8,
-    letterSpacing: 0.5,
   },
   input: {
     backgroundColor: AdminColors.surface2,

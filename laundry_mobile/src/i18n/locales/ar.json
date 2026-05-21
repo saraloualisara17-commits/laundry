@@ -6,6 +6,7 @@
     "error": "خطأ",
     "success": "تم بنجاح",
     "cancel": "إلغاء",
+    "assigned": "مُعيَّن",
     "confirm": "تأكيد",
     "save": "حفظ",
     "search": "بحث...",
@@ -18,6 +19,7 @@
     "date_start": "تاريخ البدء",
     "date_end": "تاريخ الانتهاء",
     "optional": "(اختياري)",
+    "add": "إضافة",
     "add_image": "إضافة صورة",
     "today": "اليوم",
     "all": "الكل",
@@ -31,7 +33,27 @@
     "status": "الحالة",
     "continue": "متابعة",
     "error_msg": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
-    "info": "معلومة"
+    "info": "معلومة",
+    "logout": "تسجيل الخروج",
+    "logout_confirm_title": "تسجيل الخروج",
+    "logout_confirm_msg": "هل تريد تسجيل الخروج؟",
+    "logout_btn": "خروج",
+    "more": "المزيد",
+    "ignore": "تجاهل",
+    "navigate": "التنقل",
+    "call": "اتصال",
+    "send_whatsapp": "📱 إرسال عبر واتساب",
+    "print_pdf": "🖨️ طباعة / عرض PDF",
+    "order_photos": "صور الطلب",
+    "time": "الوقت",
+    "new": "جديد",
+    "notes": "ملاحظات",
+    "photo_lab": "صورة المخبر",
+    "photo_reception": "صورة الاستلام",
+    "whatsapp": "واتساب",
+    "print": "طباعة",
+    "done": "تم",
+    "other": "أخرى"
   },
   "errors": {
     "network": "خطأ في الشبكة. يرجى التحقق من الاتصال.",
@@ -47,7 +69,8 @@
     "amount": "المبلغ",
     "paid": "تم دفع",
     "remaining": "الباقي",
-    "total": "المجموع"
+    "total": "المجموع",
+    "details": "التفاصيل المالية"
   },
   "dashboard": {
     "greeting": "مرحباً،",
@@ -58,7 +81,7 @@
     "total_clients": "إجمالي الزبائن",
     "create_order": "إنشاء طلب جديد",
     "create_order_sub": "زبون حاضر أو عبر الهاتف",
-    "overview": "نظرة عامة",
+    "overview": "الحالات الأساسية",
     "last_updated": "آخر تحديث",
     "recent_orders": "الطلبات الأخيرة",
     "view_all": "عرض الكل",
@@ -68,6 +91,9 @@
     "clients": "زبون",
     "orders_count": "طلب",
     "to_collect": "للتحصيل",
+    "at_local": "بالمحل",
+    "paid_debts": "الديون المدفوعة",
+    "orders_count_completed": "الطلبات المسواة",
     "quick_actions": "إجراءات سريعة",
     "see_orders": "عرض الطلبات",
     "stats_error": "تعذر تحميل الإحصائيات",
@@ -77,21 +103,28 @@
     "scan_hint": "ضع رمز QR داخل الإطار"
   },
   "status": {
-    "PENDING_PICKUP": "في الانتظار",
+    "PENDING_PICKUP": "قيد الاستلام",
     "PICKED_UP": "تم استلامها",
     "READY_FOR_DELIVERY": "جاهزة للتسليم",
     "DELIVERED": "تم التسليم",
     "CANCELLED": "ملغاة",
-    "IN_PROCESS": "قيد المعالجة"
+    "IN_PROCESS": "قيد المعالجة",
+    "PICKUP_FAILED": "فشل الاستلام",
+    "DELIVERY_FAILED": "فشل التسليم"
   },
   "tabs": {
     "admin": "المدير",
     "livreur": "مندوب التوصيل",
+    "employe": "موظف",
     "dashboard": "الرئيسية",
     "orders": "الطلبات",
     "clients": "الزبائن",
     "catalog": "الكتالوج",
-    "team": "الفريق"
+    "team": "الفريق",
+    "notifications": "الإشعارات",
+    "home": "الرئيسية",
+    "missions": "المهام",
+    "profile": "ملفي"
   },
   "delivery": {
     "confirm_title": "تأكيد التسليم",
@@ -114,7 +147,7 @@
   "auth": {
     "login": {
       "title": "تسجيل الدخول",
-      "subtitle": "الدخول إلى مساحة Pure Clean الخاصة بك",
+      "subtitle": "الدخول إلى مساحة {{appName}} الخاصة بك",
       "email": "البريد الإلكتروني",
       "password": "كلمة المرور",
       "submit": "دخول",
@@ -125,7 +158,12 @@
     }
   },
   "admin": {
+    "dashboard": {
+      "map_title": "خريطة"
+    },
     "unpaid": {
+      "whatsapp_msg": "مرحباً {{clientName}}،\nلديك رصيد متبقي بقيمة {{amount}} درهم على {{orderCount}} طلب(ات).\nشكراً على تسوية وضعك.",
+      "all_settled_msg": "تمت تسوية جميع الديون!",
       "whatsapp_error": "تعذر فتح واتساب",
       "remind": "تذكير",
       "no_unpaid_msg": "تمت تسوية جميع الديون.",
@@ -204,6 +242,7 @@
         "delivery_type": "نوع التسليم",
         "delivery_type_placeholder": "اختر النوع...",
         "pickup_date": "تاريخ الاستلام",
+        "delivery_date": "تاريخ التسليم",
         "choose_date": "اختر التاريخ",
         "time": "الوقت",
         "choose_time": "اختر الوقت",
@@ -272,6 +311,8 @@
         }
       },
       "title": "الطلبات",
+      "scan": "مسح",
+      "upload_queued": "تمت إضافة الصور إلى قائمة الانتظار. سيتم تحميلها في الخلفية.",
       "filter_driver": "تصفية حسب السائق",
       "all_drivers": "جميع السائقين",
       "filter_date": "تصفية حسب التاريخ",
@@ -279,8 +320,13 @@
       "ready": "جاهز 🎉",
       "validate": "تأكيد ←",
       "empty_title": "لا توجد طلبات",
+      "empty_subtitle": "لا توجد طلبات تطابق عوامل التصفية",
       "search_placeholder": "بحث عن زبون أو مرجع...",
       "assign_driver_msg": "يرجى اختيار السائق الذي سيقوم بالتسليم قبل تحديد الطلب كجاهز.",
+      "driver_responsible_msg": "هذا الطلب مُسنَد إلى السائق {{name}}. يجب على السائق تأكيد التسليم وتسجيل الدفع.",
+      "assign_driver": "تعيين سائق",
+      "change_driver": "تغيير السائق / التاريخ",
+      "no_drivers": "لا يوجد سائق متاح",
       "change_status": "تغيير الحالة",
       "change_status_msg": "هل تريد تغيير حالة الطلب إلى",
       "driver_pickup": "السائق (الاستلام)",
@@ -291,7 +337,8 @@
         "confirm_received": "تأكيد الاستلام",
         "start_processing": "بدء المعالجة",
         "mark_ready": "تحديد كجاهز",
-        "mark_delivered": "تم التسليم"
+        "mark_delivered": "تم التسليم",
+        "waiting_driver": "في انتظار السائق"
       }
     },
     "users": {
@@ -365,12 +412,16 @@
       }
     },
     "items": {
-      "photo_error": "فشل إرسال الصورة"
+      "photo_error": "فشل إرسال الصورة",
+      "default_item_name": "سجادة",
+      "whatsapp_label": "واتساب"
     },
     "map_picker": {
       "title": "تحديد الموقع",
       "confirm_btn": "تأكيد هذا الموقع",
-      "search_placeholder": "البحث عن عنوان، حي، مدينة..."
+      "search_placeholder": "البحث عن عنوان، حي، مدينة...",
+      "selected_location": "📍 الموقع المحدد",
+      "unknown_address": "عنوان غير معروف"
     },
     "clients": {
       "title": "الزبائن",
@@ -394,7 +445,9 @@
       "total_count": "في المجموع",
       "client_since": "زبون منذ",
       "no_phone": "لا يوجد رقم",
-      "no_address": "لا يوجد عنوان"
+      "no_address": "لا يوجد عنوان",
+      "no_email": "لا يوجد بريد إلكتروني",
+      "details_title": "بطاقة الزبون"
     },
     "map": {
       "title": "خريطة الطلبات",
@@ -402,6 +455,110 @@
       "empty_title": "لم يتم العثور على أي طلب",
       "empty_sub": "قم بتعديل الفلاتر أو منطقة البحث",
       "view_order": "عرض ←"
+    },
+    "more": {
+      "management": "الإدارة",
+      "catalog_sub": "إدارة الخدمات والأسعار",
+      "team_sub": "إدارة حسابات الموظفين",
+      "map_sub": "عرض جغرافي للتسليمات",
+      "settings": "الإعدادات",
+      "lang_sub": "تغيير لغة التطبيق",
+      "notif_sub": "سجل التنبيهات",
+      "map_title": "خريطة الطلبات",
+      "stats_sub": "المداخيل والطلبات والأداء"
     }
+  },
+  "stats": {
+    "title": "الإحصائيات",
+    "this_week": "هذا الأسبوع",
+    "this_month": "هذا الشهر",
+    "all_time": "الكل",
+    "received_orders": "الطلبات المستلمة",
+    "delivered_orders": "الطلبات المسلمة",
+    "orders_count": "عدد الطلبيات",
+    "pieces_count": "عدد القطع",
+    "total_area": "إجمالي عددالامتر",
+    "total_paid": "إجمالي المبالغ المدفوعة",
+    "total_unpaid": "إجمالي المبالغ الغير مدفوعة",
+    "total_items": "إجمالي القطع",
+    "total_m2": "إجمالي م²",
+    "total_price": "إجمالي الطلبيات"
+  },
+  "livreur": {
+    "greeting": "مرحباً،",
+    "profile_title": "ملفي الشخصي",
+    "role": "مندوب التوصيل",
+    "daily_summary": "ملخص اليوم",
+    "language": "اللغة",
+    "info": "المعلومات",
+    "deliveries": "التوصيلات",
+    "pickups": "الاستلامات",
+    "collected": "المحصل",
+    "map_title": "خريطة المهام",
+    "no_missions_map": "لا توجد مهام على الخريطة",
+    "no_missions_map_sub": "المهام بدون إحداثيات GPS لا تظهر",
+    "all_done": "تمت جميع المهام!",
+    "good_day": "يوماً طيباً",
+    "next_mission": "المهمة التالية",
+    "delivery_badge": "🚚 توصيل",
+    "pickup_badge": "📦 استلام",
+    "remaining_to_collect": "المتبقي للتحصيل",
+    "items_to_collect": "قطعة للاستلام",
+    "start_mission": "بدء المهمة ←",
+    "view_map": "عرض الخريطة",
+    "missions_today": "مهام اليوم",
+    "see_all": "عرض الكل ←",
+    "more_missions": "+ {{count}} مهام أخرى",
+    "missions_title": "المهام",
+    "deliveries_tab": "التوصيلات",
+    "pickups_tab": "الاستلامات",
+    "no_delivery": "لا توجد توصيلات",
+    "no_delivery_sub": "أنت على ما يرام!",
+    "no_pickup": "لا توجد استلامات مبرمجة",
+    "no_pickup_sub": "استمتع بيومك",
+    "to_collect_pill": "💰 {{amount}} درهم للتحصيل",
+    "already_paid": "✅ تم الدفع",
+    "items_count": "{{count}} قطعة",
+    "deliver_btn": "🚚 تسليم",
+    "collect_btn": "📦 استلام",
+    "refuse_btn": "❌ رفض",
+    "amount_to_collect": "للتحصيل:",
+    "nothing": "لا شيء (0 درهم)",
+    "all_amount": "الكل ({{amount}} درهم)",
+    "other_amount": "مبلغ مختلف",
+    "confirm_delivery_btn": "✅ تأكيد التسليم",
+    "confirm_btn_disabled": "تأكيد",
+    "delivery_problem": "🚚 مشكلة في التسليم",
+    "pickup_problem": "📦 مشكلة في الاستلام",
+    "notes_placeholder": "اشرح بكلمات قليلة...",
+    "confirm_pickup_title": "تم الاستلام! 📦",
+    "send_receipt_pickup": "هل تريد إرسال الإيصال للزبون؟",
+    "confirm_delivery_title": "تم التسليم! ✅",
+    "send_receipt_delivery": "هل تريد إرسال الإيصال؟",
+    "collect_error": "تعذر تأكيد الاستلام",
+    "action_failed": "فشل الإجراء",
+    "save_failed": "تعذر الحفظ.",
+    "send_failed": "تعذر الإرسال",
+    "print_failed": "تعذر طباعة الإيصال",
+    "filter_all": "الكل",
+    "filter_deliveries": "التوصيلات",
+    "filter_pickups": "الاستلامات",
+    "reason_client_absent": "الزبون غائب",
+    "reason_client_refused": "الزبون رفض",
+    "reason_payment_refused": "رفض الدفع",
+    "reason_address_not_found": "العنوان غير موجود",
+    "reason_client_cancelled": "الزبون ألغى",
+    "reason_other": "أخرى",
+    "reason_absent": "الزبون غائب",
+    "reason_unreachable": "الزبون لا يرد",
+    "reason_address": "العنوان غير موجود",
+    "select_reason": "يرجى اختيار سبب",
+    "refuse_title": "الإبلاغ عن مشكلة",
+    "section_today": "اليوم",
+    "section_overdue": "متأخرة",
+    "no_overdue": "لا توجد توصيلات متأخرة",
+    "no_overdue_sub": "جميع التوصيلات في الموعد.",
+    "send_receipt_prompt": "هل تريد إرسال الإيصال للزبون؟",
+    "driver_fallback": "مندوب"
   }
 }

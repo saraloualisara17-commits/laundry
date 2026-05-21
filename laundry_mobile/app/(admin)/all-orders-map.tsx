@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,11 +21,13 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { STATUS_COLORS, STATUS_LABELS } from '../../constants/StatusColors';
 import { useDirections } from '../../src/hooks/useDirections';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AllOrdersMapScreen() {
   const { t, i18n } = useTranslation();
+  const { livreurId } = useLocalSearchParams();
   const isArabic = i18n.language === 'ar';
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,63 +43,78 @@ export default function AllOrdersMapScreen() {
   const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await adminApi.getOrdersForMap();
+      const res = await adminApi.getOrdersForMap(livreurId as string);
       if (res.data.success) {
         setOrders(res.data.data);
       }
-    } catch (error) {
-      console.error('Error fetching orders for map:', error);
+    } catch (e) {
+      console.error('Fetch map orders error:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-    getUserLocation();
-  }, []);
 
   const getUserLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude
-      });
+      setUserLocation(location.coords);
+      return location.coords;
     } catch (e) {
-      console.warn('Get user location error:', e);
+      console.error('Error getting location:', e);
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+      getUserLocation();
+    }, [])
+  );
+
   const filteredOrders = useMemo(() => {
-    return orders.map((o, index) => {
-      let lat = parseFloat(o.clientLatitude);
-      let lng = parseFloat(o.clientLongitude);
-      
-      // Fallback to client addresses if top-level is missing
-      if ((isNaN(lat) || isNaN(lng)) && o.client?.addresses?.length > 0) {
-        const addr = o.client.addresses[0];
-        lat = parseFloat(addr.latitude);
-        lng = parseFloat(addr.longitude);
-      }
+    return (orders || []).map((o) => {
+      // Prefer the order's own delivery coords (snapshotted at creation); fall back to legacy clientLatitude/Longitude
+      const rawLat = o.deliveryLatitude ?? o.clientLatitude;
+      const rawLng = o.deliveryLongitude ?? o.clientLongitude;
+      let lat = parseFloat(rawLat);
+      let lng = parseFloat(rawLng);
 
       if (isNaN(lat) || isNaN(lng)) return null;
 
-      // Add tiny jitter to avoid perfect overlaps
+      // Add tiny jitter to avoid perfect overlaps when two orders share the same address
       const jitterLat = lat + (Math.random() - 0.5) * 0.0001;
       const jitterLng = lng + (Math.random() - 0.5) * 0.0001;
 
       return {
         ...o,
         resolvedLat: jitterLat,
-        resolvedLng: jitterLng
+        resolvedLng: jitterLng,
+        resolvedAddress: o.deliveryAddress ?? o.clientAddress ?? '',
       };
-    }).filter(o => o !== null && selectedStatuses.includes(o.status));
+    }).filter(o => o !== null && (selectedStatuses || []).includes(o.status));
   }, [orders, selectedStatuses]);
+
+  const markers = useMemo(() => {
+    return (filteredOrders || []).map((order) => (
+      <Marker
+        key={order.id}
+        coordinate={{
+          latitude: order.resolvedLat,
+          longitude: order.resolvedLng,
+        }}
+        pinColor={STATUS_COLORS[order.status] || AdminColors.primary}
+        onPress={() => {
+          setSelectedOrder(order);
+          setShowAllRoutes(false);
+        }}
+      />
+    ));
+  }, [filteredOrders, selectedOrder]);
 
   useEffect(() => {
     if (filteredOrders.length > 0 && mapRef.current && !showList) {
@@ -161,11 +178,11 @@ export default function AllOrdersMapScreen() {
         setShowList(false);
       }}
     >
-      <View style={[styles.listCardAccent, { backgroundColor: STATUS_COLORS[item.status] }]} />
+      <View style={[styles.listCardAccent, { backgroundColor: STATUS_COLORS[item.status] || AdminColors.primary }]} />
       <View style={[styles.listCardContent, isArabic && { flexDirection: 'row-reverse' }]}>
         <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
-          <Text style={styles.listCardName}>{item.clientName || item.clientNom}</Text>
-          <Text style={styles.listCardStatus}>{t(`status.${item.status}`)} • {item.numeroCommande}</Text>
+          <Text style={styles.listCardName}>{item.clientName || item.clientNom || t('common.unknown')}</Text>
+          <Text style={styles.listCardStatus}>{t(`status.${item.status}`, { defaultValue: item.status })} • {item.numeroCommande}</Text>
         </View>
         <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
       </View>
@@ -187,34 +204,7 @@ export default function AllOrdersMapScreen() {
         showsUserLocation={true}
         showsMyLocationButton={false}
       >
-        {filteredOrders.map((order) => (
-          <Marker
-            key={order.id}
-            coordinate={{
-              latitude: order.resolvedLat,
-              longitude: order.resolvedLng,
-            }}
-            onPress={() => {
-              setSelectedOrder(order);
-              setShowAllRoutes(false);
-            }}
-          >
-            <View style={{ alignItems: 'center' }}>
-              <View style={[
-                styles.markerBubble, 
-                { backgroundColor: STATUS_COLORS[order.status] },
-                selectedOrder?.id === order.id && styles.markerSelected
-              ]}>
-                <Ionicons 
-                  name={order.status === 'PENDING_PICKUP' ? 'hourglass' : (order.status === 'READY_FOR_DELIVERY' ? 'checkmark-done' : 'car')} 
-                  size={selectedOrder?.id === order.id ? 20 : 14} 
-                  color="white" 
-                />
-              </View>
-              <View style={[styles.markerArrow, { borderTopColor: STATUS_COLORS[order.status] }]} />
-            </View>
-          </Marker>
-        ))}
+        {markers}
 
         {showAllRoutes && userLocation && filteredOrders.map((order) => (
           <Polyline
@@ -297,13 +287,13 @@ export default function AllOrdersMapScreen() {
       {/* SELECTED ORDER MINI CARD */}
       {selectedOrder && !showList && (
         <View style={[styles.miniCardFloating, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={[styles.miniCardIcon, { backgroundColor: STATUS_COLORS[selectedOrder.status] + '20' }]}>
-            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[selectedOrder.status] }]} />
+          <View style={[styles.miniCardIcon, { backgroundColor: (STATUS_COLORS[selectedOrder.status] || AdminColors.primary) + '20' }]}>
+            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[selectedOrder.status] || AdminColors.primary }]} />
           </View>
 
           <View style={[{ flex: 1, marginLeft: 12 }, isArabic && { marginLeft: 0, marginRight: 12, alignItems: 'flex-end' }]}>
             <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text style={styles.miniCardName}>{selectedOrder.clientName || selectedOrder.clientNom}</Text>
+              <Text style={styles.miniCardName}>{selectedOrder.clientName || selectedOrder.clientNom || t('common.unknown')}</Text>
               {route && (
                 <View style={[styles.routeBadge, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Ionicons name="car-outline" size={12} color={AdminColors.primary} />
@@ -313,10 +303,10 @@ export default function AllOrdersMapScreen() {
               {routeLoading && <ActivityIndicator size="small" color={AdminColors.primary} />}
             </View>
             <Text style={[styles.miniCardAddress, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
-              {selectedOrder.clientAddress || t('admin.clients.no_address')}
+              {selectedOrder.resolvedAddress || t('admin.clients.no_address')}
             </Text>
-            <Text style={[styles.miniCardPrice, { color: STATUS_COLORS[selectedOrder.status] }]}>
-              {selectedOrder.montantTotal?.toFixed(2)} {t('common.dh')} • {t('financial.remaining')}: {selectedOrder.resteAPayer?.toFixed(2)} {t('common.dh')}
+            <Text style={[styles.miniCardPrice, { color: STATUS_COLORS[selectedOrder.status] || AdminColors.primary }]}>
+              {(selectedOrder.montantTotal || 0).toFixed(2)} {t('common.dh')} • {t('financial.remaining')}: {(selectedOrder.resteAPayer || 0).toFixed(2)} {t('common.dh')}
             </Text>
           </View>
 

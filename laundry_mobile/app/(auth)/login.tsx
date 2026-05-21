@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../src/store/authSlice';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
 import { authApi } from '../../src/services/api';
 import { showError } from '../../src/services/errors/errorHandler';
 import * as SecureStore from 'expo-secure-store';
+import { Image } from 'react-native';
 
 import { jwtDecode } from 'jwt-decode';
 import { Colors, Shadows, Typography, Radius } from '../../constants/theme';
@@ -16,6 +19,8 @@ import { useTranslation } from 'react-i18next';
 export default function LoginScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
+  
+  const { settings } = useSelector((state: RootState) => state.settings);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +43,7 @@ export default function LoginScreen() {
 
       const decoded: any = jwtDecode(token);
       const user = {
-        id: decoded.sub,
+        id: Number(decoded.sub),
         email: decoded.email,
         role: decoded.role,
         name: decoded.name || 'User',
@@ -69,8 +74,15 @@ export default function LoginScreen() {
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>{t('auth.login.title')}</Text>
-          <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
+          {settings.logoUrl && (
+            <Image 
+              source={{ uri: settings.logoUrl }} 
+              style={styles.logo} 
+              resizeMode="contain" 
+            />
+          )}
+          <Text style={styles.title}>{settings.appName}</Text>
+          <Text style={styles.subtitle}>{t('auth.login.subtitle', { appName: settings.appName })}</Text>
         </View>
 
         <View style={styles.form}>
@@ -147,6 +159,12 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 40,
     alignItems: 'center',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
+    borderRadius: Radius.lg,
   },
   title: {
     fontSize: Typography.size['3xl'],

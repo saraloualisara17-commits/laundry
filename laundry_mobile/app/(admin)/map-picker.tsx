@@ -1,14 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
   FlatList,
-  Dimensions,
   Platform
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps';
@@ -24,16 +22,11 @@ export default function MapPickerScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { setPendingLocation } = useOrderCreation();
+  const mapRef = useRef<MapView>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
-  const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: 33.9716,   // Morocco center default
-    longitude: -6.8498,
-    latitudeDelta: 0.5,
-    longitudeDelta: 0.5,
-  });
   const [markerCoords, setMarkerCoords] = useState<{ latitude: number, longitude: number } | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState('');
   const [resolvedRegion, setResolvedRegion] = useState('');
@@ -59,25 +52,26 @@ export default function MapPickerScreen() {
   const selectSearchResult = (result: any) => {
     const lat = parseFloat(result.lat);
     const lng = parseFloat(result.lon);
-    
-    const coords = { latitude: lat, longitude: lng };
-    setMarkerCoords(coords);
-    setMapRegion({
-      ...coords,
+
+    setMarkerCoords({ latitude: lat, longitude: lng });
+
+    // Animate map imperatively — avoids the controlled-region re-render race on Android
+    mapRef.current?.animateToRegion({
+      latitude: lat,
+      longitude: lng,
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
-    });
-    
-    // Extract clean address
+    }, 400);
+
     const addr = result.address;
     const street = addr.road || addr.neighbourhood || addr.suburb || '';
     const city = addr.city || addr.town || addr.village || addr.municipality || '';
     const region = addr.state || addr.county || '';
-    
+
     setResolvedAddress([street, city].filter(Boolean).join(', '));
     setResolvedRegion(region);
     setSearchQuery(result.display_name.split(',')[0]);
-    setSearchResults([]); // close dropdown
+    setSearchResults([]);
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -117,9 +111,15 @@ export default function MapPickerScreen() {
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
-        region={mapRegion}
-        onRegionChangeComplete={setMapRegion}
+        provider={PROVIDER_DEFAULT}
+        initialRegion={{
+          latitude: 33.9716,
+          longitude: -6.8498,
+          latitudeDelta: 0.5,
+          longitudeDelta: 0.5,
+        }}
         onPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
           setMarkerCoords({ latitude, longitude });
@@ -144,7 +144,7 @@ export default function MapPickerScreen() {
             <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.titleBadge}>
-            <Text style={styles.titleText}>{t('admin.map_picker.title', { defaultValue: "Sélectionner l'emplacement" })}</Text>
+            <Text style={styles.titleText}>{t('admin.map_picker.title')}</Text>
           </View>
           <View style={{ width: 40 }} />
         </View>
@@ -153,7 +153,7 @@ export default function MapPickerScreen() {
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
             style={styles.searchInput}
-            placeholder={t('admin.map_picker.search_placeholder', { defaultValue: 'Rechercher adresse, quartier, ville...' })}
+            placeholder={t('admin.map_picker.search_placeholder')}
             placeholderTextColor={AdminColors.textMuted}
             value={searchQuery}
             onChangeText={(text) => {
@@ -201,15 +201,15 @@ export default function MapPickerScreen() {
       {markerCoords && (
         <View style={[styles.confirmCard, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.dragHandle} />
-          <Text style={styles.cardLabel}>📍 Selected Location</Text>
-          <Text style={styles.resolvedAddr}>{resolvedAddress || 'Unknown Address'}</Text>
+          <Text style={styles.cardLabel}>{t('admin.map_picker.selected_location')}</Text>
+          <Text style={styles.resolvedAddr}>{resolvedAddress || t('admin.map_picker.unknown_address')}</Text>
           {resolvedRegion ? <Text style={styles.resolvedRegion}>{resolvedRegion}</Text> : null}
           <Text style={styles.coordsText}>
             lat: {markerCoords.latitude.toFixed(4)}, lng: {markerCoords.longitude.toFixed(4)}
           </Text>
           
           <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-            <Text style={styles.confirmBtnText}>{t('admin.map_picker.confirm_btn', { defaultValue: 'Confirmer cet emplacement' })}</Text>
+            <Text style={styles.confirmBtnText}>{t('admin.map_picker.confirm_btn')}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -14,10 +13,9 @@ import {
 } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { adminApi } from '../../src/services/adminApi';
-
 import { useTranslation } from 'react-i18next';
-
 import * as Haptics from 'expo-haptics';
+import AppInput from '../ui/AppInput';
 
 interface AddPaymentModalProps {
   visible: boolean;
@@ -102,21 +100,28 @@ export default function AddPaymentModal({ visible, onClose, orderId, totalAmount
               </View>
 
               <View>
-                <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.price_dh')}</Text>
                 <View style={styles.amountInputContainer}>
-                  <TextInput
-                    style={[
-                      styles.amountInput, 
-                      isArabic && { textAlign: 'right' },
-                      isInvalid && parseFloat(paymentAmount) > remainingAmount && { color: Colors.danger, borderBottomColor: Colors.danger }
-                    ]}
+                  <AppInput
+                    label={t('admin.catalog.price_dh')}
                     value={paymentAmount}
                     onChangeText={setPaymentAmount}
                     keyboardType="decimal-pad"
                     placeholder="0.00"
                     autoFocus
+                    error={
+                      isInvalid && parseFloat(paymentAmount) > remainingAmount
+                        ? `⚠️ ${t('admin.unpaid.max_allowed')}: ${remainingAmount.toFixed(2)} DH`
+                        : undefined
+                    }
+                    inputStyle={[
+                      styles.amountInput,
+                      isInvalid && parseFloat(paymentAmount) > remainingAmount
+                        ? { color: Colors.danger }
+                        : undefined,
+                    ]}
+                    forceDir="ltr"
                   />
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.fullAmountBtn}
                     onPress={() => {
                       setPaymentAmount(remainingAmount.toFixed(2));
@@ -126,20 +131,15 @@ export default function AddPaymentModal({ visible, onClose, orderId, totalAmount
                     <Text style={styles.fullAmountBtnText}>{t('common.all')}</Text>
                   </TouchableOpacity>
                 </View>
-                {isInvalid && parseFloat(paymentAmount) > remainingAmount && (
-                  <Text style={[styles.errorHint, isArabic && { textAlign: 'right' }]}>
-                    ⚠️ {t('admin.unpaid.max_allowed')}: {remainingAmount.toFixed(2)} DH
-                  </Text>
-                )}
               </View>
 
-              <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('common.notes')}</Text>
-              <TextInput
-                style={[styles.noteInput, isArabic && { textAlign: 'right' }]}
+              <AppInput
+                label={t('common.notes')}
                 value={paymentNote}
                 onChangeText={setPaymentNote}
                 placeholder={t('delivery.notes_placeholder')}
                 multiline
+                inputStyle={styles.noteInput}
               />
 
               <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -230,56 +230,34 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
   },
-  inputLabel: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: Colors.textSecondary,
-    marginBottom: 4
-  },
   amountInputContainer: {
     position: 'relative',
     justifyContent: 'center',
   },
-  amountInput: { 
-    fontSize: 28, 
-    fontWeight: '800', 
-    textAlign: 'center', 
-    color: Colors.primary, 
-    padding: 12, 
-    borderBottomWidth: 1, 
-    borderBottomColor: 'rgba(0,0,0,0.05)', 
-    marginBottom: 10 
+  amountInput: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.primary,
+    textAlign: 'center',
   },
   fullAmountBtn: {
     position: 'absolute',
-    right: 0,
-    top: '25%',
+    right: 8,
+    top: 32,
     backgroundColor: Colors.primary50,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    zIndex: 1,
   },
   fullAmountBtnText: {
     fontSize: 12,
     fontWeight: '700',
     color: Colors.primary,
   },
-  errorHint: {
-    fontSize: 12,
-    color: Colors.danger,
-    fontWeight: '600',
-    marginTop: -8,
-    marginBottom: 8,
-  },
-  noteInput: { 
-    padding: 14, 
-    borderRadius: 14, 
-    backgroundColor: '#F8FAFC', 
-    minHeight: 80, 
-    textAlignVertical: 'top', 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0', 
-    fontSize: 15 
+  noteInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   modalActions: { 
     flexDirection: 'row', 

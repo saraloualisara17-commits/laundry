@@ -278,14 +278,17 @@ export default function OrderItemsScreen() {
       const fileName = `recu_commande_${editingOrderId}.pdf`;
       const localUri = `${FileSystem.cacheDirectory}${fileName}`;
 
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
-      
+      const { store } = require('../../src/store/store');
+      const token = store.getState().auth.token;
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
+
       if (download.status !== 200) {
         throw new Error('Download failed');
       }
 
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available', { defaultValue: "Partage non disponible" }));
+        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
         return;
       }
 
@@ -295,7 +298,7 @@ export default function OrderItemsScreen() {
         UTI: 'com.adobe.pdf',
       });
     } catch (e) {
-      Alert.alert(t('common.error'), t('admin.orders.create.confirmation.share_pdf_error', { defaultValue: "Erreur de partage" }));
+      Alert.alert(t('common.error'), t('admin.orders.create.confirmation.share_pdf_error'));
     }
   };
 
@@ -307,7 +310,10 @@ export default function OrderItemsScreen() {
     const localUri = `${FileSystem.cacheDirectory}receipt_${editingOrderId}.pdf`;
 
     try {
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      const { store } = require('../../src/store/store');
+      const token = store.getState().auth.token;
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
       if (download.status !== 200) throw new Error('Download failed');
       await Print.printAsync({ uri: download.uri });
     } catch (e) {

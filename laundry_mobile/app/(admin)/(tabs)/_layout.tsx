@@ -34,8 +34,8 @@ export default function AdminTabsLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: 72 + (Platform.OS === 'ios' ? insets.bottom : 10),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          height: 72 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
           paddingTop: 12,
           flexDirection: isArabic ? 'row-reverse' : 'row',
         },
@@ -88,25 +88,24 @@ export default function AdminTabsLayout() {
       <Tabs.Screen
         name="catalog"
         options={{
-          title: t('tabs.catalog'),
-          tabBarLabel: t('tabs.catalog'),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              {focused && <View style={styles.activeIndicator} />}
-              <Ionicons name={focused ? "layers" : "layers-outline"} size={24} color={color} />
-            </View>
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
         name="users"
         options={{
-          title: t('tabs.team'),
-          tabBarLabel: t('tabs.team'),
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: t('common.more'),
+          tabBarLabel: t('common.more'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
-              <Ionicons name={focused ? "people-circle" : "people-circle-outline"} size={24} color={color} />
+              <Ionicons name={focused ? "ellipsis-horizontal" : "ellipsis-horizontal-outline"} size={24} color={color} />
             </View>
           ),
         }}

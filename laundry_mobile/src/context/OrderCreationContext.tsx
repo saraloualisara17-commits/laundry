@@ -126,9 +126,13 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
         id: order.client?.id,
         name: order.client?.name,
         phone: order.client?.phone || (order.client?.phones?.[0]?.phoneNumber),
-        address: order.client?.addresses?.[0]?.address,
-        latitude: order.client?.addresses?.[0]?.latitude ? parseFloat(order.client.addresses[0].latitude) : undefined,
-        longitude: order.client?.addresses?.[0]?.longitude ? parseFloat(order.client.addresses[0].longitude) : undefined
+        address: order.deliveryAddress ?? order.client?.addresses?.[0]?.address,
+        latitude: order.deliveryLatitude != null
+            ? parseFloat(order.deliveryLatitude)
+            : (order.client?.addresses?.[0]?.latitude ? parseFloat(order.client.addresses[0].latitude) : undefined),
+        longitude: order.deliveryLongitude != null
+            ? parseFloat(order.deliveryLongitude)
+            : (order.client?.addresses?.[0]?.longitude ? parseFloat(order.client.addresses[0].longitude) : undefined),
     });
     setDeliveryType(order.deliveryType);
     setLivreur(order.livreur?.id || null);

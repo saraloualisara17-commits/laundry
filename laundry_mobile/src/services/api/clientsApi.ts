@@ -37,6 +37,12 @@ export const clientsApi = {
     client.get('/api/clients/search', { params: { query } }),
 
   /**
+   * Get all orders for a specific client
+   */
+  getClientCommandes: (id: number | string) =>
+    client.get<any[]>(`/api/clients/${id}/commandes`),
+
+  /**
    * Get unpaid debts for a specific client
    */
   getClientDebtDetail: (clientId: number | string) =>

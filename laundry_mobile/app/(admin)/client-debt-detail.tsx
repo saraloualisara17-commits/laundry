@@ -45,7 +45,7 @@ export default function ClientDebtDetailScreen() {
         setClientData(null);
         Alert.alert(
           t('common.success'),
-          t('admin.unpaid.all_settled_msg', { defaultValue: 'Toutes les créances ont été réglées!' }),
+          t('admin.unpaid.all_settled_msg'),
           [{ text: 'OK', onPress: () => router.back() }]
         );
       } else {
@@ -74,11 +74,10 @@ export default function ClientDebtDetailScreen() {
       waPhone = '212' + clientData.clientPhone.slice(1).replace(/\D/g, '');
     }
     
-    const text = t('admin.unpaid.whatsapp_msg', { 
-      name: clientData.clientName, 
-      amount: clientData.totalRemaining, 
-      count: clientData.orderCount,
-      defaultValue: `Bonjour ${clientData.clientName},\nVous avez un solde restant de ${clientData.totalRemaining} DH sur ${clientData.orderCount} commande(s).\nMerci de régulariser votre situation.`
+    const text = t('admin.unpaid.whatsapp_msg', {
+      clientName: clientData.clientName,
+      amount: clientData.totalRemaining,
+      orderCount: clientData.orderCount,
     });
     const encodedText = encodeURIComponent(text);
     
@@ -93,7 +92,7 @@ export default function ClientDebtDetailScreen() {
     setShowPaymentModal(false);
     Alert.alert(
       t('common.success'),
-      t('admin.unpaid.payment_recorded_msg', { defaultValue: 'Le solde a été mis à jour avec succès.' })
+      t('admin.unpaid.payment_recorded_msg')
     );
     fetchData();
   };
@@ -129,7 +128,7 @@ export default function ClientDebtDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('admin.unpaid.client_details', { defaultValue: 'Détail Créances' })}</Text>
+          <Text style={styles.headerTitle}>{t('admin.unpaid.client_details')}</Text>
           <TouchableOpacity onPress={openWhatsApp}>
             <Ionicons name="logo-whatsapp" size={26} color="#25D366" />
           </TouchableOpacity>
@@ -165,7 +164,7 @@ export default function ClientDebtDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>{t('admin.unpaid.unpaid_orders_list', { defaultValue: 'Commandes impayées' })}</Text>
+        <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>{t('admin.unpaid.unpaid_orders_list')}</Text>
         
         {clientData.orders?.map((order: any, index: number) => (
           <TouchableOpacity 
@@ -177,7 +176,7 @@ export default function ClientDebtDetailScreen() {
             <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
               <View>
                 <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{order.reference}</Text>
-                <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>{new Date(order.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
+                <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>{new Date(order.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
               </View>
               <StatusBadge status={order.status} />
             </View>

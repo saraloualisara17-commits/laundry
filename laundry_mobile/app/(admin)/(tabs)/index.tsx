@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   RefreshControl,
   Animated,
   Dimensions,
-  ActivityIndicator
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,20 +16,20 @@ import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../src/store/store';
-import { logOut } from '../../../src/store/authSlice';
-import * as SecureStore from 'expo-secure-store';
-import { StatusBadge } from '../../../components/admin/StatusBadge';
+import { fetchSettings } from '../../../src/store/settingsSlice';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { router, useFocusEffect } from 'expo-router';
-import { ScannerModal } from '../../../components/admin/ScannerModal';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../../../src/i18n';
 import { useOrderCreation } from '../../../src/context/OrderCreationContext';
+import { ScannerModal } from '../../../components/admin/ScannerModal';
+import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 interface DashboardStats {
   totalCommandesToday: number;
+  totalCommandes: number;
   revenuesToday: number;
   totalClients: number;
 }
@@ -42,9 +42,14 @@ interface StatusStats {
 interface OverviewData {
   PENDING_PICKUP: StatusStats;
   PICKED_UP: StatusStats;
+  IN_PROCESS: StatusStats;
   READY_FOR_DELIVERY: StatusStats;
   DELIVERED: StatusStats;
-  IN_PROCESS?: StatusStats;
+  PICKUP_FAILED: StatusStats;
+  DELIVERY_FAILED: StatusStats;
+  CANCELLED: StatusStats;
+  AU_LOCAL: StatusStats;
+  PAID_DEBTS: StatusStats;
 }
 
 interface UnpaidOverview {
@@ -57,11 +62,11 @@ export default function AdminDashboard() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<any>();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { settings } = useSelector((state: RootState) => state.settings);
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -73,6 +78,7 @@ export default function AdminDashboard() {
   const { clearOrder, setMode } = useOrderCreation();
   const [isLoadingOverview, setIsLoadingOverview] = useState(true);
   const [overviewError, setOverviewError] = useState(false);
+  const [myMissionCount, setMyMissionCount] = useState(0);
 
   const readyPulsingAnim = useRef(new Animated.Value(1)).current;
 
@@ -83,14 +89,22 @@ export default function AdminDashboard() {
 
     setIsLoadingOverview(true);
     try {
-      const [ovRes, unovRes] = await Promise.all([
+      const [ovRes, unovRes, pickupsRes, deliveriesRes] = await Promise.all([
         adminApi.getStatusOverview(),
-        adminApi.getUnpaidOverview()
+        adminApi.getUnpaidOverview(),
+        user?.id ? adminApi.getOrders({ livreurId: user.id, status: 'PENDING_PICKUP', size: 100 }) : Promise.resolve({ data: { content: [] } }),
+        user?.id ? adminApi.getOrders({ livreurId: user.id, status: 'READY_FOR_DELIVERY', size: 100 }) : Promise.resolve({ data: { content: [] } })
       ]);
       setOverview(ovRes.data.data);
       setUnpaidOverview(unovRes.data);
+      const pickupCount = (pickupsRes.data.content || []).length;
+      const deliveryCount = (deliveriesRes.data.content || []).filter((o: any) => {
+        const assignedDriverId = o.deliveryDriver?.id;
+        return !assignedDriverId || Number(assignedDriverId) === Number(user?.id);
+      }).length;
+      setMyMissionCount(pickupCount + deliveryCount);
       setLastUpdated(
-        new Date().toLocaleTimeString(i18n.language === 'ar' ? 'ar-EG' : 'fr-FR', {
+        new Date().toLocaleTimeString(i18n.language === 'ar' ? 'fr-FR' : 'fr-FR', {
           hour: '2-digit', minute: '2-digit'
         })
       );
@@ -108,12 +122,8 @@ export default function AdminDashboard() {
     if (role !== 'admin') return;
 
     try {
-      const [statsRes, ordersRes] = await Promise.all([
-        adminApi.getStats(),
-        adminApi.getOrders({ limit: 5 })
-      ]);
+      const statsRes = await adminApi.getStats();
       setStats(statsRes.data);
-      setRecentOrders(ordersRes.data.content || ordersRes.data);
     } catch (error) {
       console.error('Fetch dashboard data error:', error);
     } finally {
@@ -126,6 +136,7 @@ export default function AdminDashboard() {
     useCallback(() => {
       fetchData();
       loadOverviewData();
+      dispatch(fetchSettings());
     }, [])
   );
 
@@ -146,14 +157,6 @@ export default function AdminDashboard() {
     loadOverviewData();
   }, []);
 
-  const handleLogout = async () => {
-    dispatch(logOut());
-    await SecureStore.deleteItemAsync('refreshToken');
-    await SecureStore.deleteItemAsync('accessToken');
-    await SecureStore.deleteItemAsync('user');
-    router.replace('/(auth)/login');
-  };
-
   const handleSelectMode = (mode: 'immediate' | 'scheduled') => {
     clearOrder();
     setMode(mode);
@@ -161,41 +164,57 @@ export default function AdminDashboard() {
     router.push({ pathname: '/(admin)/order-client', params: { mode } });
   };
 
-  const renderQuickAction = (icon: any, title: string, path: any) => (
-    <TouchableOpacity 
-      style={styles.actionCard} 
-      onPress={() => router.push(path)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.actionIconCircle, { backgroundColor: AdminColors.primary100 }, isArabic && { marginRight: 0, marginLeft: 12 }]}>
-        <Ionicons name={icon} size={22} color={AdminColors.primary} />
-      </View>
-      <Text style={[styles.actionTitle, isArabic && { textAlign: 'right' }]}>{title}</Text>
-      <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={16} color={AdminColors.textMuted} />
-    </TouchableOpacity>
-  );
-
-  const renderStatusCard = (status: keyof OverviewData, label: string, emoji: string, color: string) => {
+  const renderStatusCard = (status: keyof OverviewData, label: string, icon: string, color: string, type: 'basic' | 'sub' = 'basic') => {
     const data = overview?.[status] ?? { count: 0, total: 0 };
+
+    const onPress = () => {
+      if (status === 'AU_LOCAL') {
+        router.push({ pathname: '/(admin)/orders-by-status', params: { mode: 'IMMEDIATE' } });
+      } else if (status === 'PAID_DEBTS') {
+        router.push({ pathname: '/(admin)/orders-by-status', params: { specialFilter: 'PAID_DEBTS' } });
+      } else {
+        router.push({ pathname: '/(admin)/orders-by-status', params: { status } });
+      }
+    };
+
+    const showPrice = !['CANCELLED', 'DELIVERY_FAILED', 'PICKUP_FAILED', 'PAID_DEBTS', 'AU_LOCAL'].includes(status);
+
+    if (type === 'sub') {
+      return (
+        <TouchableOpacity
+          style={styles.subStatusCard}
+          onPress={onPress}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.subCardTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.subCardIconCircle, { backgroundColor: color + '20' }]}>
+              <Ionicons name={icon as any} size={24} color={color} />
+            </View>
+            <Text style={[styles.subCardCount, { color }]}>{data.count}</Text>
+          </View>
+          <Text style={[styles.subCardLabel, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{label}</Text>
+        </TouchableOpacity>
+      );
+    }
+
     return (
-      <TouchableOpacity 
-        style={[styles.statusCard, { borderTopColor: color }]}
-        onPress={() => router.push({
-          pathname: '/(admin)/orders-by-status',
-          params: { status }
-        })}
-        activeOpacity={0.8}
+      <TouchableOpacity
+        style={[styles.statusCard, { backgroundColor: color }]}
+        onPress={onPress}
+        activeOpacity={0.85}
       >
         <View style={[styles.cardTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.cardEmoji}>{emoji}</Text>
-          <Text style={[styles.cardCount, { color }]}>{data.count}</Text>
+          <Ionicons name={icon as any} size={28} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.cardCount}>{data.count}</Text>
         </View>
-        <Text style={[styles.cardLabel, isArabic && { textAlign: 'right' }]} numberOfLines={1}>{label}</Text>
-        <View style={[styles.cardAmountRow, isArabic && { alignItems: 'flex-start' }]}>
-          <Text style={[styles.cardAmount, { color }]} numberOfLines={1} adjustsFontSizeToFit>
-            {data.total.toLocaleString()} {t('common.dh')}
-          </Text>
-        </View>
+        <Text style={[styles.cardLabel, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{label}</Text>
+        {showPrice && (
+          <View style={[styles.cardAmountRow, isArabic && { alignItems: 'flex-start' }]}>
+            <Text style={styles.cardAmount} numberOfLines={1} adjustsFontSizeToFit>
+              {data.total.toLocaleString()} {t('common.dh')}
+            </Text>
+          </View>
+        )}
         {status === 'READY_FOR_DELIVERY' && data.count > 0 && (
           <Animated.View style={[styles.attentionDot, isArabic ? { left: 10, right: undefined } : { right: 10 }, { opacity: readyPulsingAnim }]} />
         )}
@@ -206,62 +225,68 @@ export default function AdminDashboard() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={[styles.greetingCol, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.greetingText}>{t('dashboard.greeting')}</Text>
-            <Text style={styles.adminName}>{user?.name || t('dashboard.admin')}</Text>
+        <View style={styles.headerContent}>
+          {/* Logo */}
+          <View style={styles.logoCircle}>
+            {settings.logoUrl ? (
+              <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
+            ) : (
+              <Ionicons name="water-outline" size={28} color={AdminColors.primary} />
+            )}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={styles.notificationBtn} 
-              onPress={() => changeLanguage(isArabic ? 'fr' : 'ar')}
-            >
-              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>{isArabic ? 'FR' : 'AR'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/(admin)/all-orders-map')}>
-              <Ionicons name="map-outline" size={22} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.notificationBtn} onPress={() => setShowScanner(true)}>
-              <Ionicons name="qr-code-outline" size={22} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.notificationBtn} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={22} color="white" />
-            </TouchableOpacity>
+          {/* Title + app name — always right-aligned */}
+          <View style={styles.headerTitleCol}>
+            <Text style={styles.headerScreenTitle}>{t('tabs.home')}</Text>
+            <Text style={styles.headerAppName}>{settings.appName}</Text>
           </View>
         </View>
       </SafeAreaView>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
       >
-        {/* 1. Hero Stats Card */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroDecoration} />
-          <Text style={[styles.heroLabel, isArabic && { textAlign: 'right' }]}>{t('dashboard.today')}</Text>
-          <View style={[styles.heroMainRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={styles.heroValue}>{stats?.totalCommandesToday || 0}</Text>
-            <Text style={styles.heroUnit}>{t('dashboard.orders')}</Text>
-          </View>
-          <View style={styles.heroDivider} />
-          <View style={[styles.heroGrid, isArabic && { flexDirection: 'row-reverse' }]}>
-            <View style={[styles.heroGridItem, isArabic && { alignItems: 'flex-end' }]}>
-              <Text style={styles.gridLabel}>{t('dashboard.revenue')}</Text>
-              <Text style={[styles.gridValue, { color: '#6EE7B7' }]}>
-                {stats?.revenuesToday?.toLocaleString() || 0} {t('common.dh')}
-              </Text>
+        {/* Quick Actions Row */}
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity 
+            style={styles.quickActionBtn} 
+            onPress={() => router.push('/(admin)/missions')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: AdminColors.primary }]}>
+              <Ionicons name="car-sport-outline" size={22} color="white" />
+              {myMissionCount > 0 && (
+                <View style={styles.actionBadge}>
+                  <Text style={styles.actionBadgeText}>
+                    {myMissionCount}
+                  </Text>
+                </View>
+              )}
             </View>
-            <View style={styles.gridDivider} />
-            <View style={[styles.heroGridItem, isArabic && { alignItems: 'flex-end' }]}>
-              <Text style={styles.gridLabel}>{t('dashboard.total_clients')}</Text>
-              <Text style={[styles.gridValue, { color: 'white' }]}>
-                {stats?.totalClients || 0}
-              </Text>
+            <Text style={styles.quickActionLabel}>{t('livreur.map_title', { defaultValue: 'Missions' })}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.quickActionBtn} 
+            onPress={() => setShowScanner(true)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#10B981' }]}>
+              <Ionicons name="qr-code-outline" size={22} color="white" />
             </View>
-          </View>
+            <Text style={styles.quickActionLabel}>{t('admin.orders.scan')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.quickActionBtn} 
+            onPress={() => router.push('/(admin)/all-orders-map')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF6' }]}>
+              <Ionicons name="map-outline" size={22} color="white" />
+            </View>
+            <Text style={styles.quickActionLabel}>{t('admin.more.map_title')}</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* 2. Create Order Section (Requested First) */}
+        {/* 2. Create Order Section */}
         <View style={styles.actionsGrid}>
           <TouchableOpacity 
             style={[styles.mainCreateBtn, isArabic && { flexDirection: 'row-reverse' }, showCreateOptions && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}
@@ -295,7 +320,7 @@ export default function AdminDashboard() {
           )}
         </View>
 
-        {/* 3. Status Section (Requested Second) */}
+        {/* 3. Status Section - Phase 1: Operational Flow */}
         <View style={[styles.sectionOverviewHeader, isArabic && { flexDirection: 'row-reverse' }]}>
           <Text style={styles.sectionOverviewTitle}>{t('dashboard.overview')}</Text>
           <Text style={styles.lastUpdatedText}>{lastUpdated}</Text>
@@ -314,85 +339,121 @@ export default function AdminDashboard() {
             <Text style={styles.retryText}>{t('dashboard.retry')}</Text>
           </TouchableOpacity>
         ) : (
-          <View style={[styles.statusCardsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
-            {renderStatusCard('PENDING_PICKUP', t('status.PENDING_PICKUP'), '⏳', '#F59E0B')}
-            {renderStatusCard('PICKED_UP', t('status.PICKED_UP'), '📥', '#3B82F6')}
-            {renderStatusCard('READY_FOR_DELIVERY', t('status.READY_FOR_DELIVERY'), '✅', '#C9A84C')}
-            {renderStatusCard('DELIVERED', t('status.DELIVERED'), '🚚', '#10B981')}
-          </View>
-        )}
+          <>
+            <View style={[styles.statusCardsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+              {renderStatusCard('PENDING_PICKUP',     t('status.PENDING_PICKUP'),     'time-outline',    '#C2185B')}
+              {renderStatusCard('PICKED_UP',          t('status.PICKED_UP'),          'swap-horizontal', '#D32F2F')}
+              {renderStatusCard('READY_FOR_DELIVERY', t('status.READY_FOR_DELIVERY'), 'car-outline',     '#00897B')}
+              {renderStatusCard('DELIVERED',          t('status.DELIVERED'),          'checkmark-done',  '#388E3C')}
+            </View>
 
-        {/* 4. Unpaid Card (Requested Third) */}
-        {unpaidOverview && (
-          <View style={styles.unpaidWrapper}>
-            <TouchableOpacity 
-              style={[styles.unpaidCard, unpaidOverview.totalRemaining === 0 && { backgroundColor: '#ECFDF5', borderColor: '#10B981' }]}
-              onPress={() => router.push('/(admin)/unpaid-orders')}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.unpaidIcon, unpaidOverview.totalRemaining === 0 && { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-                  <Text style={{ fontSize: 24 }}>{unpaidOverview.totalRemaining > 0 ? '💰' : '✅'}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
-                    {unpaidOverview.totalRemaining > 0 ? t('dashboard.unpaid_balance') : t('dashboard.all_settled')}
-                  </Text>
-                  {unpaidOverview.totalRemaining > 0 && (
-                    <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
-                      {unpaidOverview.clientsWithDebt} {t('dashboard.clients')} • {unpaidOverview.totalOrders} {t('dashboard.orders_count')}
-                    </Text>
-                  )}
-                </View>
-                <View style={[styles.unpaidAmountCol, isArabic && { alignItems: 'flex-start' }]}>
-                  <Text style={[styles.unpaidAmount, { color: unpaidOverview.totalRemaining > 0 ? '#EF4444' : '#10B981' }]}>
-                    {unpaidOverview.totalRemaining.toLocaleString()} {t('common.dh')}
-                  </Text>
-                  <Text style={styles.unpaidAmountLabel}>{t('dashboard.to_collect')}</Text>
-                </View>
+            {/* 4. Unpaid Card (Middle Section) */}
+            {unpaidOverview && (
+              <View style={styles.unpaidWrapper}>
+                <TouchableOpacity 
+                  style={[styles.unpaidCard, unpaidOverview.totalRemaining === 0 && { backgroundColor: '#ECFDF5', borderColor: '#10B981' }]}
+                  onPress={() => router.push('/(admin)/unpaid-orders')}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.unpaidIcon, unpaidOverview.totalRemaining === 0 && { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+                      <Text style={{ fontSize: 24 }}>{unpaidOverview.totalRemaining > 0 ? '💰' : '✅'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                        {unpaidOverview.totalRemaining > 0 ? t('dashboard.unpaid_balance') : t('dashboard.all_settled')}
+                      </Text>
+                      {unpaidOverview.totalRemaining > 0 && (
+                        <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                          {unpaidOverview.clientsWithDebt} {t('dashboard.clients')} • {unpaidOverview.totalOrders} {t('dashboard.orders_count')}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={[styles.unpaidAmountCol, isArabic && { alignItems: 'flex-start' }]}>
+                      <Text style={[styles.unpaidAmount, { color: unpaidOverview.totalRemaining > 0 ? '#EF4444' : '#10B981' }]}>
+                        {unpaidOverview.totalRemaining.toLocaleString()} {t('common.dh')}
+                      </Text>
+                      <Text style={styles.unpaidAmountLabel}>{t('dashboard.to_collect')}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </View>
+            )}
+
+            {/* 5. Status Section - Phase 2: Exceptions & Location (Sub Cases) */}
+            <View style={[styles.statusCardsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+              {renderStatusCard('DELIVERY_FAILED', t('status.DELIVERY_FAILED'), 'alert-circle-outline', '#F43F5E', 'sub')}
+              {renderStatusCard('PICKUP_FAILED',   t('status.PICKUP_FAILED'),   'warning-outline',      '#EF4444', 'sub')}
+              {renderStatusCard('CANCELLED',       t('status.CANCELLED'),       'trash-outline',        '#94A3B8', 'sub')}
+              {renderStatusCard('AU_LOCAL',        t('dashboard.at_local'),     'home-outline',         '#7C3AED', 'sub')}
+            </View>
+
+            {/* 6. Accounts / General Statistics (Account style) */}
+            <View style={styles.accountCardsWrapper}>
+              <TouchableOpacity 
+                style={[styles.accountCard, isArabic && { flexDirection: 'row-reverse' }]}
+                onPress={() => router.push('/(admin)/(tabs)/clients')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.accountAvatar}>
+                  <Ionicons name="people" size={24} color={AdminColors.primary} />
+                </View>
+                <View style={[styles.accountInfo, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={styles.accountLabel}>{t('tabs.clients')}</Text>
+                  <Text style={styles.accountValue}>{stats?.totalClients || 0}</Text>
+                </View>
+                <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.accountCard, isArabic && { flexDirection: 'row-reverse' }]}
+                onPress={() => router.push('/(admin)/(tabs)/orders')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.accountAvatar}>
+                  <Ionicons name="receipt" size={24} color={AdminColors.primary} />
+                </View>
+                <View style={[styles.accountInfo, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={styles.accountLabel}>{t('tabs.orders')}</Text>
+                  <Text style={styles.accountValue}>{stats?.totalCommandes || 0}</Text>
+                </View>
+                <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 7. Paid Debts Card (Large bottom card) */}
+            {overview?.PAID_DEBTS && (
+              <View style={styles.unpaidWrapper}>
+                <TouchableOpacity 
+                  style={[styles.unpaidCard, { backgroundColor: '#F0FDF4', borderColor: '#10B981' }]}
+                  onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { specialFilter: 'PAID_DEBTS' } })}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.unpaidIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+                      <Text style={{ fontSize: 24 }}>💰</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                        {t('dashboard.paid_debts')}
+                      </Text>
+                      <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                        {t('dashboard.orders_count_completed')}
+                      </Text>
+                    </View>
+                    <View style={[styles.unpaidAmountCol, isArabic && { alignItems: 'flex-start' }]}>
+                      <Text style={[styles.unpaidAmount, { color: '#10B981' }]}>
+                        {overview.PAID_DEBTS.count}
+                      </Text>
+                      <Text style={styles.unpaidAmountLabel}>{t('dashboard.orders')}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
 
-        {/* Quick Actions Grid */}
-        <View style={styles.actionsGrid}>
-          <View style={[styles.actionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            {renderQuickAction('list-outline', t('dashboard.see_orders'), '/(admin)/orders')}
-            {renderQuickAction('people-outline', t('tabs.clients'), '/(admin)/clients')}
-          </View>
-          <View style={[styles.actionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
-            {renderQuickAction('layers-outline', t('tabs.catalog'), '/(admin)/catalog')}
-            {renderQuickAction('people-circle-outline', t('tabs.team'), '/(admin)/users')}
-          </View>
-        </View>
-
-        {/* Recent Orders */}
-        <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.sectionTitle}>{t('dashboard.recent_orders')}</Text>
-          <TouchableOpacity onPress={() => router.push('/(admin)/orders')}>
-            <Text style={styles.seeAllText}>{t('dashboard.view_all')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.ordersList}>
-          {loading ? Array(3).fill(0).map((_, i) => <SkeletonCard key={i} />) : 
-            recentOrders.map((order) => (
-              <TouchableOpacity key={order.id} style={styles.orderCard} onPress={() => router.push(`/order/${order.id}`)}>
-                <View style={[styles.statusAccent, isArabic ? { right: 0, left: undefined } : { left: 0 }, { backgroundColor: (require('../../../constants/StatusColors').StatusColors[order.status] || require('../../../constants/StatusColors').StatusColors.PENDING_PICKUP).dot }]} />
-                <View style={[styles.orderTop, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <Text style={styles.orderRef}>#{order.numeroCommande}</Text>
-                  <StatusBadge status={order.status} />
-                </View>
-                <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{order.client?.name || order.clientNom}</Text>
-                <View style={[styles.orderBottom, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <Text style={styles.orderAmount}>{order.montantTotal} {t('common.dh')}</Text>
-                  <Text style={styles.orderDate}>{new Date(order.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          }
-        </View>
         <View style={{ height: 40 }} />
       </ScrollView>
       <ScannerModal visible={showScanner} onClose={() => setShowScanner(false)} />
@@ -404,13 +465,48 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   headerSafe: { backgroundColor: AdminColors.primary, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 30 },
-  greetingCol: { flex: 1 },
-  greetingText: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '500' },
-  adminName: { color: 'white', fontSize: 20, fontWeight: '800', marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
-  notificationBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  logoCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...AdminShadows.shadowSmall },
+  logoImage: { width: 52, height: 52, borderRadius: 26 },
+  headerTitleCol: { flex: 1, alignItems: 'flex-end' },
+  headerScreenTitle: { color: 'white', fontSize: 22, fontWeight: '900' },
+  headerAppName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   content: { flex: 1, marginTop: -20 },
   heroCard: { backgroundColor: '#0D1B2A', marginHorizontal: 20, borderRadius: 24, padding: 24, ...AdminShadows.shadowMedium, overflow: 'hidden', position: 'relative' },
+  quickActionsRow: { 
+    flexDirection: 'row', 
+    paddingHorizontal: 20, 
+    justifyContent: 'space-between', 
+    marginTop: 20, 
+    marginBottom: 10,
+    gap: 12
+  },
+  quickActionBtn: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...AdminShadows.shadowSmall,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: AdminColors.textPrimary,
+  },
+  langText: {
+    color: 'white',
+    fontWeight: '900',
+    fontSize: 14,
+  },
   heroDecoration: { position: 'absolute', right: -40, top: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(13,115,119,0.15)' },
   heroLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   heroMainRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 8, gap: 8 },
@@ -423,14 +519,13 @@ const styles = StyleSheet.create({
   gridValue: { fontSize: 16, fontWeight: '800' },
   gridDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 15 },
   statusCardsContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', marginTop: 12 },
-  statusCard: { width: '48%', backgroundColor: 'white', borderRadius: 18, padding: 16, marginBottom: 14, borderTopWidth: 4, ...AdminShadows.shadowSmall, position: 'relative', overflow: 'hidden' },
-  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  cardEmoji: { fontSize: 20 },
-  cardCount: { fontSize: 22, fontWeight: '900' },
-  cardLabel: { fontSize: 12, fontWeight: '700', color: AdminColors.textSecondary },
-  cardAmountRow: { marginTop: 4 },
-  cardAmount: { fontSize: 14, fontWeight: '800' },
-  attentionDot: { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: AdminColors.danger },
+  statusCard: { width: '48%', borderRadius: 18, padding: 16, marginBottom: 14, ...AdminShadows.shadowSmall, position: 'relative', overflow: 'hidden' },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cardCount: { fontSize: 26, fontWeight: '800', color: 'white' },
+  cardLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
+  cardAmountRow: { marginTop: 6 },
+  cardAmount: { fontSize: 13, fontWeight: '800', color: 'white' },
+  attentionDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
   unpaidWrapper: { paddingHorizontal: 20, marginBottom: 16, marginTop: 4 },
   unpaidCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#FEE2E2', ...AdminShadows.shadowSmall },
   unpaidMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -483,7 +578,154 @@ const styles = StyleSheet.create({
   sectionOverviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, marginTop: 24, marginBottom: 8 },
   sectionOverviewTitle: { fontSize: 18, fontWeight: '800', color: AdminColors.textPrimary },
   lastUpdatedText: { fontSize: 12, color: AdminColors.textMuted, fontWeight: '500' },
+  subStatusCard: {
+    width: '48%',
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    ...AdminShadows.shadowSmall,
+  },
+  subCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  subCardIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subCardLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: AdminColors.textSecondary,
+  },
+  subCardCount: {
+    fontSize: 23,
+    fontWeight: '900',
+  },
+  accountCardsWrapper: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    gap: 12,
+    marginBottom: 16,
+  },
+  accountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 16,
+    ...AdminShadows.shadowSmall,
+  },
+  accountAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: AdminColors.primary50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountInfo: {
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  accountLabel: {
+    fontSize: 13,
+    color: AdminColors.textSecondary,
+    fontWeight: '600',
+  },
+  accountValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: AdminColors.textPrimary,
+    marginTop: 2,
+  },
   errorContainer: { marginHorizontal: 20, padding: 30, backgroundColor: 'white', borderRadius: 20, alignItems: 'center', gap: 10, ...AdminShadows.shadowSmall },
   errorText: { fontSize: 14, color: AdminColors.textSecondary, fontWeight: '600' },
   retryText: { fontSize: 14, color: AdminColors.primary, fontWeight: '700', textDecorationLine: 'underline' },
+  actionBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: AdminColors.danger,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  actionBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  missionWrapper: {
+    paddingHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  missionCard: {
+    backgroundColor: AdminColors.primary,
+    borderRadius: 24,
+    padding: 20,
+    ...AdminShadows.shadowMedium,
+  },
+  missionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  missionIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: 'white',
+  },
+  missionSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
+  },
+  missionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 16,
+  },
+  missionStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  missionStatItem: {
+    flex: 1,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.1)',
+  },
+  missionStatValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: 'white',
+  },
+  missionStatLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+    marginTop: 4,
+    textAlign: 'center',
+  },
 });

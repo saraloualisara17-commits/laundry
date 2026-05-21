@@ -101,7 +101,7 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>
+              <Text style={[styles.inputLabel, { textAlign: 'center' }]}>
                 {t('delivery.collected_amount')}
               </Text>
               <TextInput 

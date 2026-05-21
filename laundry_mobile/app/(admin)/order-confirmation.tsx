@@ -67,36 +67,41 @@ export default function OrderConfirmationScreen() {
     router.replace(`/order/${id}`);
   };
 
+  const getAuthHeaders = (): Record<string, string> => {
+    try {
+      const { store } = require('../../src/store/store');
+      const token: string | null = store.getState().auth.token;
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  };
+
   const handleWhatsApp = async () => {
     const pdfUrl = adminApi.getOrderPdfUrl(orderId as string);
     const localUri = `${FileSystem.cacheDirectory}recu_${orderNumber}.pdf`;
 
     try {
       setSharing(true);
-      
-      // 1. Download the PDF file
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
-      
-      if (download.status !== 200) {
-        throw new Error('Download failed');
-      }
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
+        headers: getAuthHeaders(),
+      });
 
-      // 2. Check if sharing is available
+      if (download.status !== 200) throw new Error('Download failed');
+
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
         return;
       }
 
-      // 3. Open the native sharing dialog (User picks WhatsApp & Contact)
       await Sharing.shareAsync(download.uri, {
         mimeType: 'application/pdf',
         dialogTitle: `${t('admin.orders.create.confirmation.send_receipt')} #${orderNumber}`,
         UTI: 'com.adobe.pdf',
       });
-
     } catch (e) {
       console.error('WhatsApp/PDF share error:', e);
-      Linking.openURL(pdfUrl);
+      Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {
       setSharing(false);
     }
@@ -108,12 +113,14 @@ export default function OrderConfirmationScreen() {
 
     try {
       setSharing(true);
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri);
+      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
+        headers: getAuthHeaders(),
+      });
       if (download.status !== 200) throw new Error('Download failed');
       await Print.printAsync({ uri: download.uri });
     } catch (e) {
       console.error('Print error:', e);
-      Linking.openURL(pdfUrl);
+      Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {
       setSharing(false);
     }

@@ -49,8 +49,8 @@ export const ordersApi = {
   /**
    * Assign a delivery driver to an order
    */
-  assignDeliveryDriver: (id: number | string, deliveryDriverId: string | number) =>
-    client.patch(`/api/admin/commandes/${id}/delivery-driver`, { deliveryDriverId }),
+  assignDeliveryDriver: (id: number | string, deliveryDriverId: string | number, scheduledDeliveryDate?: string) =>
+    client.patch(`/api/admin/commandes/${id}/delivery-driver`, { deliveryDriverId, scheduledDeliveryDate }),
 
   /**
    * Get order status history
@@ -67,8 +67,8 @@ export const ordersApi = {
   /**
    * Get orders for map visualization
    */
-  getOrdersForMap: () =>
-    client.get('/api/admin/commandes/map'),
+  getOrdersForMap: (livreurId?: number | string) =>
+    client.get('/api/admin/commandes/map', { params: { livreurId } }),
 
   // --- LIVREUR SPECIFIC ---
 
@@ -77,6 +77,9 @@ export const ordersApi = {
 
   getPendingPickups: () =>
     client.get('/api/livreur/commandes/pending-pickup'),
+
+  getPastDeliveries: () =>
+    client.get('/api/livreur/commandes/past-deliveries'),
 
   cancelDelivery: (id: number | string) =>
     client.put(`/api/livreur/commandes/${id}/cancel`),

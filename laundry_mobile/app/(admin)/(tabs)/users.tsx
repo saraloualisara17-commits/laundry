@@ -22,28 +22,31 @@ import { EmptyState } from '../../../components/admin/EmptyState';
 import { router, useFocusEffect } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import AppInput from '../../../components/ui/AppInput';
 
 export default function UsersScreen() {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t } = useTranslation();
+  const f = useFormStyles();
+  const isArabic = f.isArabic;
 
   const ROLE_CONFIG: Record<string, { label: string, color: string, bg: string, border: string, description: string }> = {
     admin: { 
-      label: t('tabs.admin', { defaultValue: 'Administrateur' }), 
+      label: t('tabs.admin'), 
       color: AdminColors.primary, 
       bg: AdminColors.primary100, 
       border: AdminColors.primary200,
       description: t('admin.users.roles.admin_desc')
     },
     employe: { 
-      label: t('common.staff', { defaultValue: 'Staff' }), 
+      label: t('common.staff'), 
       color: '#1D4ED8', 
       bg: 'rgba(59,130,246,0.10)', 
       border: 'rgba(59,130,246,0.20)',
       description: t('admin.users.roles.staff_desc')
     },
     livreur: { 
-      label: t('tabs.livreur', { defaultValue: 'Livreur' }), 
+      label: t('tabs.livreur'), 
       color: '#D97706', 
       bg: 'rgba(245,158,11,0.10)', 
       border: 'rgba(245,158,11,0.20)',
@@ -133,7 +136,7 @@ export default function UsersScreen() {
             try {
               await client.delete(`/admin/delete-user/${user.id}`);
               fetchUsers();
-              Alert.alert(t('common.success'), t('admin.users.user_deleted', { defaultValue: 'Membre supprimé avec succès' }));
+              Alert.alert(t('common.success'), t('admin.users.user_deleted'));
             } catch (error: any) {
               const msg = error.response?.data?.message || t('common.error_msg');
               Alert.alert(t('common.error'), msg);
@@ -147,7 +150,7 @@ export default function UsersScreen() {
   const saveUser = async () => {
     try {
       if (!form.name || !form.email || (!userModal.data && !form.password)) {
-        return Alert.alert(t('common.error'), t('admin.users.required_fields', { defaultValue: 'Veuillez remplir les champs obligatoires' }));
+        return Alert.alert(t('common.error'), t('admin.users.required_fields'));
       }
       
       const payload = {
@@ -171,10 +174,10 @@ export default function UsersScreen() {
 
   const resetPassword = async () => {
     try {
-      if (!newPass || newPass.length < 8) return Alert.alert(t('common.error'), t('admin.users.password_min_length', { defaultValue: 'Minimum 8 caractères' }));
+      if (!newPass || newPass.length < 8) return Alert.alert(t('common.error'), t('admin.users.password_min_length'));
       if (passModal.userId) {
         await adminApi.resetPassword(passModal.userId, newPass);
-        Alert.alert(t('common.success'), t('admin.users.password_updated', { defaultValue: 'Mot de passe réinitialisé' }));
+        Alert.alert(t('common.success'), t('admin.users.password_updated'));
         setPassModal({ open: false, userId: null });
         setNewPass('');
       }
@@ -208,7 +211,7 @@ export default function UsersScreen() {
               <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 12 }]}>
                 <Text style={[styles.userName, isArabic && { textAlign: 'right' }]}>{item.name}</Text>
                 <Text style={[styles.userEmail, isArabic && { textAlign: 'right' }]}>{item.email}</Text>
-                <Text style={[styles.userEmail, { marginTop: 1 }, isArabic && { textAlign: 'right' }]}>{item.phone || item.phoneNumber || t('admin.users.no_phone', { defaultValue: 'Sans numéro' })}</Text>
+                <Text style={[styles.userEmail, { marginTop: 1 }, isArabic && { textAlign: 'right' }]}>{item.phone || item.phoneNumber || t('admin.users.no_phone')}</Text>
               </View>
               
               <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -359,29 +362,48 @@ export default function UsersScreen() {
           
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.full_name')}</Text>
-              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} value={form.name} onChangeText={t => setForm({...form, name: t})} />
+              <AppInput
+                label={t('admin.users.full_name')}
+                value={form.name}
+                onChangeText={v => setForm({...form, name: v})}
+              />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.email')}</Text>
-              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={t => setForm({...form, email: t})} />
+              <AppInput
+                label={t('admin.users.email')}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={form.email}
+                onChangeText={v => setForm({...form, email: v})}
+                forceDir="ltr"
+              />
             </View>
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.phone')}</Text>
-              <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} keyboardType="phone-pad" value={form.phone} onChangeText={t => setForm({...form, phone: t})} />
+              <AppInput
+                label={t('admin.users.phone')}
+                keyboardType="phone-pad"
+                value={form.phone}
+                onChangeText={v => setForm({...form, phone: v})}
+                forceDir="ltr"
+              />
             </View>
 
             {!userModal.data && (
               <View style={styles.formField}>
-                <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.password')}</Text>
-                <TextInput style={[styles.input, isArabic && { textAlign: 'right' }]} secureTextEntry value={form.password} onChangeText={t => setForm({...form, password: t})} />
+                <AppInput
+                  label={t('admin.users.password')}
+                  isPassword
+                  value={form.password}
+                  onChangeText={v => setForm({...form, password: v})}
+                  forceDir="ltr"
+                />
               </View>
             )}
 
             <View style={styles.formField}>
-              <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.users.role')}</Text>
+              <Text style={[styles.label, f.label]}>{t('admin.users.role')}</Text>
               <View style={styles.roleGrid}>
                 {Object.entries(ROLE_CONFIG).map(([key, cfg]) => (
                   <TouchableOpacity 
@@ -410,12 +432,12 @@ export default function UsersScreen() {
         <View style={styles.overlay}>
           <View style={styles.dialog}>
             <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.users.reset_password')}</Text>
-            <TextInput 
-              style={[styles.input, isArabic && { textAlign: 'right' }]} 
-              secureTextEntry 
-              placeholder={t('admin.users.new_password_placeholder')}
+            <AppInput
+              label={t('admin.users.new_password_placeholder')}
+              isPassword
               value={newPass}
               onChangeText={setNewPass}
+              forceDir="ltr"
             />
             <View style={[styles.dialogActions, isArabic && { flexDirection: 'row-reverse' }]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => { setPassModal({ open: false, userId: null }); setNewPass(''); }}>
@@ -661,9 +683,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: AdminColors.textSecondary,
-    textTransform: 'uppercase',
     marginBottom: 8,
-    letterSpacing: 0.5,
   },
   input: {
     backgroundColor: AdminColors.surface2,

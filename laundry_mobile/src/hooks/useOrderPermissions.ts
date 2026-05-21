@@ -1,12 +1,8 @@
-/**
- * Hook for managing order-related permissions based on user roles and order status.
- */
-
 import { useMemo } from 'react';
-import { 
-  isPickupPhase, 
-  isDelivered, 
-  isReadyForDelivery 
+import {
+  isPickupPhase,
+  isDelivered,
+  isReadyForDelivery,
 } from '../../constants/orderWorkflow';
 
 export interface OrderPermissions {
@@ -24,30 +20,29 @@ export interface OrderPermissions {
 export const useOrderPermissions = (user: any, order: any): OrderPermissions => {
   return useMemo(() => {
     const role = user?.role?.toUpperCase();
-    
+
     const isAdmin = role === 'ADMIN';
     const isEmploye = role === 'EMPLOYE';
     const isLivreur = role === 'LIVREUR';
 
     const status = order?.status;
+    const delivered = isDelivered(status);
 
-    // canDelete: Only Admins can delete orders
+    const totalAmount = Math.max(0, Number(order?.montantTotal) || 0);
+    const paidAmount = Math.max(0, Number(order?.montantPaye) || 0);
+    const fullyPaid = totalAmount > 0 && (totalAmount - paidAmount) <= 0.05;
+
     const canDelete = isAdmin;
 
-    // canEdit: Admin/Employee can edit anytime unless delivered. 
-    // Livreur can only edit during pickup phases.
-    const canEdit = (isAdmin || isEmploye || (isLivreur && isPickupPhase(status))) && !isDelivered(status);
+    const canEdit = (isAdmin || isEmploye || (isLivreur && isPickupPhase(status))) && !delivered;
 
-    // canAddLaboPhoto: Internal staff only
-    const canAddLaboPhoto = isAdmin || isEmploye;
+    // No photos needed once the order is delivered
+    const canAddLaboPhoto = (isAdmin || isEmploye) && !delivered;
+    const canAddReceptionPhoto = (isAdmin || isEmploye || isLivreur) && !delivered;
 
-    // canAddReceptionPhoto: Everyone can add reception photos
-    const canAddReceptionPhoto = isAdmin || isEmploye || isLivreur;
+    // No payment button when already fully paid
+    const canAddPayment = (isAdmin || isEmploye) && delivered && !fullyPaid;
 
-    // canAddPayment: Currently allowed for admins on delivered orders in the details view
-    const canAddPayment = isAdmin && isDelivered(status);
-
-    // canAssignDriver: Internal staff can assign drivers when order is ready
     const canAssignDriver = (isAdmin || isEmploye) && isReadyForDelivery(status);
 
     return {
@@ -61,7 +56,7 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
       canAddPayment,
       canAssignDriver,
     };
-  }, [user, order?.status]); // Memoize based on user and status
+  }, [user, order?.status, order?.montantTotal, order?.montantPaye]);
 };
 
 export default useOrderPermissions;

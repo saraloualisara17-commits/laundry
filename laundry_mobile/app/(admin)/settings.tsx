@@ -1,0 +1,264 @@
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ScrollView, 
+  TextInput, 
+  Image, 
+  ActivityIndicator, 
+  Alert 
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { AdminColors, AdminShadows } from '../../constants/AdminColors';
+import { useTranslation } from 'react-i18next';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../src/store/store';
+import { updateSettings } from '../../src/store/settingsSlice';
+import * as ImagePicker from 'expo-image-picker';
+import { useFormStyles } from '../../src/hooks/useFormStyles';
+import { router } from 'expo-router';
+
+export default function SettingsScreen() {
+  const { t } = useTranslation();
+  const f = useFormStyles();
+  const isArabic = f.isArabic;
+  const dispatch = useDispatch<AppDispatch>();
+  const { settings } = useSelector((state: RootState) => state.settings);
+
+  const [appName, setAppName] = useState(settings.appName);
+  const [businessPhone, setBusinessPhone] = useState(settings.businessPhone || '');
+  const [selectedImage, setSelectedImage] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0]);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!appName.trim()) {
+      Alert.alert(t('common.error'), 'Application name cannot be empty');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await dispatch(updateSettings({
+        appName,
+        businessPhone: businessPhone.trim() || undefined,
+        logo: selectedImage,
+      })).unwrap();
+      
+      Alert.alert(t('common.success'), 'Settings updated successfully');
+      setSelectedImage(null);
+    } catch (error) {
+      Alert.alert(t('common.error'), 'Failed to update settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Branding Settings</Text>
+        </View>
+      </SafeAreaView>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>Visual Identity</Text>
+          
+          <View style={styles.card}>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Name</Text>
+            <TextInput
+              style={[styles.input, isArabic && { textAlign: 'right' }]}
+              value={appName}
+              onChangeText={setAppName}
+              placeholder="Enter App Name"
+              placeholderTextColor={AdminColors.textMuted}
+            />
+
+            <View style={styles.divider} />
+
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>Business Phone</Text>
+            <TextInput
+              style={[styles.input, isArabic && { textAlign: 'right' }]}
+              value={businessPhone}
+              onChangeText={setBusinessPhone}
+              placeholder="0600000000"
+              placeholderTextColor={AdminColors.textMuted}
+              keyboardType="phone-pad"
+            />
+
+            <View style={styles.divider} />
+
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Logo</Text>
+            <View style={[styles.logoContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={styles.logoPreview}>
+                <Image 
+                  source={{ uri: selectedImage?.uri || settings.logoUrl || 'https://via.placeholder.com/150' }} 
+                  style={styles.logoImage} 
+                />
+              </View>
+              <TouchableOpacity style={styles.pickBtn} onPress={pickImage}>
+                <Ionicons name="camera-outline" size={20} color={AdminColors.primary} />
+                <Text style={styles.pickBtnText}>Change Logo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} 
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <>
+              <Ionicons name="save-outline" size={20} color="white" />
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: AdminColors.bg,
+  },
+  header: {
+    backgroundColor: 'white',
+    ...AdminShadows.shadowSmall,
+  },
+  headerContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backBtn: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: AdminColors.textPrimary,
+  },
+  content: {
+    padding: 20,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: AdminColors.textMuted,
+    marginBottom: 12,
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    ...AdminShadows.shadowSmall,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: AdminColors.textMuted,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  input: {
+    backgroundColor: AdminColors.bg,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: AdminColors.textPrimary,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginVertical: 20,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  logoPreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: AdminColors.bg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  pickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: AdminColors.primary,
+    borderStyle: 'dashed',
+  },
+  pickBtnText: {
+    color: AdminColors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    backgroundColor: AdminColors.primary,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    ...AdminShadows.shadowTeal,
+  },
+  saveBtnText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+});

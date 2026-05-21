@@ -165,7 +165,7 @@ export default function OrderClientScreen() {
   const captureLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('admin.orders.location_permission_denied', { defaultValue: 'Enable location in settings' }));
+      Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
       return;
     }
 
@@ -182,7 +182,7 @@ export default function OrderClientScreen() {
         setRegion(geo.region || geo.district || geo.city || '');
       }
     } catch (error) {
-      Alert.alert(t('common.error'), t('admin.orders.location_capture_error', { defaultValue: 'Could not capture location' }));
+      Alert.alert(t('common.error'), t('admin.orders.location_capture_error'));
     }
   };
 
@@ -433,7 +433,7 @@ export default function OrderClientScreen() {
                             fontSize: 16,
                             fontWeight: pickupDate ? '700' : '500'
                           }}>
-                            {pickupDate ? pickupDate.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR') : t('common.date')}
+                            {pickupDate ? pickupDate.toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR') : t('common.date')}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -456,7 +456,7 @@ export default function OrderClientScreen() {
                             fontSize: 16,
                             fontWeight: pickupTime ? '700' : '500'
                           }}>
-                            {pickupTime ? pickupTime.toLocaleTimeString(isArabic ? 'ar-EG' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }) : t('common.time')}
+                            {pickupTime ? pickupTime.toLocaleTimeString(isArabic ? 'fr-FR' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }) : t('common.time')}
                           </Text>
                         </View>
                       </TouchableOpacity>

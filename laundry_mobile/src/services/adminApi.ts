@@ -21,7 +21,7 @@ export const adminApi = {
   getStats: () => statisticsApi.getTodayStats(),
   getStatusOverview: () => statisticsApi.getStatusOverview(),
   getRecentOrders: () => ordersApi.getOrders({ limit: 5, sort: 'recent' }),
-  getOrdersForMap: () => ordersApi.getOrdersForMap(),
+  getOrdersForMap: (livreurId?: number | string) => ordersApi.getOrdersForMap(livreurId),
 
   // Orders
   getOrders: (params: any) => ordersApi.getOrders(params),
@@ -29,8 +29,8 @@ export const adminApi = {
   deleteOrder: (id: number | string) => ordersApi.deleteOrder(id),
   updateOrderStatus: (id: number | string, status: string, paymentData?: any) => 
     ordersApi.updateStatus(id, { status, ...paymentData }),
-  assignDeliveryDriver: (id: number | string, driverId: string | number) => 
-    ordersApi.assignDeliveryDriver(id, driverId),
+  assignDeliveryDriver: (id: number | string, driverId: string | number, scheduledDeliveryDate?: string) =>
+    ordersApi.assignDeliveryDriver(id, driverId, scheduledDeliveryDate),
   getOrderPayments: (id: number | string) => paymentsApi.getOrderPayments(id),
   addOrderPayment: (id: number | string, amount: number, note?: string) => 
     paymentsApi.addPayment(id, { amount, note }),
@@ -45,6 +45,7 @@ export const adminApi = {
   getClient: (id: number | string) => clientsApi.getClient(id),
   createClient: (data: any) => clientsApi.createClient(data),
   updateClient: (id: number | string, data: any) => clientsApi.updateClient(id, data),
+  getClientCommandes: (id: number | string) => clientsApi.getClientCommandes(id),
   getClientDebtDetail: (clientId: number | string) => clientsApi.getClientDebtDetail(clientId),
 
   // Catalog

@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator } from 'react-native';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Colors, Shadows } from '../../../constants/theme';
+import { useFormStyles } from '../../../src/hooks/useFormStyles';
 
 interface ClientTabProps {
   order: any;
@@ -25,11 +26,12 @@ const ClientTab: React.FC<ClientTabProps> = ({
   getClientPhone,
   setShowDriverModal,
 }) => {
+  const f = useFormStyles();
   return (
     <View>
       <View style={styles.infoCard}>
-        <Text style={[styles.sectionLabel, isArabic && { textAlign: 'right' }]}>
-          {t('admin.orders.create.client_info').toUpperCase()}
+        <Text style={[styles.sectionLabel, f.sectionLabel]}>
+          {t('admin.orders.create.client_info')}
         </Text>
 
         <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -40,7 +42,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
             style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}
             onPress={() => onClientPress(order.client?.id)}
           >
-            <Text style={styles.infoLabel}>{t('tabs.clients').toUpperCase()}</Text>
+            <Text style={[styles.infoLabel, f.label]}>{t('tabs.clients')}</Text>
             <Text
               style={[
                 styles.infoValue,
@@ -60,7 +62,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
             <Ionicons name="call" size={20} color={Colors.success} />
           </View>
           <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.infoLabel}>{t('admin.clients.phone').toUpperCase()}</Text>
+            <Text style={[styles.infoLabel, f.label]}>{t('admin.clients.phone')}</Text>
             <Text style={styles.infoValue}>{getClientPhone(order.client)}</Text>
           </View>
           <Feather name="external-link" size={14} color={Colors.textMuted} />
@@ -75,7 +77,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
             <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
           </View>
           <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
-            <Text style={styles.infoLabel}>WHATSAPP</Text>
+            <Text style={styles.infoLabel}>{t('admin.items.whatsapp_label')}</Text>
             <Text style={styles.infoValue}>
               {sharing ? t('common.loading') : t('admin.orders.create.confirmation.send_receipt')}
             </Text>
@@ -97,7 +99,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
               <MaterialIcons name="local-shipping" size={20} color={Colors.accent} />
             </View>
             <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
-              <Text style={styles.infoLabel}>{t('admin.orders.driver_pickup').toUpperCase()}</Text>
+              <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_pickup')}</Text>
               <Text style={styles.infoValue}>{order.livreur.name}</Text>
             </View>
           </View>
@@ -109,7 +111,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
               <MaterialIcons name="local-shipping" size={20} color={Colors.success} />
             </View>
             <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
-              <Text style={styles.infoLabel}>{t('admin.orders.driver_delivery').toUpperCase()}</Text>
+              <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_delivery')}</Text>
               <Text style={styles.infoValue}>{order.deliveryDriver.name}</Text>
             </View>
           </View>
@@ -124,7 +126,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
               <Feather name="plus" size={20} color={Colors.primary} />
             </View>
             <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
-              <Text style={styles.infoLabel}>{t('admin.orders.driver_delivery').toUpperCase()}</Text>
+              <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_delivery')}</Text>
               <Text style={[styles.infoValue, { color: Colors.primary }]}>
                 {t('admin.orders.filter_driver')}
               </Text>
@@ -150,7 +152,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
 
           <View style={styles.mapWrapper}>
             <MapView
-              provider={PROVIDER_DEFAULT}
+              provider={PROVIDER_GOOGLE}
               style={styles.map}
               scrollEnabled={false}
               zoomEnabled={false}
@@ -205,7 +207,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.textMuted,
     marginBottom: 16,
-    letterSpacing: 1,
   },
   infoRow: {
     flexDirection: 'row',

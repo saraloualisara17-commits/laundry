@@ -25,12 +25,19 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useDirections } from '../../src/hooks/useDirections';
 import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
+import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
+import { useFormStyles } from '../../src/hooks/useFormStyles';
 
 export default function OrdersByStatusScreen() {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const f = useFormStyles();
+  const isArabic = f.isArabic;
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isEmploye = user?.role?.toUpperCase() === 'EMPLOYE';
 
-  const { status } = useLocalSearchParams();
+  const { status, mode, specialFilter } = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ordersData, setOrdersData] = useState<any>(null);
@@ -38,79 +45,114 @@ export default function OrdersByStatusScreen() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
-  const mapRef = useRef<MapView>(null);
-  const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
   
-  // Filters
+  // Missing states
   const [dateDebut, setDateDebut] = useState<Date | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [staffList, setStaffList] = useState<any[]>([]);
-  
-  // Modals
-  const [showStaffModal, setShowStaffModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStaffModal, setShowStaffModal] = useState(false);
 
-  // Generate last 14 days
-  const dateOptions = Array.from({ length: 14 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    let label = d.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR', { weekday: 'short' });
-    let dayNum = d.getDate();
-    if (i === 0) label = t('common.today');
-    if (i === 1) label = t('common.yesterday');
-    return { date: d, label, dayNum };
-  });
+  const mapRef = useRef<MapView>(null);
+  const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
 
-  const sameDay = (d1: string | Date, d2: Date) => {
-    const date1 = new Date(d1);
-    return date1.getFullYear() === d2.getFullYear() &&
-           date1.getMonth() === d2.getMonth() &&
-           date1.getDate() === d2.getDate();
-  };
+  const ordersWithGps = useMemo(() => {
+    return (ordersData?.content || []).filter((o: any) => o.clientLatitude && o.clientLongitude);
+  }, [ordersData]);
 
-  const getStatusConfig = (s: string) => {
-    switch(s) {
-      case 'PENDING_PICKUP': return { label: t('status.PENDING_PICKUP'), emoji: '⏳', color: STATUS_COLORS.PENDING_PICKUP, bg: STATUS_COLORS.PENDING_PICKUP };
-      case 'PICKED_UP': return { label: t('status.PICKED_UP'), emoji: '📥', color: STATUS_COLORS.PICKED_UP, bg: STATUS_COLORS.PICKED_UP };
-      case 'IN_PROCESS': return { label: t('status.IN_PROCESS'), emoji: '⚙️', color: STATUS_COLORS.IN_PROCESS, bg: STATUS_COLORS.IN_PROCESS };
-      case 'READY_FOR_DELIVERY': return { label: t('status.READY_FOR_DELIVERY'), emoji: '✅', color: STATUS_COLORS.READY_FOR_DELIVERY, bg: STATUS_COLORS.READY_FOR_DELIVERY };
-      case 'DELIVERED': return { label: t('status.DELIVERED'), emoji: '🚚', color: STATUS_COLORS.DELIVERED, bg: STATUS_COLORS.DELIVERED };
-      default: return { label: s, emoji: '📦', color: AdminColors.primary, bg: AdminColors.primary };
-    }
-  };
-
-  const statusConfig = getStatusConfig(status as string);
-
-  const fetchFilters = async () => {
-    try {
-      const usersRes = await adminApi.getUsers();
-      setStaffList(usersRes.data);
-    } catch (e) {
-      console.error('Failed to load staff list', e);
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const params: any = {
-        status: status,
-        page: 0,
-        limit: 100
+  // Status configuration lookup
+  const statusConfig = useMemo(() => {
+    if (mode === 'IMMEDIATE') {
+      return {
+        label: t('dashboard.at_local'),
+        emoji: '🏠',
+        color: '#7C3AED',
+        bg: '#F5F3FF'
       };
-      
-      if (dateDebut) {
-        const d = new Date(dateDebut);
-        d.setHours(0,0,0,0);
-        params.dateDebut = d.toISOString().split('T')[0];
-        params.dateFin = d.toISOString().split('T')[0];
-      }
-      if (selectedStaffId) params.livreurId = selectedStaffId;
+    }
+    if (specialFilter === 'PAID_DEBTS') {
+      return {
+        label: t('dashboard.paid_debts'),
+        emoji: '💰',
+        color: '#10B981',
+        bg: '#ECFDF5'
+      };
+    }
 
-      const res = await adminApi.getOrders(params);
+    const s = status as string;
+    const colors = require('../../constants/StatusColors').StatusColors[s] || { dot: '#94A3B8', bg: 'rgba(148, 163, 184, 0.1)' };
+    
+    const emojiMap: Record<string, string> = {
+      PENDING_PICKUP: '⏳',
+      PICKED_UP: '📥',
+      IN_PROCESS: '🧼',
+      READY_FOR_DELIVERY: '✅',
+      DELIVERED: '🚚',
+      CANCELLED: '🗑️',
+      PICKUP_FAILED: '❌',
+      DELIVERY_FAILED: '🚫'
+    };
+
+    return {
+      label: t(`status.${s}`),
+      emoji: emojiMap[s] || '📋',
+      color: colors.dot,
+      bg: colors.bg
+    };
+  }, [status, mode, specialFilter, i18n.language]);
+
+  const markers = useMemo(() => {
+    return ordersWithGps.map((order: any) => {
+      const lat = parseFloat(order.clientLatitude);
+      const lng = parseFloat(order.clientLongitude);
+
+      if (isNaN(lat) || isNaN(lng)) return null;
+
+      return (
+        <Marker
+          key={order.id}
+          coordinate={{ latitude: lat, longitude: lng }}
+          pinColor={STATUS_COLORS[order.status] || statusConfig.color}
+          onPress={() => setSelectedOrder(order)}
+        />
+      );
+    }).filter(Boolean);
+  }, [ordersWithGps, selectedOrder?.id, statusConfig]);
+  
+  const fetchStaff = async () => {
+    try {
+      const res = await adminApi.getUsers();
+      setStaffList(res.data.filter((u: any) => u.role?.toLowerCase() === 'livreur' || u.role?.toLowerCase() === 'employe'));
+    } catch (e) {
+      console.error('Fetch staff error:', e);
+    }
+  };
+
+  const fetchData = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    try {
+      let res;
+      const params: any = {
+        page: 0,
+        size: 50,
+        dateDebut: dateDebut ? dateDebut.toISOString().split('T')[0] : undefined,
+        livreurId: selectedStaffId || undefined
+      };
+
+      if (specialFilter === 'PAID_DEBTS') {
+        res = await adminApi.getOrders({ ...params, paidDebts: true });
+      } else {
+        res = await adminApi.getOrders({
+          ...params,
+          status: status as string,
+          mode: mode as string,
+          activeOnly: mode === 'IMMEDIATE' ? true : undefined
+        });
+      }
+
       setOrdersData(res.data);
-    } catch (error) {
-      console.error('Error fetching orders by status:', error);
+    } catch (e) {
+      console.error('Fetch orders error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -118,26 +160,46 @@ export default function OrdersByStatusScreen() {
   };
 
   useEffect(() => {
-    fetchFilters();
-    fetchData();
-    getUserLocation();
-  }, [status, dateDebut, selectedStaffId]);
+    fetchStaff();
+  }, []);
 
-  const getUserLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude
-      });
-    } catch (e) {
-      console.warn('Get user location error:', e);
-    }
+  useEffect(() => {
+    fetchData();
+  }, [status, mode, specialFilter, dateDebut, selectedStaffId]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData(true);
   };
 
-  // Update route when selected order changes
+  const clearFilters = () => {
+    setDateDebut(null);
+    setSelectedStaffId(null);
+  };
+
+  const centerOnUserLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+    const location = await Location.getCurrentPositionAsync({});
+    setUserLocation(location.coords);
+    mapRef.current?.animateToRegion({
+      ...location.coords,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    });
+  };
+
+  const openInExternalMap = (order: any) => {
+    const lat = parseFloat(order.clientLatitude);
+    const lng = parseFloat(order.clientLongitude);
+    const label = order.client?.name || order.clientName;
+    const url = Platform.select({
+      ios: `maps:0,0?q=${label}@${lat},${lng}`,
+      android: `geo:0,0?q=${lat},${lng}(${label})`
+    });
+    if (url) Linking.openURL(url);
+  };
+
   useEffect(() => {
     if (selectedOrder && userLocation) {
       calculateRoute([
@@ -149,90 +211,11 @@ export default function OrdersByStatusScreen() {
     }
   }, [selectedOrder, userLocation]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, [status, dateDebut, selectedStaffId]);
-
-  const clearFilters = () => {
-    setDateDebut(null);
-    setSelectedStaffId(null);
-  };
-
-  const centerOnUserLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const location = await Location.getCurrentPositionAsync({});
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-      setUserLocation(coords);
-      
-      mapRef.current?.animateToRegion({
-        ...coords,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 500);
-    } catch (e) {
-      console.warn('Location error:', e);
-    }
-  };
-
-  const openInExternalMap = (order: any) => {
-    const lat = order.resolvedLat;
-    const lng = order.resolvedLng;
-    const label = encodeURIComponent(order.clientName || order.clientNom);
-    const url = Platform.select({
-      ios: `maps:0,0?q=${label}@${lat},${lng}`,
-      android: `geo:0,0?q=${lat},${lng}(${label})`
-    });
-    if (url) Linking.openURL(url);
-  };
-
-  const handleCall = (phone: string) => {
-    if (phone) Linking.openURL(`tel:${phone}`);
-  };
-
-  const ordersWithGps = useMemo(() => {
-    return (ordersData?.content || []).map((o: any) => {
-      let lat = parseFloat(o.clientLatitude);
-      let lng = parseFloat(o.clientLongitude);
-
-      // Fallback to client addresses if top-level is missing
-      if ((isNaN(lat) || isNaN(lng)) && o.client?.addresses?.length > 0) {
-        const addr = o.client.addresses[0];
-        lat = parseFloat(addr.latitude);
-        lng = parseFloat(addr.longitude);
-      }
-
-      if (isNaN(lat) || isNaN(lng)) return null;
-
-      // Add tiny jitter to avoid perfect overlaps
-      const jitterLat = lat + (Math.random() - 0.5) * 0.0001;
-      const jitterLng = lng + (Math.random() - 0.5) * 0.0001;
-
-      return {
-        ...o,
-        resolvedLat: jitterLat,
-        resolvedLng: jitterLng
-      };
-    }).filter((o: any) => o !== null);
-  }, [ordersData]);
-
   const renderOrderCard = ({ item }: { item: any }) => {
     const isReady = item.status === 'READY_FOR_DELIVERY';
-    const statusCfg = require('../../constants/StatusColors').StatusColors[item.status] || { dot: statusConfig.bg };
+    const statusCfg = require('../../constants/StatusColors').StatusColors[item.status] || { dot: statusConfig.color };
 
-    const hasDimensions = item.commandeTapis?.some((t: any) => t.modeTarification === 'PER_M2' && t.largeur && t.hauteur);
-    const totalArea = hasDimensions ? item.commandeTapis.reduce((sum: number, t: any) => {
-       if (t.modeTarification === 'PER_M2' && t.largeur && t.hauteur) {
-           return sum + (parseFloat(t.largeur) * parseFloat(t.hauteur));
-       }
-       return sum;
-    }, 0) : 0;
+    const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
 
     return (
       <TouchableOpacity
@@ -259,19 +242,12 @@ export default function OrdersByStatusScreen() {
         <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
           <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="cube-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{item.commandeTapis?.length || 0} {t('dashboard.orders_count')}</Text>
+            <Text style={styles.infoText}>{itemsSummary}</Text>
           </View>
           <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="calendar-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
+            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
           </View>
-          
-          {totalArea > 0 && (
-            <View style={[styles.areaChip, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Ionicons name="grid-outline" size={12} color="#0284C7" />
-              <Text style={styles.areaText}>{totalArea.toFixed(2)} m²</Text>
-            </View>
-          )}
         </View>
 
         <View style={[styles.cardBottom, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -293,50 +269,47 @@ export default function OrdersByStatusScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
-        </TouchableOpacity>
-        <View style={[{ flex: 1, marginLeft: 8, flexDirection: 'row', alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse', marginRight: 8, marginLeft: 0 }]}>
-          <Text style={{ fontSize: 20, [isArabic ? 'marginLeft' : 'marginRight']: 6 }}>{statusConfig.emoji}</Text>
-          <Text style={styles.headerTitle}>{statusConfig.label}</Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={[
-            styles.mapToggleBtn, 
-            showMap ? { backgroundColor: AdminColors.primary } : { backgroundColor: 'rgba(0,0,0,0.06)' },
-            isArabic && { marginRight: 0, marginLeft: 8 }
-          ]}
-          onPress={() => {
-            setShowMap(!showMap);
-            if (showMap) {
-              setSelectedOrder(null);
-              setShowAllRoutes(false);
-            }
-          }}
-        >
-          <Ionicons 
-            name={showMap ? "list" : "map"} 
-            size={18} 
-            color={showMap ? "white" : AdminColors.textSecondary} 
-          />
-        </TouchableOpacity>
-
-        {(dateDebut || selectedStaffId) && (
-          <TouchableOpacity onPress={clearFilters} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>{t('admin.orders.reset_btn', { defaultValue: 'Effacer' })}</Text>
+      {!showMap && (
+        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
-        )}
-      </View>
+          <View style={[{ flex: 1, marginLeft: 8, flexDirection: 'row', alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse', marginRight: 8, marginLeft: 0 }]}>
+            <Text style={{ fontSize: 20, [isArabic ? 'marginLeft' : 'marginRight']: 6 }}>{statusConfig.emoji}</Text>
+            <Text style={styles.headerTitle}>{statusConfig.label}</Text>
+          </View>
+          
+          {!isEmploye && (
+            <TouchableOpacity
+              style={[
+                styles.mapToggleBtn,
+                { backgroundColor: 'rgba(0,0,0,0.06)' },
+                isArabic && { marginRight: 0, marginLeft: 8 }
+              ]}
+              onPress={() => setShowMap(true)}
+            >
+              <Ionicons
+                name="map"
+                size={18}
+                color={AdminColors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+
+          {(dateDebut || selectedStaffId) && (
+            <TouchableOpacity onPress={clearFilters} style={styles.clearBtn}>
+              <Text style={styles.clearBtnText}>{t('admin.orders.reset_btn')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {showMap ? (
         <View style={{ flex: 1 }}>
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFillObject}
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             initialRegion={{
               latitude: 33.9716,
               longitude: -6.8498,
@@ -346,51 +319,14 @@ export default function OrdersByStatusScreen() {
             showsUserLocation={true}
             showsMyLocationButton={false}
           >
-            {ordersWithGps.map((order: any) => (
-              <Marker
-                key={order.id}
-                coordinate={{
-                  latitude: order.resolvedLat,
-                  longitude: order.resolvedLng,
-                }}
-                onPress={() => {
-                  setSelectedOrder(order);
-                  setShowAllRoutes(false);
-                }}
-              >
-                <View style={{ alignItems: 'center' }}>
-                  <View style={{
-                    width: selectedOrder?.id === order.id ? 44 : 32,
-                    height: selectedOrder?.id === order.id ? 44 : 32,
-                    borderRadius: 22,
-                    backgroundColor: STATUS_COLORS[order.status] || statusConfig.bg,
-                    borderWidth: 3,
-                    borderColor: 'white',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    ...AdminShadows.shadowSmall,
-                  }} />
-                  <View style={{
-                    width: 0,
-                    height: 0,
-                    borderLeftWidth: 5,
-                    borderRightWidth: 5,
-                    borderTopWidth: 8,
-                    borderLeftColor: 'transparent',
-                    borderRightColor: 'transparent',
-                    borderTopColor: STATUS_COLORS[order.status] || statusConfig.bg,
-                    marginTop: -1,
-                  }}/>
-                </View>
-              </Marker>
-            ))}
+            {markers}
 
             {showAllRoutes && userLocation && ordersWithGps.map((order: any) => (
               <Polyline
                 key={`all-route-${order.id}`}
                 coordinates={[
                   { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                  { latitude: order.resolvedLat, longitude: order.resolvedLng }
+                  { latitude: order.clientLatitude ? parseFloat(order.clientLatitude) : 0, longitude: order.clientLongitude ? parseFloat(order.clientLongitude) : 0 }
                 ]}
                 strokeWidth={2}
                 strokeColor="rgba(0, 122, 255, 0.5)"
@@ -410,11 +346,23 @@ export default function OrdersByStatusScreen() {
             )}
           </MapView>
 
+          {/* Floating Back Button */}
+          <TouchableOpacity 
+            style={[styles.floatingBackBtn, isArabic && { left: 'auto', right: 20 }]} 
+            onPress={() => {
+              setShowMap(false);
+              setSelectedOrder(null);
+              setShowAllRoutes(false);
+            }}
+          >
+            <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={22} color={AdminColors.textPrimary} />
+          </TouchableOpacity>
+
           {/* Map overlay — pin count badge */}
-          <View style={[styles.mapBadge, isArabic && { left: 'auto', right: 12, flexDirection: 'row-reverse' }]}>
+          <View style={[styles.mapBadge, isArabic && { left: 'auto', right: 80, flexDirection: 'row-reverse' }]}>
             <View style={[styles.badgeDot, { backgroundColor: statusConfig.color }]} />
             <Text style={styles.badgeText}>
-              {ordersWithGps.length} {t('admin.orders.on_map', { defaultValue: 'sur la carte' })}
+              {ordersWithGps.length} {t('admin.orders.on_map')}
             </Text>
           </View>
 
@@ -487,60 +435,68 @@ export default function OrdersByStatusScreen() {
           <View style={[styles.summaryCard, { borderColor: statusConfig.bg }]}>
             <View style={[styles.summaryTop, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.summaryCol}>
-                <Text style={styles.summaryLabel}>{t('common.total', { defaultValue: 'TOTAL' })} {t('tabs.orders', { defaultValue: 'COMMANDES' }).toUpperCase()}</Text>
+                <Text style={[styles.summaryLabel, f.statLabel]}>{t('common.total')} {t('tabs.orders')}</Text>
                 <Text style={[styles.summaryValue, { color: statusConfig.color }]}>
                   {ordersData?.totalElements || 0}
                 </Text>
               </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryCol}>
-                <Text style={styles.summaryLabel}>{t('common.total', { defaultValue: 'TOTAL' })} {t('financial.amount', { defaultValue: 'MONTANT' }).toUpperCase()}</Text>
-                <Text style={[styles.summaryValue, { color: statusConfig.color }]}>
-                  {ordersData?.totalValue?.toLocaleString() || 0} {t('common.dh')}
-                </Text>
-              </View>
+              {!isEmploye && (
+                <>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.summaryCol}>
+                    <View style={styles.summaryAmountRow}>
+                      <View style={styles.summaryAmountItem}>
+                        <Text style={[styles.summaryLabel, f.statLabel]}>{t('stats.total_paid')}</Text>
+                        <Text style={[styles.summaryAmountValue, { color: '#10B981' }]}>
+                          {ordersData?.totalValue?.toLocaleString() || 0} {t('common.dh')}
+                        </Text>
+                      </View>
+                      <View style={styles.summaryAmountDivider} />
+                      <View style={styles.summaryAmountItem}>
+                        <Text style={[styles.summaryLabel, f.statLabel]}>{t('stats.total_unpaid')}</Text>
+                        <Text style={[styles.summaryAmountValue, { color: '#EF4444' }]}>
+                          {ordersData?.totalUnpaid?.toLocaleString() || 0} {t('common.dh')}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
           </View>
 
           {/* Filters */}
           <View style={[styles.filtersContainer, isArabic && { flexDirection: 'row-reverse' }]}>
-            <TouchableOpacity 
-              style={[styles.filterBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            <TouchableOpacity
+              style={[styles.filterBtn, selectedStaffId && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={() => setShowStaffModal(true)}
             >
               <Ionicons name="person" size={16} color={selectedStaffId ? AdminColors.primary : AdminColors.textMuted} />
               <Text style={[styles.filterBtnText, selectedStaffId && styles.filterBtnTextActive]} numberOfLines={1}>
                 {selectedStaffId ? staffList.find(s => s.id === selectedStaffId)?.name || t('common.staff') : t('common.staff')}
               </Text>
+              {selectedStaffId && (
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); setSelectedStaffId(null); }} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={16} color={AdminColors.primary} />
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.filterBtn, isArabic && { flexDirection: 'row-reverse' }]} 
+            <TouchableOpacity
+              style={[styles.filterBtn, dateDebut && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
               onPress={() => setShowDatePicker(true)}
             >
               <Ionicons name="calendar-outline" size={16} color={dateDebut ? AdminColors.primary : AdminColors.textMuted} />
-              <Text style={[styles.filterBtnText, dateDebut && styles.filterBtnTextActive]}>
-                {dateDebut ? dateDebut.toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR') : t('common.all_dates')}
+              <Text style={[styles.filterBtnText, dateDebut && styles.filterBtnTextActive]} numberOfLines={1}>
+                {dateDebut ? dateDebut.toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
               </Text>
               {dateDebut && (
-                 <TouchableOpacity onPress={(e) => { e.stopPropagation(); setDateDebut(null); }}>
-                   <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
-                 </TouchableOpacity>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); setDateDebut(null); }} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={16} color={AdminColors.primary} />
+                </TouchableOpacity>
               )}
             </TouchableOpacity>
           </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={dateDebut || new Date()}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) setDateDebut(selectedDate);
-              }}
-            />
-          )}
 
           {/* List */}
           {loading && !refreshing ? (
@@ -567,6 +523,44 @@ export default function OrdersByStatusScreen() {
           )}
         </>
       )}
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>{t('admin.orders.filter_date')}</Text>
+              <TouchableOpacity onPress={() => { setDateDebut(null); setShowDatePicker(false); }}>
+                <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={dateDebut || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              themeVariant="light"
+              onChange={(event, selectedDate) => {
+                if (Platform.OS === 'android') {
+                  setShowDatePicker(false);
+                  if (event.type === 'set' && selectedDate) setDateDebut(selectedDate);
+                } else {
+                  if (selectedDate) setDateDebut(selectedDate);
+                }
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={{ marginTop: 20, backgroundColor: AdminColors.primary, borderRadius: 14, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>{t('common.confirm')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Staff Modal */}
       <Modal
@@ -616,149 +610,73 @@ export default function OrdersByStatusScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6' },
+
+  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    ...AdminShadows.shadowSmall,
-    zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: 'white', ...AdminShadows.shadowSmall, zIndex: 10,
   },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
-  },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: AdminColors.textPrimary },
   mapToggleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
+    width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginLeft: 8,
   },
-  clearBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: AdminColors.primary50,
-    borderRadius: 8,
-  },
-  clearBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AdminColors.primary,
-  },
+  clearBtn: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: AdminColors.primary50, borderRadius: 8, marginLeft: 6 },
+  clearBtnText: { fontSize: 12, fontWeight: '700', color: AdminColors.primary },
+
+  // Summary
   summaryCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    margin: 16,
-    padding: 16,
-    borderTopWidth: 4,
-    ...AdminShadows.shadowSmall,
+    backgroundColor: 'white', borderRadius: 18, margin: 16, padding: 20,
+    borderTopWidth: 4, ...AdminShadows.shadowSmall,
   },
-  summaryTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  summaryCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: AdminColors.textSecondary,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    gap: 8,
-  },
+  summaryTop: { flexDirection: 'row', alignItems: 'center' },
+  summaryCol: { flex: 1, alignItems: 'center' },
+  summaryLabel: { fontSize: 11, fontWeight: '700', color: AdminColors.textSecondary, marginBottom: 6 },
+  summaryValue: { fontSize: 26, fontWeight: '900' },
+  summaryDivider: { width: 1, height: 44, backgroundColor: '#F1F5F9' },
+  summaryAmountRow: { flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' },
+  summaryAmountItem: { alignItems: 'center', width: '100%' },
+  summaryAmountValue: { fontSize: 16, fontWeight: '800' },
+  summaryAmountDivider: { height: 1, width: '60%', backgroundColor: '#F1F5F9' },
+
+  // Filters
+  filtersContainer: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, gap: 10 },
   filterBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'white',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: AdminColors.border,
-    ...AdminShadows.shadowSmall,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: 'white', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12,
+    borderWidth: 1, borderColor: AdminColors.border, ...AdminShadows.shadowSmall,
   },
-  filterBtnText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: AdminColors.textSecondary,
+  filterBtnActive: {
+    borderColor: AdminColors.primary,
+    borderWidth: 1.5,
+    backgroundColor: AdminColors.primary100,
   },
-  filterBtnTextActive: {
-    color: AdminColors.primary,
-    fontWeight: '700',
-  },
-  listContainer: {
-    paddingBottom: 24,
-  },
+  filterBtnText: { flex: 1, fontSize: 13, fontWeight: '500', color: AdminColors.textSecondary },
+  filterBtnTextActive: { color: AdminColors.primary, fontWeight: '700' },
+
+  // List
+  listContainer: { paddingBottom: 24, paddingTop: 4 },
+
+  // Order card — simple 3-row layout
   orderCard: {
-    backgroundColor: 'white',
-    borderRadius: 14,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 16,
-    position: 'relative',
-    overflow: 'hidden',
-    ...AdminShadows.shadowSmall,
+    backgroundColor: 'white', borderRadius: 16, marginHorizontal: 16, marginBottom: 10,
+    paddingVertical: 16, paddingHorizontal: 18, paddingLeft: 22,
+    overflow: 'hidden', ...AdminShadows.shadowSmall,
   },
-  accentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  accentBarAr: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
+  accentBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5 },
+  accentBarAr: { position: 'absolute', right: 0, left: undefined, top: 0, bottom: 0, width: 5 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  orderRef: { fontSize: 12, fontWeight: '700', color: AdminColors.textMuted, letterSpacing: 0.5 },
+  cardAmount: { fontSize: 16, fontWeight: '800' },
+  cardClient: { fontSize: 17, fontWeight: '700', color: AdminColors.textPrimary, marginBottom: 8 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardMetaText: { fontSize: 13, color: AdminColors.textSecondary, fontWeight: '500' },
   orderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  orderRef: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: AdminColors.textMuted,
-  },
-  orderAmount: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: AdminColors.primary,
   },
   orderClientName: {
     fontSize: 16,
@@ -766,23 +684,88 @@ const styles = StyleSheet.create({
     color: AdminColors.textPrimary,
     marginBottom: 10,
   },
-  orderDetails: {
+  readyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: AdminColors.border,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
   },
-  orderDate: {
-    fontSize: 12,
-    color: AdminColors.textMuted,
+  readyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
   },
-  orderDriver: {
+  readyText: {
     fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginTop: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoText: {
+    fontSize: 13,
     color: AdminColors.textSecondary,
     fontWeight: '500',
   },
+  areaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  areaText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  cardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  amountText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: AdminColors.primary,
+  },
+  financialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  payeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  resteText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -960,140 +943,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  orderTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  orderRef: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: AdminColors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  orderClientName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
-    marginTop: 6,
-  },
-  readyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
-  },
-  readyDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  readyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginTop: 12,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: AdminColors.textSecondary,
-    fontWeight: '500',
-  },
-  areaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  areaText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0284C7',
-  },
-  cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: AdminColors.primary,
-  },
-  financialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  payeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  resteText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  dateCard: {
-    width: 60,
-    height: 70,
-    borderRadius: 14,
+  statusDot: { width: 14, height: 14, borderRadius: 7 },
+  floatingBackBtn: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
-    ...AdminShadows.shadowSmall,
-  },
-  dateCardInactive: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  dateCardActive: {
-    backgroundColor: AdminColors.primary,
-  },
-  dateDayLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: AdminColors.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  dateDayNum: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: AdminColors.primary,
-  },
-  dateTextActive: {
-    color: 'white',
+    zIndex: 20,
+    ...AdminShadows.shadowMedium,
   },
 });

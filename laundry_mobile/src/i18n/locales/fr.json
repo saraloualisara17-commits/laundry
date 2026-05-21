@@ -6,6 +6,7 @@
     "error": "Erreur",
     "success": "Succès",
     "cancel": "Annuler",
+    "assigned": "Assigné",
     "confirm": "Confirmer",
     "save": "Enregistrer",
     "search": "Rechercher...",
@@ -18,6 +19,7 @@
     "date_start": "Date début",
     "date_end": "Date fin",
     "optional": "(Optionnel)",
+    "add": "Ajouter",
     "add_image": "Ajouter une image",
     "today": "Aujourd'hui",
     "all": "Tous",
@@ -31,7 +33,27 @@
     "status": "Statut",
     "continue": "Continuer",
     "error_msg": "Une erreur s'est produite. Veuillez réessayer.",
-    "info": "Information"
+    "info": "Information",
+    "logout": "Déconnexion",
+    "logout_confirm_title": "Déconnexion",
+    "logout_confirm_msg": "Voulez-vous vous déconnecter ?",
+    "logout_btn": "Déconnecter",
+    "more": "Plus",
+    "ignore": "Ignorer",
+    "navigate": "Naviguer",
+    "call": "Appeler",
+    "send_whatsapp": "📱 Envoyer sur WhatsApp",
+    "print_pdf": "🖨️ Imprimer / Voir PDF",
+    "order_photos": "Photos de la commande",
+    "time": "Heure",
+    "new": "Nouveau",
+    "notes": "Notes",
+    "photo_lab": "Photo Labo",
+    "photo_reception": "Photo Récep.",
+    "whatsapp": "WhatsApp",
+    "print": "Imprimer",
+    "done": "Terminé",
+    "other": "Autre"
   },
   "errors": {
     "network": "Erreur réseau. Veuillez vérifier votre connexion.",
@@ -47,7 +69,8 @@
     "amount": "Montant",
     "paid": "Payé",
     "remaining": "Reste",
-    "total": "Total"
+    "total": "Total",
+    "details": "Détails financiers"
   },
   "dashboard": {
     "greeting": "Bonjour,",
@@ -58,7 +81,7 @@
     "total_clients": "TOTAL CLIENTS",
     "create_order": "Créer une commande",
     "create_order_sub": "Client présent ou téléphonique",
-    "overview": "Vue d'ensemble",
+    "overview": "Les états de base",
     "last_updated": "Dernière mise à jour",
     "recent_orders": "Commandes récentes",
     "view_all": "Voir tout",
@@ -68,6 +91,9 @@
     "clients": "client(s)",
     "orders_count": "commande(s)",
     "to_collect": "à encaisser",
+    "at_local": "Au Local",
+    "paid_debts": "Dettes Payées",
+    "orders_count_completed": "Commandes réglées",
     "quick_actions": "Actions rapides",
     "see_orders": "Voir commandes",
     "stats_error": "Impossible de charger les statistiques",
@@ -82,16 +108,23 @@
     "READY_FOR_DELIVERY": "Prêtes à livrer",
     "DELIVERED": "Livrées",
     "CANCELLED": "Annulée",
-    "IN_PROCESS": "En traitement"
+    "IN_PROCESS": "En traitement",
+    "PICKUP_FAILED": "Collecte échouée",
+    "DELIVERY_FAILED": "Livraison échouée"
   },
   "tabs": {
     "admin": "Administrateur",
     "livreur": "Livreur",
+    "employe": "Employé",
     "dashboard": "Tableau de Bord",
     "orders": "Commandes",
     "clients": "Clients",
     "catalog": "Catalogue",
-    "team": "Équipe"
+    "team": "Équipe",
+    "notifications": "Notifications",
+    "home": "Accueil",
+    "missions": "Missions",
+    "profile": "Profil"
   },
   "delivery": {
     "confirm_title": "Confirmer la livraison",
@@ -114,7 +147,7 @@
   "auth": {
     "login": {
       "title": "Connexion",
-      "subtitle": "Accédez à votre espace Pure Clean",
+      "subtitle": "Accédez à votre espace {{appName}}",
       "email": "Email",
       "password": "Mot de passe",
       "submit": "Se connecter",
@@ -125,7 +158,12 @@
     }
   },
   "admin": {
+    "dashboard": {
+      "map_title": "Carte"
+    },
     "unpaid": {
+      "whatsapp_msg": "Bonjour {{clientName}},\nVous avez un solde restant de {{amount}} DH sur {{orderCount}} commande(s).\nMerci de régulariser votre situation.",
+      "all_settled_msg": "Toutes les créances ont été réglées !",
       "whatsapp_error": "Impossible d'ouvrir WhatsApp",
       "remind": "Relancer",
       "no_unpaid_msg": "Toutes les créances sont régularisées.",
@@ -204,6 +242,7 @@
         "delivery_type": "Type de Livraison",
         "delivery_type_placeholder": "Sélectionner le type...",
         "pickup_date": "Date de récupération",
+        "delivery_date": "Date de livraison",
         "choose_date": "Choisir date",
         "time": "Heure",
         "choose_time": "Choisir heure",
@@ -272,6 +311,8 @@
         }
       },
       "title": "Commandes",
+      "scan": "Scanner",
+      "upload_queued": "Images ajoutées à la file d'attente. Elles seront téléchargées en arrière-plan.",
       "filter_driver": "Filtrer par Livreur",
       "all_drivers": "Tous les livreurs",
       "filter_date": "Filtrer par Date",
@@ -279,8 +320,13 @@
       "ready": "Prête 🎉",
       "validate": "Valider →",
       "empty_title": "Aucune commande",
+      "empty_subtitle": "Aucune commande ne correspond à vos filtres",
       "search_placeholder": "Rechercher client ou référence...",
       "assign_driver_msg": "Veuillez choisir le livreur qui effectuera la livraison avant de marquer comme prêt.",
+      "driver_responsible_msg": "Cette commande est assignée au livreur {{name}}. Le livreur doit confirmer la livraison et enregistrer le paiement.",
+      "assign_driver": "Assigner un livreur",
+      "change_driver": "Changer le livreur / date",
+      "no_drivers": "Aucun livreur disponible",
       "change_status": "Changer le statut",
       "change_status_msg": "Voulez-vous passer la commande au statut",
       "driver_pickup": "LIVREUR (COLLECTE)",
@@ -291,7 +337,8 @@
         "confirm_received": "Confirmer la réception",
         "start_processing": "Démarrer le traitement",
         "mark_ready": "Marquer comme prêt",
-        "mark_delivered": "Marquer comme livré"
+        "mark_delivered": "Marquer comme livré",
+        "waiting_driver": "En attente du livreur"
       }
     },
     "users": {
@@ -365,12 +412,16 @@
       }
     },
     "items": {
-      "photo_error": "Échec de l'envoi de l'image"
+      "photo_error": "Échec de l'envoi de l'image",
+      "default_item_name": "Tapis",
+      "whatsapp_label": "WhatsApp"
     },
     "map_picker": {
       "title": "Sélectionner l'emplacement",
       "confirm_btn": "Confirmer cet emplacement",
-      "search_placeholder": "Rechercher adresse, quartier, ville..."
+      "search_placeholder": "Rechercher adresse, quartier, ville...",
+      "selected_location": "📍 Emplacement sélectionné",
+      "unknown_address": "Adresse inconnue"
     },
     "clients": {
       "title": "Clients",
@@ -394,7 +445,9 @@
       "total_count": "au total",
       "client_since": "Client depuis",
       "no_phone": "Pas de numéro",
-      "no_address": "Pas d'adresse"
+      "no_address": "Pas d'adresse",
+      "no_email": "Pas d'email",
+      "details_title": "Fiche Client"
     },
     "map": {
       "title": "Carte des commandes",
@@ -402,6 +455,110 @@
       "empty_title": "Aucune commande trouvée",
       "empty_sub": "Ajustez vos filtres ou la zone de recherche",
       "view_order": "Voir →"
+    },
+    "more": {
+      "management": "Gestion",
+      "catalog_sub": "Gérer les services et tarifs",
+      "team_sub": "Gérer les comptes employés",
+      "map_sub": "Vue géographique des livraisons",
+      "settings": "Paramètres",
+      "lang_sub": "Changer la langue de l'application",
+      "notif_sub": "Historique des alertes",
+      "map_title": "Carte des commandes",
+      "stats_sub": "Revenus, commandes et performances"
     }
+  },
+  "stats": {
+    "title": "Statistiques",
+    "this_week": "Cette semaine",
+    "this_month": "Ce mois",
+    "all_time": "Tout",
+    "received_orders": "Commandes reçues",
+    "delivered_orders": "Commandes livrées",
+    "orders_count": "Nombre de commandes",
+    "pieces_count": "Nombre de pièces",
+    "total_area": "Surface totale",
+    "total_paid": "Total encaissé",
+    "total_unpaid": "Total non payé",
+    "total_items": "Total articles",
+    "total_m2": "Total m²",
+    "total_price": "Total commandes"
+  },
+  "livreur": {
+    "greeting": "Bonjour,",
+    "profile_title": "Mon Profil",
+    "role": "LIVREUR",
+    "daily_summary": "Résumé du jour",
+    "language": "Langue",
+    "info": "Informations",
+    "deliveries": "Livraisons",
+    "pickups": "Collectes",
+    "collected": "Encaissé",
+    "map_title": "Carte des missions",
+    "no_missions_map": "Aucune mission sur la carte",
+    "no_missions_map_sub": "Les missions sans coordonnées GPS ne s'affichent pas",
+    "all_done": "Toutes les missions sont terminées!",
+    "good_day": "Bonne journée",
+    "next_mission": "PROCHAINE MISSION",
+    "delivery_badge": "🚚 LIVRAISON",
+    "pickup_badge": "📦 COLLECTE",
+    "remaining_to_collect": "Reste à encaisser",
+    "items_to_collect": "article(s) à collecter",
+    "start_mission": "Démarrer la mission →",
+    "view_map": "Voir la carte",
+    "missions_today": "Missions du jour",
+    "see_all": "Voir tout →",
+    "more_missions": "+ {{count}} autres missions",
+    "missions_title": "Missions",
+    "deliveries_tab": "Livraisons",
+    "pickups_tab": "Collectes",
+    "no_delivery": "Aucune livraison",
+    "no_delivery_sub": "Vous êtes à jour!",
+    "no_pickup": "Aucune collecte prévue",
+    "no_pickup_sub": "Profitez de votre journée",
+    "to_collect_pill": "💰 {{amount}} DH à encaisser",
+    "already_paid": "✅ Déjà payé",
+    "items_count": "{{count}} article(s)",
+    "deliver_btn": "🚚 LIVRER",
+    "collect_btn": "📦 COLLECTER",
+    "refuse_btn": "❌ REFUS",
+    "amount_to_collect": "À encaisser :",
+    "nothing": "RIEN (0 DH)",
+    "all_amount": "TOUT ({{amount}} DH)",
+    "other_amount": "MONTANT DIFFÉRENT",
+    "confirm_delivery_btn": "✅ CONFIRMER LA LIVRAISON",
+    "confirm_btn_disabled": "CONFIRMER",
+    "delivery_problem": "🚚 Problème livraison",
+    "pickup_problem": "📦 Problème collecte",
+    "notes_placeholder": "Expliquez en quelques mots...",
+    "confirm_pickup_title": "Collecte confirmée! 📦",
+    "send_receipt_pickup": "Envoyer le reçu au client?",
+    "confirm_delivery_title": "Livraison confirmée! ✅",
+    "send_receipt_delivery": "Envoyer le reçu?",
+    "collect_error": "Impossible de confirmer la collecte",
+    "action_failed": "Action échouée",
+    "save_failed": "Impossible d'enregistrer.",
+    "send_failed": "Impossible d'envoyer",
+    "print_failed": "Impossible d'imprimer le reçu",
+    "filter_all": "Tous",
+    "filter_deliveries": "Livraisons",
+    "filter_pickups": "Collectes",
+    "reason_client_absent": "Client absent",
+    "reason_client_refused": "Client a refusé",
+    "reason_payment_refused": "Refus de payer",
+    "reason_address_not_found": "Adresse introuvable",
+    "reason_client_cancelled": "Client a annulé",
+    "reason_other": "Autre",
+    "reason_absent": "Client absent",
+    "reason_unreachable": "Client injoignable",
+    "reason_address": "Adresse introuvable",
+    "select_reason": "Veuillez sélectionner une raison",
+    "refuse_title": "Signaler un problème",
+    "section_today": "Aujourd'hui",
+    "section_overdue": "En retard",
+    "no_overdue": "Aucune livraison en retard",
+    "no_overdue_sub": "Toutes les livraisons sont à jour.",
+    "send_receipt_prompt": "Voulez-vous envoyer le reçu au client ?",
+    "driver_fallback": "Livreur"
   }
 }

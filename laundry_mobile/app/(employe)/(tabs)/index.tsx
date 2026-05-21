@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Animated
+  RefreshControl, ActivityIndicator, Animated, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,9 +22,9 @@ function changeLanguage(lang: string) {
 }
 
 const STATUS_CARDS = [
-  { key: 'PENDING_PICKUP', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
-  { key: 'PICKED_UP',      color: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
-  { key: 'READY_FOR_DELIVERY', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
+  { key: 'PENDING_PICKUP',     color: '#C2185B', bg: 'rgba(194, 24, 91, 0.08)' },
+  { key: 'PICKED_UP',          color: '#D32F2F', bg: 'rgba(211, 47, 47, 0.08)' },
+  { key: 'READY_FOR_DELIVERY', color: '#00897B', bg: 'rgba(0, 137, 123, 0.08)' },
 ];
 
 export default function EmployeDashboard() {
@@ -32,6 +32,7 @@ export default function EmployeDashboard() {
   const isArabic = i18nHook.language === 'ar';
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { settings } = useSelector((state: RootState) => state.settings);
   const { clearOrder, setMode } = useOrderCreation();
 
   const [overview, setOverview] = useState<any>(null);
@@ -100,22 +101,31 @@ export default function EmployeDashboard() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={isArabic && { alignItems: 'flex-end' }}>
-            <Text style={styles.greeting}>{t('dashboard.greeting')}</Text>
-            <Text style={styles.userName}>{user?.name || 'Employé'}</Text>
+      <SafeAreaView edges={['top']} style={styles.headerSafe}>
+        <View style={styles.headerContent}>
+          {/* Logo */}
+          <View style={styles.logoCircle}>
+            {settings.logoUrl ? (
+              <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
+            ) : (
+              <Ionicons name="water-outline" size={28} color={AdminColors.primary} />
+            )}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity
-              style={styles.headerBtn}
-              onPress={() => changeLanguage(isArabic ? 'fr' : 'ar')}
-            >
-              <Text style={styles.headerBtnText}>{isArabic ? 'FR' : 'AR'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={20} color="white" />
-            </TouchableOpacity>
+          
+          {/* Actions + App Name */}
+          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={() => changeLanguage(isArabic ? 'fr' : 'ar')}
+              >
+                <Text style={styles.headerBtnText}>{isArabic ? 'FR' : 'AR'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerBtn} onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.headerAppName}>{settings.appName}</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -136,7 +146,7 @@ export default function EmployeDashboard() {
           <View style={[styles.readyBanner, isArabic && { flexDirection: 'row-reverse' }]}>
             <Animated.View style={[styles.readyDot, { opacity: readyAnim }]} />
             <Text style={styles.readyText}>
-              {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready', { defaultValue: 'Prêt à livrer' })}
+              {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready')}
             </Text>
           </View>
         )}
@@ -190,14 +200,19 @@ export default function EmployeDashboard() {
         </Text>
         <View style={[styles.statusRow, isArabic && { flexDirection: 'row-reverse' }]}>
           {STATUS_CARDS.map(({ key, color, bg }) => (
-            <View key={key} style={[styles.statusCard, { borderTopColor: color, backgroundColor: bg }]}>
+            <TouchableOpacity
+              key={key}
+              style={[styles.statusCard, { borderTopColor: color, backgroundColor: bg }]}
+              onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { status: key } })}
+              activeOpacity={0.75}
+            >
               <Text style={[styles.statusCount, { color }]}>
                 {overview?.[key]?.count ?? 0}
               </Text>
               <Text style={styles.statusLabel} numberOfLines={2}>
                 {t(`status.${key}`)}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
@@ -234,7 +249,7 @@ export default function EmployeDashboard() {
 
         {/* Recent Orders */}
         <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
-          {t('dashboard.recent_orders', { defaultValue: 'Commandes récentes' })}
+          {t('dashboard.recent_orders')}
         </Text>
 
         {recentOrders.length === 0 ? (
@@ -267,18 +282,15 @@ export default function EmployeDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6F8' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: AdminColors.primary },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  greeting: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  userName: { fontSize: 20, color: 'white', fontWeight: '700', marginTop: 2 },
+  headerSafe: { backgroundColor: AdminColors.primary, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 30 },
+  logoCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...AdminShadows.shadowSmall },
+  logoImage: { width: 52, height: 52, borderRadius: 26 },
+  headerTitleCol: { flex: 1, alignItems: 'flex-end' },
+  headerScreenTitle: { color: 'white', fontSize: 22, fontWeight: '900' },
+  headerAppName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   headerBtn: {
     width: 36,
     height: 36,
@@ -288,7 +300,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerBtnText: { color: 'white', fontWeight: '700', fontSize: 12 },
-  scroll: { flex: 1 },
+  scroll: { flex: 1, marginTop: -20 },
   readyBanner: {
     flexDirection: 'row',
     alignItems: 'center',

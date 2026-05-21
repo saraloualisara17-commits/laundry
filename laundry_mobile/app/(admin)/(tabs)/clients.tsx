@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  TextInput, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Modal,
+  ScrollView,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
@@ -31,6 +35,8 @@ export default function ClientsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const searchTimeout = React.useRef<any>(null);
 
   const fetchClients = async (pageNum: number, isRefresh: boolean = false, currentSearch?: string) => {
@@ -41,20 +47,28 @@ export default function ClientsScreen() {
       const params = {
         search: currentSearch && currentSearch.length > 1 ? currentSearch : undefined,
         page: pageNum,
-        limit: 20
+        limit: 20,
+        createdAfter: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
       };
 
       const res = await adminApi.getClients(params);
       const newClients = res.data.content || res.data || [];
+      const clientsArray = Array.isArray(newClients) ? newClients : [];
       
       if (isRefresh || pageNum === 0) {
-        setClients(newClients);
+        setClients(clientsArray);
       } else {
-        setClients(prev => [...prev, ...newClients]);
+        setClients(prev => {
+          const combined = [...prev, ...clientsArray];
+          const unique = combined.filter((item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id)
+          );
+          return unique;
+        });
       }
 
-      setHasMore(newClients.length === 20);
-      setTotalCount(res.data.totalElements || newClients.length);
+      setHasMore(clientsArray.length === 20);
+      setTotalCount(res.data.totalElements || (isRefresh || pageNum === 0 ? clientsArray.length : totalCount));
     } catch (error) {
       console.error('Fetch clients error:', error);
     } finally {
@@ -81,7 +95,7 @@ export default function ClientsScreen() {
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [search]);
+  }, [search, selectedDate]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -90,7 +104,8 @@ export default function ClientsScreen() {
   };
 
   const loadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loadingMore && hasMore && !loading) {
+      setLoadingMore(true);
       const nextPage = page + 1;
       setPage(nextPage);
       fetchClients(nextPage, false, search);
@@ -138,7 +153,7 @@ export default function ClientsScreen() {
             <Text style={styles.countBadgeText}>{item.totalCommandes || 0} {t('dashboard.orders_count')}</Text>
           </View>
           {item.createdAt && (
-            <Text style={styles.sinceText}>{t('admin.clients.client_since')} {new Date(item.createdAt).toLocaleDateString(isArabic ? 'ar-EG' : 'fr-FR')}</Text>
+            <Text style={styles.sinceText}>{t('admin.clients.client_since')} {new Date(item.createdAt).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
           )}
         </View>
       </View>
@@ -174,6 +189,23 @@ export default function ClientsScreen() {
             onChangeText={setSearch}
           />
         </View>
+
+        <View style={[styles.filterRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <TouchableOpacity
+            style={[styles.filterBtn, selectedDate && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={14} color={selectedDate ? AdminColors.primary : AdminColors.textMuted} />
+            <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+              {selectedDate ? selectedDate.toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
+            </Text>
+            {selectedDate && (
+              <TouchableOpacity onPress={(e) => { e.stopPropagation(); setSelectedDate(null); }} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={16} color={AdminColors.primary} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
 
       <FlatList
@@ -199,6 +231,44 @@ export default function ClientsScreen() {
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={AdminColors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 40 }} />}
       />
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={styles.modalTitle}>{t('admin.orders.filter_date')}</Text>
+              <TouchableOpacity onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}>
+                <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={selectedDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              themeVariant="light"
+              onChange={(event, date) => {
+                if (Platform.OS === 'android') {
+                  setShowDatePicker(false);
+                  if (event.type === 'set' && date) setSelectedDate(date);
+                } else {
+                  if (date) setSelectedDate(date);
+                }
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={{ marginTop: 20, backgroundColor: AdminColors.primary, borderRadius: 14, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>{t('common.confirm')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -259,6 +329,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: AdminColors.textPrimary,
     fontWeight: '500',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  filterBtn: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 6,
+    ...AdminShadows.shadowSmall,
+  },
+  filterBtnActive: {
+    borderColor: AdminColors.primary,
+    borderWidth: 1.5,
+    backgroundColor: AdminColors.primary100,
+  },
+  filterPlaceholderText: {
+    flex: 1,
+    fontSize: 13,
+    color: AdminColors.textMuted,
+    fontWeight: '500',
+  },
+  filterSelectedText: {
+    flex: 1,
+    fontSize: 13,
+    color: AdminColors.textPrimary,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalDismiss: { flex: 1 },
+  modalSheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: AdminColors.textPrimary,
   },
   listContent: {
     padding: 16,

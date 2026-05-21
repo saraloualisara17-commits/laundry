@@ -4,12 +4,14 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
+import { useTranslation } from 'react-i18next';
 
 const PRIMARY = '#0D7377';
 const TEXT_MUTED = '#94A3B8';
 
 export default function LivreurLayout() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { readyDeliveries, readyOrders } = useSelector((s: RootState) => s.livreur);
   const missionCount = (readyDeliveries?.length || 0) + (readyOrders?.length || 0);
 
@@ -21,8 +23,8 @@ export default function LivreurLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: 68 + (Platform.OS === 'ios' ? insets.bottom : 10),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          height: 68 + insets.bottom,
+          paddingBottom: insets.bottom + 10,
           paddingTop: 10,
           elevation: 12,
           shadowColor: '#000',
@@ -38,7 +40,7 @@ export default function LivreurLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarLabel: 'Accueil',
+          tabBarLabel: t('tabs.home'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrap}>
               {focused && <View style={styles.pill} />}
@@ -50,7 +52,7 @@ export default function LivreurLayout() {
       <Tabs.Screen
         name="missions"
         options={{
-          tabBarLabel: 'Missions',
+          tabBarLabel: t('tabs.missions'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrap}>
               {focused && <View style={styles.pill} />}
@@ -69,7 +71,7 @@ export default function LivreurLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarLabel: 'Profil',
+          tabBarLabel: t('tabs.profile'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrap}>
               {focused && <View style={styles.pill} />}
@@ -78,11 +80,8 @@ export default function LivreurLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="map-view" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       {/* Hidden screens — accessible via Stack push */}
-      <Tabs.Screen name="map-view" options={{ href: null }} />
-      {/* Legacy screens hidden (map, deliveries, create-order) */}
-      <Tabs.Screen name="map" options={{ href: null }} />
-      <Tabs.Screen name="deliveries" options={{ href: null }} />
       <Tabs.Screen name="create-order" options={{ href: null }} />
     </Tabs>
   );

@@ -36,8 +36,14 @@ export const clientsApi = {
   /**
    * Search clients by name or phone.
    */
-  searchClients: (query: string) => 
+  searchClients: (query: string) =>
     api.get<ClientDTO[]>('/api/clients/search', { params: { query } }),
+
+  /**
+   * Get all orders for a specific client.
+   */
+  getClientCommandes: (id: number | string) =>
+    api.get<any[]>(`/api/clients/${id}/commandes`),
 };
 
 export default clientsApi;

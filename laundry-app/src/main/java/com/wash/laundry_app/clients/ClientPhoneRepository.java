@@ -5,4 +5,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ClientPhoneRepository extends JpaRepository<ClientPhone, Long> {
+    java.util.Optional<ClientPhone> findFirstByClientId(Long clientId);
 }

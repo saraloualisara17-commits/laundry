@@ -5,7 +5,7 @@ export const driversApi = {
    * Get all active users (filtered as drivers in some contexts)
    */
   getActiveDrivers: () =>
-    client.get('/admin/active-users'),
+    client.get('/api/admin/active-users'),
 
   /**
    * Get dashboard statistics for the current livreur

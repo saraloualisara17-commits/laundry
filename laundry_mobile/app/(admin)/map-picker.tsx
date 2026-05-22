@@ -9,7 +9,7 @@ import {
   FlatList,
   Platform
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -38,7 +38,8 @@ export default function MapPickerScreen() {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?` +
         `format=json&q=${encoded}&limit=5&` +
-        `addressdetails=1&accept-language=fr`
+        `addressdetails=1&accept-language=fr`,
+        { headers: { 'User-Agent': 'AstraPro-LaundryApp/1.0' } }
       );
       const data = await res.json();
       setSearchResults(data);
@@ -79,20 +80,22 @@ export default function MapPickerScreen() {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?` +
         `format=json&lat=${lat}&lon=${lng}&` +
-        `accept-language=fr`
+        `accept-language=fr`,
+        { headers: { 'User-Agent': 'AstraPro-LaundryApp/1.0' } }
       );
       const data = await res.json();
       const addr = data.address || {};
-      
+
       const street = addr.road || addr.neighbourhood || addr.suburb || '';
       const city = addr.city || addr.town || addr.village || addr.municipality || '';
       const region = addr.state || addr.county || '';
-      
+
       setResolvedAddress([street, city].filter(Boolean).join(', '));
       setResolvedRegion(region);
       setSearchQuery(data.display_name?.split(',')[0] || '');
     } catch(e) {
       console.warn('Reverse geocode failed:', e);
+      setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     }
   };
 
@@ -113,7 +116,7 @@ export default function MapPickerScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
         initialRegion={{
           latitude: 33.9716,
           longitude: -6.8498,

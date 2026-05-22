@@ -41,8 +41,8 @@ public class Client {
     private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by_livreur_id", nullable = false)
-    private User createdByLivreur;
+    @JoinColumn(name = "created_by_id", nullable = false)
+    private User createdBy;
 
     @PrePersist
     protected void onCreate() {

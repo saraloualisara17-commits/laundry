@@ -94,6 +94,9 @@
     "at_local": "Au Local",
     "paid_debts": "Dettes Payées",
     "orders_count_completed": "Commandes réglées",
+    "self_submitted_orders": "Commandes Clients Web",
+    "self_submitted_sub": "Commandes passées par les clients eux-mêmes",
+    "no_self_submitted": "Aucune commande client web",
     "quick_actions": "Actions rapides",
     "see_orders": "Voir commandes",
     "stats_error": "Impossible de charger les statistiques",
@@ -560,5 +563,13 @@
     "no_overdue_sub": "Toutes les livraisons sont à jour.",
     "send_receipt_prompt": "Voulez-vous envoyer le reçu au client ?",
     "driver_fallback": "Livreur"
+  },
+  "orders": {
+    "no_pickup_driver": "Sans livreur de collecte",
+    "assign_pickup_driver": "Assigner un livreur de collecte",
+    "reassign_pickup_driver": "Changer le livreur de collecte",
+    "edit_items": "Articles",
+    "items_updated": "Articles mis à jour avec succès",
+    "not_your_order": "Vous n'êtes pas le livreur de cet ordre"
   }
 }

@@ -14,25 +14,25 @@ export const ordersApi = {
    * Get paginated orders with filters
    */
   getOrders: (params: OrderFilters) =>
-    client.get<PaginatedResponse<any>>('/admin/commandes', { params }),
+    client.get<PaginatedResponse<any>>('/api/admin/commandes', { params }),
 
   /**
    * Get a single order by ID
    */
   getOrder: (id: number | string) =>
-    client.get(`/admin/commandes/${id}`),
+    client.get(`/api/admin/commandes/${id}`),
 
   /**
    * Create a new order
    */
   createOrder: (data: any) =>
-    client.post('/admin/commandes', data),
+    client.post('/api/admin/commandes', data),
 
   /**
    * Update an existing order
    */
   updateOrder: (id: number | string, data: any) =>
-    client.put(`/admin/commandes/${id}`, data),
+    client.put(`/api/admin/commandes/${id}`, data),
 
   /**
    * Update order status
@@ -105,6 +105,12 @@ export const ordersApi = {
     client.get<string>(`/api/commandes/${id}/receipt/delivery/thermal`, {
       responseType: 'text',
     }),
+
+  assignPickupDriver: (id: number | string, livreurId: string | number) =>
+    client.put(`/api/admin/commandes/${id}`, { livreurId }),
+
+  updateOrderItemsByDriver: (id: number | string, tapis: any[]) =>
+    client.patch(`/api/livreur/commandes/${id}/items`, tapis),
 
   reportFailedAttempt: (
     orderId: number | string,

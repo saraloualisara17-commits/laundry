@@ -94,6 +94,9 @@
     "at_local": "بالمحل",
     "paid_debts": "الديون المدفوعة",
     "orders_count_completed": "الطلبات المسواة",
+    "self_submitted_orders": "طلبات العملاء (الويب)",
+    "self_submitted_sub": "طلبات أرسلها العملاء بأنفسهم",
+    "no_self_submitted": "لا توجد طلبات من الويب",
     "quick_actions": "إجراءات سريعة",
     "see_orders": "عرض الطلبات",
     "stats_error": "تعذر تحميل الإحصائيات",
@@ -560,5 +563,13 @@
     "no_overdue_sub": "جميع التوصيلات في الموعد.",
     "send_receipt_prompt": "هل تريد إرسال الإيصال للزبون؟",
     "driver_fallback": "مندوب"
+  },
+  "orders": {
+    "no_pickup_driver": "بدون مندوب استلام",
+    "assign_pickup_driver": "تعيين مندوب الاستلام",
+    "reassign_pickup_driver": "تغيير مندوب الاستلام",
+    "edit_items": "المنتجات",
+    "items_updated": "تم تحديث المنتجات بنجاح",
+    "not_your_order": "أنت لست مندوب استلام هذا الطلب"
   }
 }

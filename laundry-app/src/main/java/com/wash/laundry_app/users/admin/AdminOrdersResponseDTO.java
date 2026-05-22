@@ -26,6 +26,7 @@ public class AdminOrdersResponseDTO {
     private boolean last;
 
     // Summary stats computed over the ENTIRE filtered result set (not just this page)
-    private double totalValue;
-    private long totalVolumes;
+    private java.math.BigDecimal totalValue;    // sum of montantPaye (total collected)
+    private java.math.BigDecimal totalUnpaid;   // sum of (montantTotal - montantPaye) (total remaining)
+    private Long totalVolumes;
 }

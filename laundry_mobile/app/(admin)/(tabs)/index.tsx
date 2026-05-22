@@ -421,7 +421,31 @@ export default function AdminDashboard() {
               </TouchableOpacity>
             </View>
 
-            {/* 7. Paid Debts Card (Large bottom card) */}
+            {/* 7. Self-Submitted Orders Card */}
+            <View style={styles.unpaidWrapper}>
+              <TouchableOpacity
+                style={[styles.unpaidCard, { borderColor: '#6366F1' }]}
+                onPress={() => router.push('/(admin)/self-submitted-orders')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.unpaidIcon, { backgroundColor: '#EEF2FF' }]}>
+                    <Text style={{ fontSize: 24 }}>🌐</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                      {t('dashboard.self_submitted_orders')}
+                    </Text>
+                    <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                      {t('dashboard.self_submitted_sub')}
+                    </Text>
+                  </View>
+                  <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={20} color={AdminColors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* 8. Paid Debts Card (Large bottom card) */}
             {overview?.PAID_DEBTS && (
               <View style={styles.unpaidWrapper}>
                 <TouchableOpacity 

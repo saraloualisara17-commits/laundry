@@ -71,7 +71,7 @@ export default function UsersScreen() {
     try {
       const [activeRes, inactiveRes] = await Promise.all([
         adminApi.getUsers(),
-        client.get('/admin/inactive-users')
+        client.get('/api/admin/inactive-users')
       ]);
       
       const allUsers = [

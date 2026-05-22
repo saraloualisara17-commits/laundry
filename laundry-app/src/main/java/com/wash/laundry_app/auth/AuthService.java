@@ -23,10 +23,24 @@ public class AuthService {
             User cached = (User) attrs.getRequest().getAttribute("_currentUser");
             if (cached != null) return cached;
         }
+        
         // Fallback: fetch from DB (e.g. scheduled tasks, tests)
         var authenticated = SecurityContextHolder.getContext().getAuthentication();
-        var userId = (Long) authenticated.getPrincipal();
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("Utilisateur introuvable"));
+        if (authenticated == null || !authenticated.isAuthenticated()) {
+            return null;
+        }
+        
+        Object principal = authenticated.getPrincipal();
+        if (principal instanceof String) {
+            // e.g. "anonymousUser"
+            return null;
+        }
+        
+        if (principal instanceof Long userId) {
+            return userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException("Utilisateur introuvable"));
+        }
+        
+        return null;
     }
 }

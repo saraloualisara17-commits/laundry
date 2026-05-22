@@ -13,37 +13,37 @@ export const usersApi = {
    * Get all active users
    */
   getActiveUsers: () =>
-    client.get('/admin/active-users'),
+    client.get('/api/admin/active-users'),
 
   /**
    * Create a new user
    */
   createUser: (data: UserCreateRequest) =>
-    client.post('/admin/create-user', data),
+    client.post('/api/admin/create-user', data),
 
   /**
    * Update an existing user
    */
   updateUser: (id: number | string, data: Partial<UserCreateRequest>) =>
-    client.put(`/admin/update-user/${id}`, data),
+    client.put(`/api/admin/update-user/${id}`, data),
 
   /**
    * Activate a user account
    */
   activateUser: (id: number | string) =>
-    client.patch(`/admin/active-user/${id}`),
+    client.patch(`/api/admin/active-user/${id}`),
 
   /**
    * Deactivate a user account
    */
   deactivateUser: (id: number | string) =>
-    client.patch(`/admin/inactive-user/${id}`),
+    client.patch(`/api/admin/inactive-user/${id}`),
 
   /**
    * Reset user password
    */
   resetPassword: (id: number | string, password: string) =>
-    client.put(`/admin/change-user-password/${id}`, { password }),
+    client.put(`/api/admin/change-user-password/${id}`, { password }),
 };
 
 export default usersApi;

@@ -44,7 +44,7 @@ import ClientTab from '../../components/orders/tabs/ClientTab';
 import SuiviTab from '../../components/orders/tabs/SuiviTab';
 import { getWorkflowAction, OrderStatus, WorkflowAction, isDelivered } from '../../constants/orderWorkflow';
 import { useOrder, useUpdateOrderStatus, useAddPayment, useAddOrderImages } from '../../src/hooks/query/useOrder';
-import { useDriversList, useAssignDeliveryDriver } from '../../src/hooks/query/useDrivers';
+import { useDriversList, usePickupDriversList, useAssignDeliveryDriver, useAssignPickupDriver } from '../../src/hooks/query/useDrivers';
 import { useDeleteOrder } from '../../src/hooks/query/useOrders';
 import * as Haptics from 'expo-haptics';
 
@@ -80,29 +80,36 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
 
   // Queries
   const { payments, history, refetch, isRefreshing } = useOrder(id as string);
-  const { data: drivers = [] } = useDriversList();
+  const { data: drivers = [], isLoading: driversLoading, isError: driversError } = useDriversList();
+  const { data: pickupDrivers = [], isLoading: pickupDriversLoading } = usePickupDriversList();
 
   // Mutations
   const updateStatusMutation = useUpdateOrderStatus();
   const addPaymentMutation = useAddPayment();
   const assignDriverMutation = useAssignDeliveryDriver();
+  const assignPickupDriverMutation = useAssignPickupDriver();
   const deleteOrderMutation = useDeleteOrder();
 
   const [activeTab, setActiveTab] = useState<'articles' | 'client' | 'suivi'>('articles');
   const [viewImage, setViewImage] = useState<string | null>(null);
 
   const permissions = useOrderPermissions(currentUser, order);
-  const { 
-    canEdit, 
-    canDelete, 
-    canAddLaboPhoto, 
+  const {
+    canEdit,
+    canDelete,
+    canAddLaboPhoto,
     canAddReceptionPhoto,
     canAddPayment,
+    canAssignPickupDriver,
     canAssignDriver
   } = permissions;
 
   const [deliveryDate, setDeliveryDate] = useState<Date>(new Date());
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
+  // Pickup driver assignment state
+  const [showPickupDriverModal, setShowPickupDriverModal] = useState(false);
+  const [selectedPickupDriverId, setSelectedPickupDriverId] = useState<string | null>(null);
 
   const handleClientPress = useCallback((clientId: number | string) => {
     router.push(`/client/${clientId}`);
@@ -203,6 +210,19 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       Alert.alert(t('common.error'), t('common.error_msg'));
     }
   }, [id, selectedDriverId, deliveryDate, order?.status, assignDriverMutation, performStatusUpdate, t]);
+
+  const handleAssignPickupDriver = useCallback(async () => {
+    if (!selectedPickupDriverId) {
+      Alert.alert(t('common.error'), t('admin.orders.filter_driver'));
+      return;
+    }
+    try {
+      await assignPickupDriverMutation.mutateAsync({ id: id as string, livreurId: selectedPickupDriverId });
+      setShowPickupDriverModal(false);
+    } catch (error) {
+      Alert.alert(t('common.error'), t('common.error_msg'));
+    }
+  }, [id, selectedPickupDriverId, assignPickupDriverMutation, t]);
 
   const handleAddPhotos = useCallback(async (type: 'reception' | 'apres_traitement') => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -590,8 +610,32 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             >
               <Feather name="truck" size={16} color={Colors.primary} />
               <Text style={styles.assignDriverText}>
-                {t('admin.orders.assign_driver', { defaultValue: 'Assigner un livreur' })}
+                {t('admin.orders.assign_driver', { defaultValue: 'Assigner un livreur de livraison' })}
               </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* ── Pickup Driver Assignment ── */}
+          {canAssignPickupDriver && (
+            <TouchableOpacity
+              style={[styles.assignDriverBtn, order.livreur && { borderColor: '#D97706', backgroundColor: '#FFFBEB' }]}
+              onPress={() => {
+                setSelectedPickupDriverId(order.livreur?.id ? String(order.livreur.id) : null);
+                setShowPickupDriverModal(true);
+              }}
+            >
+              <Feather name="package" size={16} color={order.livreur ? '#D97706' : Colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.assignDriverText, order.livreur && { color: '#D97706' }]}>
+                  {order.livreur
+                    ? t('orders.reassign_pickup_driver', { defaultValue: 'Changer le livreur de collecte' })
+                    : t('orders.assign_pickup_driver', { defaultValue: 'Assigner un livreur de collecte' })}
+                </Text>
+                {order.livreur && (
+                  <Text style={{ fontSize: 12, color: '#92400E', marginTop: 1 }}>{order.livreur.name}</Text>
+                )}
+              </View>
+              <Feather name="edit-2" size={14} color={order.livreur ? '#D97706' : Colors.primary} />
             </TouchableOpacity>
           )}
         </View>
@@ -757,7 +801,18 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                 <Text style={[styles.inputLabel, { marginTop: 24 }, isArabic && { textAlign: 'right' }]}>
                   {t('admin.orders.filter_driver')}
                 </Text>
-                {drivers.length === 0 && (
+                {driversLoading && (
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 16 }} />
+                )}
+                {!driversLoading && driversError && (
+                  <View style={styles.emptyDrivers}>
+                    <Feather name="alert-circle" size={24} color="#EF4444" />
+                    <Text style={[styles.emptyDriversText, { color: '#EF4444' }]}>
+                      {t('common.error_msg')}
+                    </Text>
+                  </View>
+                )}
+                {!driversLoading && !driversError && drivers.length === 0 && (
                   <View style={styles.emptyDrivers}>
                     <Feather name="users" size={24} color={Colors.textMuted} />
                     <Text style={styles.emptyDriversText}>
@@ -822,6 +877,87 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
         </View>
       </Modal>
 
+
+      {/* ── Pickup Driver Assignment Modal ── */}
+      <Modal visible={showPickupDriverModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={() => setShowPickupDriverModal(false)} />
+          <View style={[styles.modalSheet, { height: '70%' }]}>
+            <View style={styles.modalHandle} />
+            <View style={[styles.modalHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.modalIconBadge, { backgroundColor: '#FEF3C7' }]}>
+                <Feather name="package" size={20} color="#D97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, isArabic && { textAlign: 'right' }]}>
+                  {t('orders.assign_pickup_driver', { defaultValue: 'Livreur de collecte' })}
+                </Text>
+                <Text style={[styles.modalSubtitle, isArabic && { textAlign: 'right' }]}>
+                  #{order.numeroCommande}
+                </Text>
+              </View>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              <View style={styles.modalBody}>
+                <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>
+                  {t('admin.orders.filter_driver')}
+                </Text>
+                {pickupDriversLoading && (
+                  <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: 16 }} />
+                )}
+                {!pickupDriversLoading && pickupDrivers.length === 0 && (
+                  <View style={styles.emptyDrivers}>
+                    <Feather name="users" size={24} color={Colors.textMuted} />
+                    <Text style={styles.emptyDriversText}>{t('admin.orders.no_drivers')}</Text>
+                  </View>
+                )}
+                {pickupDrivers.map((driver: any) => {
+                  const selected = selectedPickupDriverId === String(driver.id);
+                  return (
+                    <TouchableOpacity
+                      key={driver.id}
+                      style={[styles.driverOption, selected && styles.driverOptionSelected, isArabic && { flexDirection: 'row-reverse' }]}
+                      onPress={() => setSelectedPickupDriverId(String(driver.id))}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.driverAvatarSmall, { backgroundColor: selected ? 'rgba(255,255,255,0.25)' : Colors.primary100 }]}>
+                        <Text style={[styles.driverAvatarText, { color: selected ? 'white' : Colors.primaryDark }]}>
+                          {driver.name?.[0]?.toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.driverOptionName, selected && { color: 'white' }]}>{driver.name}</Text>
+                        {driver.phone && (
+                          <Text style={{ fontSize: 12, color: selected ? 'rgba(255,255,255,0.75)' : Colors.textMuted, marginTop: 2 }}>{driver.phone}</Text>
+                        )}
+                      </View>
+                      {selected
+                        ? <Ionicons name="checkmark-circle" size={22} color="white" />
+                        : <View style={styles.driverRadioEmpty} />
+                      }
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
+              <TouchableOpacity style={[styles.secondaryModalBtn, { flex: 1 }]} onPress={() => setShowPickupDriverModal(false)}>
+                <Text style={styles.secondaryModalBtnText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryModalBtn, { flex: 1.5, backgroundColor: '#D97706' }, !selectedPickupDriverId && { opacity: 0.5 }]}
+                onPress={handleAssignPickupDriver}
+                disabled={!selectedPickupDriverId || assignPickupDriverMutation.isPending}
+              >
+                {assignPickupDriverMutation.isPending
+                  ? <ActivityIndicator color="white" size="small" />
+                  : <Text style={styles.primaryModalBtnText}>{t('common.confirm')}</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Single Payment Modal */}
       <PaymentModal

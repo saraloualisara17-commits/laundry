@@ -8,9 +8,5 @@ public interface CommandeTapisRepository extends JpaRepository<CommandeTapis, Lo
 
     List<CommandeTapis> findByCommandeId(Long commandeId);
 
-    List<CommandeTapis> findByEtat(TapisEtat etat);
-
-    List<CommandeTapis> findByCommandeIdAndEtat(Long commandeId, TapisEtat etat);
-
     long countByCommandeId(Long commandeId);
 }

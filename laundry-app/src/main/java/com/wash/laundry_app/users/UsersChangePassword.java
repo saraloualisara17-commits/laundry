@@ -10,7 +10,7 @@ import lombok.Setter;
 
 public class UsersChangePassword {
     @NotBlank(message = "password is required ")
-    @Size(min = 6 ,max = 15,message = "password must be between 6 and 15 character")
+    @Size(min = 8, max = 128, message = "password must be between 8 and 128 characters")
     private String password;
 
     public String getPassword() {

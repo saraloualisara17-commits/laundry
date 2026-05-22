@@ -11,7 +11,7 @@ import AdminCommandeDetail from './pages/admin/AdminCommandeDetail'
 import AllClients from './pages/admin/AllClients'
 import ClientCommandes from './pages/admin/ClientCommandes'
 import AdminDashboard from './pages/admin/AdminDashboard'
-import CarpetTypes from './pages/admin/CarpetTypes'
+import CatalogPage from './pages/admin/CatalogPage'
 import PersistLogin from './routes/PersistLogin'
 import RegisterClient from './pages/livreur/RegisterClient'
 import Dashboard from './pages/livreur/LivreurDashboard'
@@ -29,6 +29,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import SuspendedAccount from './pages/errors/SuspendedAccount'
 import Forbidden from './pages/errors/Forbidden'
 import NotFound from './pages/errors/NotFound'
+import OrderLanding from './pages/public/OrderLanding'
 
 
 function App() {
@@ -39,6 +40,8 @@ function App() {
       <Provider store={store}>
         <BrowserRouter>
           <Routes>
+            {/* Public client order page — no auth required */}
+            <Route path="/order" element={<OrderLanding />} />
             <Route path="/compte-suspendu" element={<SuspendedAccount />} />
             <Route path="/404" element={<NotFound />} />
             <Route path="/interdit" element={<Forbidden />} />
@@ -59,7 +62,7 @@ function App() {
                   <Route path='/admin/commandes/:id' element={<AdminCommandeDetail />} />
                   <Route path='/admin/clients' element={<AllClients />} />
                   <Route path='/admin/clients/:clientId' element={<ClientCommandes />} />
-                  <Route path='/admin/carpet-types' element={<CarpetTypes />} />
+                  <Route path='/admin/catalog' element={<CatalogPage />} />
                 </Route>
 
                 <Route element={<RequireAuth allowedRoles={["livreur"]} />}>

@@ -1,6 +1,6 @@
 package com.wash.laundry_app.command;
 
-import com.wash.laundry_app.tapis.Tapis;
+import com.wash.laundry_app.catalog.Product;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "commande_tapis")
@@ -25,8 +27,8 @@ public class CommandeTapis {
     private Commande commande;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tapis_id", nullable = false)
-    private Tapis tapis;
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
 
     @Column(nullable = false)
     private Integer quantite = 1;
@@ -36,10 +38,6 @@ public class CommandeTapis {
 
     @Column(name = "sous_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal sousTotal;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TapisEtat etat = TapisEtat.en_attente;
 
     // ── Dimension-based pricing fields ──────────────────────────────────────
 
@@ -55,9 +53,33 @@ public class CommandeTapis {
     @Column(name = "prix_final", precision = 10, scale = 2)
     private BigDecimal prixFinal;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal longueur;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal poids;
+
+    @Column(name = "remise_montant", precision = 10, scale = 2)
+    private BigDecimal remiseMontant = BigDecimal.ZERO;
+
+    @Column(name = "tag_numero", length = 50)
+    private String tagNumero;
+
+    @Column(name = "notes", length = 1000)
+    private String notes;
+
+    @Column(name = "couleur", length = 50)
+    private String couleur;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "mode_tarification", length = 20)
     private ModeTarification modeTarification;
+
+    @Column(name = "remise_raison")
+    private String remiseRaison;
+
+    @OneToMany(mappedBy = "commandeTapis", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CommandeImage> images = new java.util.ArrayList<>();
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -70,20 +92,32 @@ public class CommandeTapis {
     public void setId(Long id) { this.id = id; }
     public Commande getCommande() { return commande; }
     public void setCommande(Commande commande) { this.commande = commande; }
-    public Tapis getTapis() { return tapis; }
-    public void setTapis(Tapis tapis) { this.tapis = tapis; }
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
     public Integer getQuantite() { return quantite; }
     public void setQuantite(Integer quantite) { this.quantite = quantite; }
     public BigDecimal getPrixUnitaire() { return prixUnitaire; }
     public void setPrixUnitaire(BigDecimal prixUnitaire) { this.prixUnitaire = prixUnitaire; }
     public BigDecimal getSousTotal() { return sousTotal; }
     public void setSousTotal(BigDecimal sousTotal) { this.sousTotal = sousTotal; }
-    public TapisEtat getEtat() { return etat; }
-    public void setEtat(TapisEtat etat) { this.etat = etat; }
     public BigDecimal getLargeur() { return largeur; }
     public void setLargeur(BigDecimal largeur) { this.largeur = largeur; }
     public BigDecimal getHauteur() { return hauteur; }
     public void setHauteur(BigDecimal hauteur) { this.hauteur = hauteur; }
+    public BigDecimal getLongueur() { return longueur; }
+    public void setLongueur(BigDecimal longueur) { this.longueur = longueur; }
+    public BigDecimal getPoids() { return poids; }
+    public void setPoids(BigDecimal poids) { this.poids = poids; }
+    public BigDecimal getRemiseMontant() { return remiseMontant; }
+    public void setRemiseMontant(BigDecimal remiseMontant) { this.remiseMontant = remiseMontant; }
+    public String getRemiseRaison() { return remiseRaison; }
+    public void setRemiseRaison(String remiseRaison) { this.remiseRaison = remiseRaison; }
+    public String getTagNumero() { return tagNumero; }
+    public void setTagNumero(String tagNumero) { this.tagNumero = tagNumero; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public String getCouleur() { return couleur; }
+    public void setCouleur(String couleur) { this.couleur = couleur; }
     public BigDecimal getPrixCalcule() { return prixCalcule; }
     public void setPrixCalcule(BigDecimal prixCalcule) { this.prixCalcule = prixCalcule; }
     public BigDecimal getPrixFinal() { return prixFinal; }

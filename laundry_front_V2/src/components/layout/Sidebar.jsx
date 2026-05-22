@@ -8,6 +8,7 @@ import {
   Wrench, 
   Users, 
   LayoutDashboard,
+  LayoutGrid,
   XCircle, 
   RefreshCw,
   HelpCircle,
@@ -27,7 +28,7 @@ const Sidebar = ({ user }) => {
     { name: t('nav.users'), path: '/admin/users-management', icon: Shield },
     { name: t('nav.orders'), path: '/admin/commandes', icon: ClipboardList },
     { name: t('nav.clients'), path: '/admin/clients', icon: Users },
-    { name: t('nav.carpet_types'), path: '/admin/carpet-types', icon: Layers },
+    { name: 'Catalogue', path: '/admin/catalog', icon: LayoutGrid },
   ];
 
   const livreurLinks = [

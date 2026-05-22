@@ -35,7 +35,7 @@ export default function CatalogScreen() {
     PER_M2: { label: t('admin.catalog.pricing.per_m2'), color: AdminColors.primary, icon: 'square-outline' },
     PER_UNIT: { label: t('admin.catalog.pricing.per_unit'), color: '#3B82F6', icon: 'list-outline' },
     PER_KG: { label: t('admin.catalog.pricing.per_kg'), color: '#F59E0B', icon: 'scale-outline' },
-    PER_LINEAR_M: { label: t('admin.catalog.pricing.per_linear_m'), color: '#8B5CF6', icon: 'ruler-outline' },
+    PER_LINEAR_M: { label: t('admin.catalog.pricing.per_linear_m'), color: '#8B5CF6', icon: 'resize-outline' },
     CUSTOM: { label: t('admin.catalog.pricing.custom'), color: AdminColors.textMuted, icon: 'create-outline' },
   };
 
@@ -448,10 +448,9 @@ export default function CatalogScreen() {
 
             <View style={styles.formField}>
               <AppInput
-                label={t('admin.catalog.category_name_ar')}
-                value={catForm.nomAr}
-                onChangeText={v => setCatForm({...catForm, nomAr: v})}
-                lang="ar"
+                label={t('admin.catalog.product_name')}
+                value={prodForm.nom}
+                onChangeText={v => setProdForm({...prodForm, nom: v})}
               />
             </View>
 

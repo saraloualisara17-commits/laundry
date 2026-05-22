@@ -180,7 +180,7 @@ function PickupCard({ order, onCollect, collecting, onReportProblem }: any) {
   const { t } = useTranslation();
   const addr = order.client?.addresses?.[0]?.address || order.clientAdresse;
   const phone = order.client?.phones?.[0]?.phoneNumber || order.clientPhone;
-  
+
   const itemsSummary = formatOrderItemsSummary(order.commandeTapis || order.tapis, t);
 
   return (
@@ -222,11 +222,11 @@ function PickupCard({ order, onCollect, collecting, onReportProblem }: any) {
               <Text style={[styles.utilBtnText, { color: C.primary }]}>{t('common.navigate')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.utilBtn, { backgroundColor: 'rgba(0,0,0,0.04)', borderColor: 'rgba(0,0,0,0.08)' }]}
-              onPress={() => router.push(`/order/${order.id}` as any)}
+              style={[styles.utilBtn, { backgroundColor: 'rgba(217,119,6,0.10)', borderColor: 'rgba(217,119,6,0.2)' }]}
+              onPress={() => router.push({ pathname: '/(livreur)/edit-order-items', params: { id: order.id } } as any)}
             >
-              <Ionicons name="list" size={18} color={Colors.textSecondary} />
-              <Text style={[styles.utilBtnText, { color: Colors.textSecondary }]}>{t('common.details')}</Text>
+              <Ionicons name="create-outline" size={18} color="#D97706" />
+              <Text style={[styles.utilBtnText, { color: '#D97706' }]}>{t('orders.edit_items', { defaultValue: 'Articles' })}</Text>
             </TouchableOpacity>
           </View>
 

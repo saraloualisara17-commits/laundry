@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  FlatList, 
-  ScrollView, 
-  Modal, 
-  TextInput, 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ScrollView,
+  Modal,
+  TextInput,
   Switch,
   ActivityIndicator,
   Alert,
@@ -15,7 +15,8 @@ import {
   Platform,
   Image,
   Share,
-  Linking
+  Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -64,7 +65,8 @@ export default function OrderItemsScreen() {
   
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const modalScrollRef = useRef<ScrollView>(null);
+
   // Modals
   const [configModal, setConfigModal] = useState<{ open: boolean, product: any, editCartId: string | null }>({
     open: false, product: null, editCartId: null
@@ -570,7 +572,12 @@ export default function OrderItemsScreen() {
       </View>
 
       {/* Config Modal */}
-      <Modal visible={configModal.open} animationType="slide" transparent>
+      <Modal
+        visible={configModal.open}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setConfigModal({ open: false, product: null, editCartId: null })} />
           <View style={styles.modalSheet}>
@@ -590,26 +597,28 @@ export default function OrderItemsScreen() {
               </View>
             </View>
 
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+            <ScrollView ref={modalScrollRef} style={styles.modalBody} keyboardShouldPersistTaps="handled">
               {configModal.product?.pricingMethod === 'PER_M2' && (
                 <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.width')}</Text>
-                    <TextInput 
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                      keyboardType="decimal-pad" 
+                    <TextInput
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      keyboardType="decimal-pad"
                       value={configForm.largura}
-                      onChangeText={t => setConfigForm({...configForm, largura: t})}
+                      onChangeText={v => setConfigForm({...configForm, largura: v})}
+                      onFocus={() => modalScrollRef.current?.scrollTo({ y: 0, animated: true })}
                     />
                   </View>
                   <View style={{ width: 12 }} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.height')}</Text>
-                    <TextInput 
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                      keyboardType="decimal-pad" 
+                    <TextInput
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      keyboardType="decimal-pad"
                       value={configForm.hauteur}
-                      onChangeText={t => setConfigForm({...configForm, hauteur: t})}
+                      onChangeText={v => setConfigForm({...configForm, hauteur: v})}
+                      onFocus={() => modalScrollRef.current?.scrollTo({ y: 0, animated: true })}
                     />
                   </View>
                 </View>
@@ -638,11 +647,12 @@ export default function OrderItemsScreen() {
                 <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_kg')} (kg)</Text>
-                    <TextInput 
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                      keyboardType="decimal-pad" 
+                    <TextInput
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      keyboardType="decimal-pad"
                       value={configForm.poids}
-                      onChangeText={t => setConfigForm({...configForm, poids: t})}
+                      onChangeText={v => setConfigForm({...configForm, poids: v})}
+                      onFocus={() => modalScrollRef.current?.scrollTo({ y: 0, animated: true })}
                     />
                   </View>
                 </View>
@@ -652,11 +662,12 @@ export default function OrderItemsScreen() {
                 <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_linear_m')} (m)</Text>
-                    <TextInput 
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                      keyboardType="decimal-pad" 
+                    <TextInput
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      keyboardType="decimal-pad"
                       value={configForm.longueur}
-                      onChangeText={t => setConfigForm({...configForm, longueur: t})}
+                      onChangeText={v => setConfigForm({...configForm, longueur: v})}
+                      onFocus={() => modalScrollRef.current?.scrollTo({ y: 0, animated: true })}
                     />
                   </View>
                 </View>
@@ -666,11 +677,12 @@ export default function OrderItemsScreen() {
                 <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('financial.amount')} ({t('common.dh')})</Text>
-                    <TextInput 
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                      keyboardType="numeric" 
+                    <TextInput
+                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      keyboardType="numeric"
                       value={configForm.customPrice}
-                      onChangeText={t => setConfigForm({...configForm, customPrice: t})}
+                      onChangeText={v => setConfigForm({...configForm, customPrice: v})}
+                      onFocus={() => modalScrollRef.current?.scrollTo({ y: 0, animated: true })}
                     />
                   </View>
                 </View>
@@ -904,19 +916,19 @@ const styles = StyleSheet.create({
   unitSmall: { fontSize: 12, color: AdminColors.textMuted },
   productImgBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
 
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'flex-end' 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
-  modalSheet: { 
-    backgroundColor: 'white', 
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24, 
+  modalSheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: SCREEN_HEIGHT * 0.85,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
   },
   dragHandle: { 
     width: 40, 
@@ -965,15 +977,16 @@ const styles = StyleSheet.create({
     color: AdminColors.textSecondary, 
     marginBottom: 4 
   },
-  dimInput: { 
-    flex: 1, 
-    height: 48, 
-    fontSize: 16, 
-    textAlign: 'center', 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0', 
-    borderRadius: 12, 
-    backgroundColor: 'white' 
+  dimInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: 'white',
+    color: '#1E293B',
   },
   calcBox: { 
     backgroundColor: '#F1F5F9', 
@@ -1025,13 +1038,14 @@ const styles = StyleSheet.create({
     minWidth: 40, 
     textAlign: 'center' 
   },
-  formInput: { 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0', 
-    borderRadius: 12, 
-    padding: 12, 
-    fontSize: 15, 
-    backgroundColor: 'white' 
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    backgroundColor: 'white',
+    color: '#1E293B',
   },
   sheetFooter: { 
     paddingVertical: 16, 
@@ -1095,13 +1109,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center' 
   },
-  dialogInput: { 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0', 
-    borderRadius: 14, 
-    padding: 14, 
-    fontSize: 16, 
-    backgroundColor: '#F8FAFC' 
+  dialogInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: '#F8FAFC',
+    color: '#1E293B',
   },
   dialogButtons: { 
     flexDirection: 'row', 

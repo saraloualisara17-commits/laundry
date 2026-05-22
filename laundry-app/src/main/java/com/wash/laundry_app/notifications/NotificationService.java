@@ -17,6 +17,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PushNotificationService pushNotificationService;
 
     @Transactional
     public Notification createNotification(User recipient, String title, String message, String type, String referenceId) {
@@ -30,13 +31,19 @@ public class NotificationService {
                 .build();
         Notification saved = notificationRepository.save(notification);
         
-        // Push notification via WebSocket
-        pushNotification(saved);
+        // WebSocket broadcast
+        pushWebSocketNotification(saved);
+        
+        // Push notification (Expo)
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("type", type);
+        data.put("referenceId", referenceId);
+        pushNotificationService.sendPushNotification(recipient, title, message, data);
         
         return saved;
     }
 
-    private void pushNotification(Notification notification) {
+    private void pushWebSocketNotification(Notification notification) {
         if (notification.getRecipient() == null) return;
         
         NotificationDTO dto = NotificationDTO.builder()

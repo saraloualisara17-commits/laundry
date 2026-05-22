@@ -9,6 +9,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import com.wash.laundry_app.config.LegacyEndpointInterceptor;
+
+import com.wash.laundry_app.config.RateLimitInterceptor;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,6 +23,23 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000}")
     private String allowedOrigins;
+
+    private final LegacyEndpointInterceptor legacyEndpointInterceptor;
+    private final RateLimitInterceptor rateLimitInterceptor;
+
+    public WebConfig(LegacyEndpointInterceptor legacyEndpointInterceptor, RateLimitInterceptor rateLimitInterceptor) {
+        this.legacyEndpointInterceptor = legacyEndpointInterceptor;
+        this.rateLimitInterceptor = rateLimitInterceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(legacyEndpointInterceptor)
+                .addPathPatterns("/admin/**", "/employe/**", "/livreur/**", "/api/admin/**", "/api/employe/**", "/api/livreur/**");
+        
+        registry.addInterceptor(rateLimitInterceptor)
+                .addPathPatterns("/**");
+    }
 
     // =====================
     // CORS CONFIG
@@ -34,16 +56,6 @@ public class WebConfig implements WebMvcConfigurer {
         if (allowedOrigins != null && !allowedOrigins.isBlank()) {
             originPatterns.addAll(Arrays.asList(allowedOrigins.split(",")));
         }
-
-        // ── ngrok Wildcard Patterns ───────────────────────────────────────────
-        // ngrok free tier uses *.ngrok-free.app (new format) and *.ngrok.io (legacy).
-        // IMPORTANT: Spring Security requires setAllowedOriginPatterns() (not
-        // setAllowedOrigins()) when using wildcards WITH allowCredentials=true.
-        // setAllowedOrigins() rejects wildcards + credentials as a security measure.
-        originPatterns.add("https://*.ngrok-free.app");  // ngrok free tier (2024+)
-        originPatterns.add("https://*.ngrok-free.dev");   // ngrok free tier (.dev TLD variant)
-        originPatterns.add("https://*.ngrok.io");         // ngrok legacy / paid
-        originPatterns.add("https://*.ngrok-paid.app");   // ngrok paid (future-proof)
 
         // Use setAllowedOriginPatterns — supports wildcards + credentials together.
         config.setAllowedOriginPatterns(originPatterns);
@@ -82,8 +94,12 @@ public class WebConfig implements WebMvcConfigurer {
     // =====================
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve uploaded files (carpet photos) from the ./uploads directory.
+        String uploadPath = new java.io.File("uploads").getAbsolutePath();
+        if (!uploadPath.endsWith(java.io.File.separator)) {
+            uploadPath += java.io.File.separator;
+        }
+        
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:uploads/");
+                .addResourceLocations("file:" + uploadPath);
     }
 }

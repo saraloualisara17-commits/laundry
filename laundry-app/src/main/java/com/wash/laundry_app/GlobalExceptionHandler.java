@@ -4,9 +4,11 @@ import com.wash.laundry_app.users.UserNotFoundException;
 import com.wash.laundry_app.users.InvalidCredentialsException;
 import com.wash.laundry_app.command.ForbiddenOperationException;
 import com.wash.laundry_app.command.CommandeNotFoundException;
+import com.wash.laundry_app.command.workflow.InvalidTransitionException;
 import com.wash.laundry_app.clients.ClientNotFoundException;
 import com.wash.laundry_app.clients.ClientExistException;
 import com.wash.laundry_app.clients.PendingClientExistsException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,158 +22,108 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ✅ Corps de requ\u00eate manquant ou malform\u00e9 (JSON invalide, body vide)
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.BAD_REQUEST.value());
-        error.put("error", "Bad Request");
-        error.put("message", "Le corps de la requ\u00eate est manquant ou invalide");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", "Le corps de la requête est manquant ou invalide: " + ex.getMessage());
     }
 
-    // ✅ Erreurs de validation (@Valid)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
-        Map<String, Object> error = new HashMap<>();
         Map<String, String> fieldErrors = new HashMap<>();
-
-        ex.getBindingResult().getFieldErrors()
-                .forEach(fieldError -> fieldErrors.put(
-                        fieldError.getField(),
-                        fieldError.getDefaultMessage()
-                ));
-
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.BAD_REQUEST.value());
-        error.put("error", "Validation Failed");
-        error.put("errors", fieldErrors);
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        ex.getBindingResult().getFieldErrors().forEach(error -> fieldErrors.put(error.getField(), error.getDefaultMessage()));
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        response.put("error", "Validation Failed");
+        response.put("message", "Validation failed for one or more fields");
+        response.put("errors", fieldErrors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    // ✅ Param\u00e8tre manquant dans la requ\u00eate
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Map<String, Object>> handleMissingParams(MissingServletRequestParameterException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.BAD_REQUEST.value());
-        error.put("error", "Bad Request");
-        error.put("message", "Param\u00e8tre manquant: " + ex.getParameterName());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", "Paramètre manquant: " + ex.getParameterName());
     }
 
-    // ✅ Ressource non trouv\u00e9e
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.NOT_FOUND.value());
-        error.put("error", "Not Found");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
-    // ✅ Acc\u00e8s interdit
+    @ExceptionHandler(InvalidTransitionException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidTransition(InvalidTransitionException ex) {
+        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Workflow Transition", ex.getMessage());
+    }
+
     @ExceptionHandler(ForbiddenOperationException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenOperationException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.FORBIDDEN.value());
-        error.put("error", "Forbidden");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN.value()).body(error);
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
     }
 
-    // ✅ Client non trouv\u00e9
     @ExceptionHandler(ClientNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleClientNotFound(ClientNotFoundException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.NOT_FOUND.value());
-        error.put("error", "Not Found");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
-    // ✅ Commande non trouv\u00e9e
     @ExceptionHandler(CommandeNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleCommandeNotFound(CommandeNotFoundException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.NOT_FOUND.value());
-        error.put("error", "Not Found");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
-    // ✅ Identifiants invalides / Conflits
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.BAD_REQUEST.value());
-        error.put("error", "Bad Request");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
     }
 
-    // ✅ Erreur g\u00e9n\u00e9rale (attrape tout ce qui n'est pas g\u00e9r\u00e9)
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        error.put("error", "Internal Server Error");
-        error.put("message", "Une erreur interne est survenue. Veuillez réessayer.");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(error);
-    }
-
-    // ✅ Conflit (Client d\u00e9j\u00e0 existant)
     @ExceptionHandler(ClientExistException.class)
     public ResponseEntity<Map<String, Object>> handleClientExist(ClientExistException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.CONFLICT.value());
-        error.put("error", "Conflict");
-        error.put("message", "Ce client existe d\u00e9j\u00e0.");
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict", "Ce client existe déjà.");
     }
 
-    // ✅ Client en attente déjà existant pour ce livreur
     @ExceptionHandler(PendingClientExistsException.class)
     public ResponseEntity<Map<String, Object>> handlePendingClientExists(PendingClientExistsException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.CONFLICT.value());
-        error.put("error", "Conflict");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
     }
 
-    // ✅ Compte desactivé
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<Map<String, Object>> handleDisabledAccount(DisabledException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.FORBIDDEN.value());
-        error.put("error", "ACCOUNT_DISABLED");
-        error.put("message", "Votre compte est désactivé. Contactez l'administrateur.");
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "Votre compte est désactivé. Contactez l'administrateur.");
     }
 
-    // ✅ Erreur de stockage de fichier
-    @ExceptionHandler(com.wash.laundry_app.tapis.FileStorageException.class)
-    public ResponseEntity<Map<String, Object>> handleFileStorageException(com.wash.laundry_app.tapis.FileStorageException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("timestamp", LocalDateTime.now());
-        error.put("status", HttpStatus.BAD_REQUEST.value());
-        error.put("error", "Bad Request");
-        error.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT, "Invalid Operation", ex.getMessage());
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        // Log full details server-side; return generic message to client — no stack trace or class name exposed.
+        log.error("Unhandled RuntimeException: {}", ex.getMessage(), ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "Une erreur interne s'est produite. Veuillez réessayer.");
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
+        log.error("Unhandled Exception: {}", ex.getMessage(), ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "Une erreur interne s'est produite. Veuillez réessayer.");
+    }
+
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String error, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", status.value());
+        body.put("error", error);
+        body.put("message", message);
+        return ResponseEntity.status(status).body(body);
     }
 }

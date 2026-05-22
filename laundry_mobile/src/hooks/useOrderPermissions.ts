@@ -15,6 +15,7 @@ export interface OrderPermissions {
   canAddReceptionPhoto: boolean;
   canAddPayment: boolean;
   canAssignDriver: boolean;
+  canAssignPickupDriver: boolean;
 }
 
 export const useOrderPermissions = (user: any, order: any): OrderPermissions => {
@@ -44,6 +45,7 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
     const canAddPayment = (isAdmin || isEmploye) && delivered && !fullyPaid;
 
     const canAssignDriver = (isAdmin || isEmploye) && isReadyForDelivery(status);
+    const canAssignPickupDriver = (isAdmin || isEmploye) && status === 'PENDING_PICKUP';
 
     return {
       isAdmin,
@@ -55,6 +57,7 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
       canAddReceptionPhoto,
       canAddPayment,
       canAssignDriver,
+      canAssignPickupDriver,
     };
   }, [user, order?.status, order?.montantTotal, order?.montantPaye]);
 };

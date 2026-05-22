@@ -12,6 +12,7 @@ export interface OrderDTO {
   livreurName?: string;
   deliveryDriverId?: number;
   deliveryDriverName?: string;
+  selfSubmitted?: boolean;
 }
 
 export interface AdminOrdersResponseDTO {
@@ -35,6 +36,7 @@ export interface OrderFilters {
   mode?: string;
   activeOnly?: boolean;
   paidDebts?: boolean;
+  selfSubmitted?: boolean;
   search?: string;
   page?: number;
   size?: number;

@@ -3,7 +3,7 @@ package com.wash.laundry_app.auth;
 import com.wash.laundry_app.users.Role;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserMapper;
-import com.wash.laundry_app.users.UserRepository;
+import com.wash.laundry_app.users.services.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,11 +27,11 @@ import java.util.Map;
 public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final UserMapper userMapper;
     private final JwtConfig jwtConfig;
     private final AuthService authService;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
 
     @org.springframework.beans.factory.annotation.Value("${app.use-secure-cookies:true}")
@@ -48,8 +48,7 @@ public class AuthController {
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
         }
 
-        var user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid credentials"));
+        var user = userService.getByEmail(request.getEmail());
 
         if (user.getIsActive() != null && !user.getIsActive()) {
             throw new org.springframework.security.authentication.DisabledException("Compte désactivé. Contactez votre administrateur.");
@@ -58,17 +57,6 @@ public class AuthController {
         var refreshToken = jwtService.generateRefreshToken(user);
         boolean isProd = "prod".equals(System.getenv("SPRING_PROFILES_ACTIVE"));
 
-        // ── Cookie Security Settings ──────────────────────────────────────────
-        // We always use Secure=true + SameSite=None when the app is accessed
-        // over HTTPS (production OR ngrok dev tunnels). This is required because:
-        // - Browsers block SameSite=Lax cookies on HTTPS pages if Secure=false
-        // - ngrok gives you HTTPS, so dev mode also needs Secure=true + None
-        // We detect HTTPS via the X-Forwarded-Proto header (set by ngrok/proxies).
-        // ── Detect HTTPS ───────────────────────────────────────────────────────
-        // X-Forwarded-Proto is a REQUEST header set by ngrok / reverse proxies.
-        // It must be read from HttpServletRequest, NOT HttpServletResponse.
-        // Reading it from the response always returns null → cookie missing Secure flag
-        // → browser on HTTPS silently drops it → /auth/refresh gets no cookie → 403.
         boolean isHttps = "https".equalsIgnoreCase(req.getHeader("X-Forwarded-Proto")) || useSecureCookies;
 
         ResponseCookie cookie = ResponseCookie
@@ -86,7 +74,7 @@ public class AuthController {
         rt.setUser(user);
         rt.setTokenHash(jwtService.hashToken(refreshToken.toString()));
         rt.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(jwtConfig.getRefreshTokenExpiration()));
-        refreshTokenRepository.save(rt);
+        refreshTokenService.save(rt);
 
         return ResponseEntity.ok(new JwtResponse(accessTocken.toString(), refreshToken.toString()));
     }
@@ -108,12 +96,12 @@ public class AuthController {
 
         // HIGH-4: Verify token hasn't been revoked (is in DB)
         String hash = jwtService.hashToken(refreshToken);
-        var storedToken = refreshTokenRepository.findByTokenHash(hash);
+        var storedToken = refreshTokenService.findByTokenHash(hash);
         if (storedToken.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        var user = userRepository.findById(jwt.getUserId()).orElseThrow();
+        var user = userService.getByIdEntity(jwt.getUserId());
         var accessToken = jwtService.generateAccessToken(user);
         return ResponseEntity.ok(new JwtResponse(accessToken.toString(), refreshToken));
     }
@@ -129,7 +117,7 @@ public class AuthController {
         String refreshToken = cookieRefreshToken != null ? cookieRefreshToken : headerRefreshToken;
         if (refreshToken != null) {
             // HIGH-4: Revoke token in DB
-            refreshTokenRepository.deleteByTokenHash(jwtService.hashToken(refreshToken));
+            refreshTokenService.deleteByTokenHash(jwtService.hashToken(refreshToken));
         }
 
         boolean isProd = "prod".equals(System.getenv("SPRING_PROFILES_ACTIVE"));

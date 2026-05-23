@@ -10,4 +10,3 @@ CREATE TABLE audit_logs (
     timestamp DATETIME NOT NULL,
     CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users (id)
 );
-`

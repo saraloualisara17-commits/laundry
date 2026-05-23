@@ -1,0 +1,3 @@
+ALTER TABLE commandes
+    ADD COLUMN self_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+    MODIFY COLUMN created_by_id BIGINT NULL;

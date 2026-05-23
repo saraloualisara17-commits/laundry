@@ -1,0 +1,1 @@
+ALTER TABLE commandes ADD COLUMN montant_paye DECIMAL(10, 2) DEFAULT 0.00;

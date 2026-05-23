@@ -32,3 +32,12 @@ laundry-app/uploads/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Extracted Docker jar (analysis only)
+jar_extracted/
+
+# Vite cache
+.vite/
+
+# Claude memory
+.claude/

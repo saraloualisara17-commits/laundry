@@ -1,37 +1,36 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  TextInput, 
-  Image, 
-  ActivityIndicator, 
-  Alert 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Image,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store/store';
-import { updateSettings } from '../../src/store/settingsSlice';
 import * as ImagePicker from 'expo-image-picker';
 import { useFormStyles } from '../../src/hooks/useFormStyles';
 import { router } from 'expo-router';
+import { useSettings, useUpdateSettings } from '../../src/hooks/query/useSettings';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const f = useFormStyles();
   const isArabic = f.isArabic;
-  const dispatch = useDispatch<AppDispatch>();
-  const { settings } = useSelector((state: RootState) => state.settings);
 
-  const [appName, setAppName] = useState(settings.appName);
-  const [businessPhone, setBusinessPhone] = useState(settings.businessPhone || '');
-  const [selectedImage, setSelectedImage] = useState<any>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const updateSettings = useUpdateSettings();
+
+  const [appName, setAppName] = useState(settings?.appName ?? 'PureClean');
+  const [businessPhone, setBusinessPhone] = useState(settings?.businessPhone ?? '');
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -40,7 +39,6 @@ export default function SettingsScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
-
     if (!result.canceled) {
       setSelectedImage(result.assets[0]);
     }
@@ -51,30 +49,33 @@ export default function SettingsScreen() {
       Alert.alert(t('common.error'), 'Application name cannot be empty');
       return;
     }
-
-    setIsSaving(true);
     try {
-      await dispatch(updateSettings({
-        appName,
+      await updateSettings.mutateAsync({
+        appName: appName.trim(),
         businessPhone: businessPhone.trim() || undefined,
-        logo: selectedImage,
-      })).unwrap();
-      
+        logo: selectedImage
+          ? {
+              uri: selectedImage.uri,
+              name: selectedImage.fileName || 'logo.jpg',
+              type: selectedImage.mimeType || 'image/jpeg',
+            }
+          : undefined,
+      });
       Alert.alert(t('common.success'), 'Settings updated successfully');
       setSelectedImage(null);
-    } catch (error) {
+    } catch {
       Alert.alert(t('common.error'), 'Failed to update settings');
-    } finally {
-      setIsSaving(false);
     }
   };
+
+  const logoPreviewUri = selectedImage?.uri ?? settings?.logoUrl ?? undefined;
 
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
         <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
+            <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Branding Settings</Text>
         </View>
@@ -83,7 +84,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>Visual Identity</Text>
-          
+
           <View style={styles.card}>
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Name</Text>
             <TextInput
@@ -111,10 +112,13 @@ export default function SettingsScreen() {
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Logo</Text>
             <View style={[styles.logoContainer, isArabic && { flexDirection: 'row-reverse' }]}>
               <View style={styles.logoPreview}>
-                <Image 
-                  source={{ uri: selectedImage?.uri || settings.logoUrl || 'https://via.placeholder.com/150' }} 
-                  style={styles.logoImage} 
-                />
+                {logoPreviewUri ? (
+                  <Image source={{ uri: logoPreviewUri }} style={styles.logoImage} />
+                ) : (
+                  <View style={[styles.logoImage, styles.logoPlaceholder]}>
+                    <Ionicons name="image-outline" size={32} color={AdminColors.textMuted} />
+                  </View>
+                )}
               </View>
               <TouchableOpacity style={styles.pickBtn} onPress={pickImage}>
                 <Ionicons name="camera-outline" size={20} color={AdminColors.primary} />
@@ -124,12 +128,12 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.saveBtn, isSaving && { opacity: 0.7 }]} 
+        <TouchableOpacity
+          style={[styles.saveBtn, updateSettings.isPending && { opacity: 0.7 }]}
           onPress={handleSave}
-          disabled={isSaving}
+          disabled={updateSettings.isPending}
         >
-          {isSaving ? (
+          {updateSettings.isPending ? (
             <ActivityIndicator color="white" />
           ) : (
             <>
@@ -228,6 +232,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'contain',
+  },
+  logoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pickBtn: {
     flex: 1,

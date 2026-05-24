@@ -4,7 +4,6 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 import { store, RootState } from '../src/store/store';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials } from '../src/store/authSlice';
-import { fetchSettings } from '../src/store/settingsSlice';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { OrderCreationProvider } from '../src/context/OrderCreationContext';
@@ -16,6 +15,8 @@ import { uploadManager } from '../src/services/uploads';
 import { socketClient } from '../src/services/realtime';
 import { pushNotificationService } from '../src/services/notifications/pushNotificationService';
 import { initI18n } from '../src/i18n';
+import { settingsApi } from '../src/services/api/settingsApi';
+import { queryKeys } from '../src/services/query/queryKeys';
 import {
   Cairo_400Regular,
   Cairo_500Medium,
@@ -38,16 +39,22 @@ function RootLayoutNav() {
         // Init i18n first so language is correct before any screen renders
         await initI18n();
 
-        // Fetch system settings (branding)
-        // @ts-ignore
-        dispatch(fetchSettings());
+        // Prefetch settings into the React Query cache so every screen that
+        // calls useSettings() gets data instantly without its own network hit.
+        // staleTime: Infinity means this result is never invalidated by time —
+        // only by an explicit updateSettings mutation.
+        queryClient.prefetchQuery({
+          queryKey: queryKeys.settings.all,
+          queryFn: settingsApi.getSettings,
+          staleTime: Infinity,
+        });
 
         const storedUser = await SecureStore.getItemAsync('user');
         const storedToken = await SecureStore.getItemAsync('accessToken');
         if (storedUser && storedToken) {
           dispatch(setCredentials({
             user: JSON.parse(storedUser),
-            token: storedToken
+            token: storedToken,
           }));
         }
       } catch (e) {
@@ -71,7 +78,6 @@ function RootLayoutNav() {
 
     return () => {
       removeHandlers();
-      // Disconnect only on full unmount if needed, or keep it managed by user state
     };
   }, [user?.id]);
 

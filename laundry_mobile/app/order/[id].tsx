@@ -20,17 +20,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { Ionicons, Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { adminApi } from '../../src/services/adminApi';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { BASE_URL } from '../../src/services/api/client';
 import { Colors, Shadows, StatusColors } from '../../constants/theme';
 import { format } from 'date-fns';
 import { fr, ar } from 'date-fns/locale';
 import * as ImagePicker from 'expo-image-picker';
-import * as WebBrowser from 'expo-web-browser';
-import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { uploadManager } from '../../src/services/uploads';
 import { useTranslation } from 'react-i18next';
 import { useFormStyles } from '../../src/hooks/useFormStyles';
@@ -53,7 +49,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
   const currentUser = useSelector((state: any) => state.auth.user);
-  const authToken = useSelector((state: any) => state.auth.token);
   const { order, loading } = useOrder(id as string);
 
   if (loading || !order) {
@@ -121,8 +116,6 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     loadOrderForEditing(order);
     router.push('/(admin)/order-items');
   }, [order, clearOrder, loadOrderForEditing, router]);
-
-  const [sharing, setSharing] = useState(false);
 
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -273,47 +266,12 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     );
   }, [id, router, deleteOrderMutation, t]);
 
-  const handleShareReceipt = useCallback(async () => {
-    setSharing(true);
-    try {
-      const delivered = isDelivered(order.status);
-      const pdfUrl = delivered
-        ? adminApi.getDeliveryPdfUrl(id as string)
-        : adminApi.getOrderPdfUrl(id as string);
-      const localUri = `${FileSystem.cacheDirectory}receipt_${id}_share.pdf`;
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
-        authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined);
-      if (download.status !== 200) throw new Error('download_failed');
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert(t('common.error'), t('common.sharing_unavailable', { defaultValue: 'Le partage n\'est pas disponible sur cet appareil.' }));
-        return;
-      }
-      await Sharing.shareAsync(download.uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: t('admin.orders.create.confirmation.view_pdf', { defaultValue: 'Reçu' }),
-        UTI: 'com.adobe.pdf',
-      });
-    } catch (e) {
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setSharing(false);
-    }
-  }, [id, order, t]);
-
-  const handleViewPdf = useCallback(async () => {
-    const delivered = isDelivered(order.status);
-    const pdfUrl = delivered ? adminApi.getDeliveryPdfUrl(id as string) : adminApi.getOrderPdfUrl(id as string);
-    const localUri = `${FileSystem.cacheDirectory}receipt_${id}.pdf`;
-    try {
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
-        authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined);
-      if (download.status !== 200) throw new Error(t('common.error_msg'));
-      await Print.printAsync({ uri: download.uri });
-    } catch (e) {
-      WebBrowser.openBrowserAsync(pdfUrl);
-    }
-  }, [id, order, t]);
+  const { sharingAction, handleShareWhatsApp, handlePrint } = useReceiptActions(
+    id as string,
+    order?.status,
+    order?.numeroCommande,
+    t
+  );
 
   const getClientPhone = useCallback((client: any) => {
     if (!client) return '';
@@ -343,11 +301,11 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowDeliveryModal(false);
-      Alert.alert(t('delivery.delivery_success'), t('delivery.send_receipt_prompt'), [{ text: t('common.cancel'), style: 'cancel' }, { text: '📱 WhatsApp', onPress: () => handleShareReceipt() }]);
+      Alert.alert(t('delivery.delivery_success'), t('delivery.send_receipt_prompt'), [{ text: t('common.cancel'), style: 'cancel' }, { text: '📱 WhatsApp', onPress: () => handleShareWhatsApp() }]);
     } catch (e) {
       Alert.alert(t('common.error'), t('common.error_msg'));
     }
-  }, [id, collectedAmount, deliveryNotes, remaining, updateStatusMutation, handleShareReceipt, t]);
+  }, [id, collectedAmount, deliveryNotes, remaining, updateStatusMutation, handleShareWhatsApp, t]);
 
   const handleAddPayment = useCallback(async () => {
     const amount = parseFloat(paymentAmount);
@@ -691,8 +649,8 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               isArabic={isArabic}
               t={t}
               onClientPress={handleClientPress}
-              handleShareReceipt={handleShareReceipt}
-              sharing={sharing}
+              handleShareReceipt={handleShareWhatsApp}
+              sharing={sharingAction === 'whatsapp'}
               getClientPhone={getClientPhone}
               setShowDriverModal={setShowDriverModal}
             />
@@ -720,16 +678,18 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       {/* ── Sticky Bottom Bar ── */}
       {(permissions.isAdmin || permissions.isEmploye) && (
         <View style={[styles.bottomBar, isArabic && { flexDirection: 'row-reverse' }]}>
-          <TouchableOpacity style={styles.bottomBarBtn} onPress={handleShareReceipt} disabled={sharing}>
-            {sharing
+          <TouchableOpacity style={styles.bottomBarBtn} onPress={handleShareWhatsApp} disabled={!!sharingAction}>
+            {sharingAction === 'whatsapp'
               ? <ActivityIndicator size="small" color="#25D366" />
               : <Ionicons name="logo-whatsapp" size={22} color="#25D366" />}
             <Text style={[styles.bottomBarBtnText, { color: '#25D366' }]}>{t('common.whatsapp')}</Text>
           </TouchableOpacity>
           <View style={styles.bottomBarDivider} />
-          <TouchableOpacity style={styles.bottomBarBtn} onPress={handleViewPdf}>
-            <Ionicons name="document-text-outline" size={22} color={Colors.primary} />
-            <Text style={[styles.bottomBarBtnText, { color: Colors.primary }]}>{t('admin.orders.create.confirmation.view_pdf')}</Text>
+          <TouchableOpacity style={styles.bottomBarBtn} onPress={handlePrint} disabled={!!sharingAction}>
+            {sharingAction === 'print'
+              ? <ActivityIndicator size="small" color={Colors.primary} />
+              : <Ionicons name="document-text-outline" size={22} color={Colors.primary} />}
+            <Text style={[styles.bottomBarBtnText, { color: Colors.primary }]}>{t('common.print')}</Text>
           </TouchableOpacity>
           {(canAddLaboPhoto || canAddReceptionPhoto) && (
             <>

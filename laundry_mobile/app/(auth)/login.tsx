@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../src/store/authSlice';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../src/store/store';
+import { useSettings } from '../../src/hooks/query/useSettings';
 import { authApi } from '../../src/services/api';
 import { showError } from '../../src/services/errors/errorHandler';
 import * as SecureStore from 'expo-secure-store';
@@ -20,7 +19,8 @@ export default function LoginScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   
-  const { settings } = useSelector((state: RootState) => state.settings);
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,10 +75,10 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           {settings.logoUrl && (
-            <Image 
-              source={{ uri: settings.logoUrl }} 
-              style={styles.logo} 
-              resizeMode="contain" 
+            <Image
+              source={{ uri: settings.logoUrl }}
+              style={styles.logo}
+              resizeMode="contain"
             />
           )}
           <Text style={styles.title}>{settings.appName}</Text>

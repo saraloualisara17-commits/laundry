@@ -18,10 +18,12 @@ export const useDriversList = () => {
 
 /**
  * Hook for pickup drivers (livreur + admin).
+ * Uses queryKeys.users.pickup() — a child of queryKeys.users.drivers() so that
+ * invalidating all drivers also clears this subset.
  */
 export const usePickupDriversList = () => {
   return useQuery({
-    queryKey: [...queryKeys.users.drivers(), 'pickup'],
+    queryKey: queryKeys.users.pickup(),
     queryFn: () => adminApi.getUsers().then(res => res.data.filter((u: any) => {
       const r = u.role?.toLowerCase();
       return r === 'livreur' || r === 'admin';

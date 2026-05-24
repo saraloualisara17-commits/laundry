@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../src/store/store';
+import { useSettings } from '../../src/hooks/query/useSettings';
 
 interface AdminHeaderProps {
   title: string;
@@ -15,7 +14,8 @@ interface AdminHeaderProps {
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, rightAction }) => {
   const { i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
-  const { settings } = useSelector((state: RootState) => state.settings);
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, RefreshControl
@@ -6,17 +6,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { adminApi } from '../../../src/services/adminApi';
 import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
+import { useInfiniteOrders } from '../../../src/hooks/query/useOrders';
 
-const ALLOWED_STATUSES = [
-  'Toutes', 'PENDING_PICKUP', 'PICKED_UP', 'IN_PROCESS', 'READY_FOR_DELIVERY', 'CANCELLED',
-];
 
 export default function EmployeOrdersScreen() {
   const { t, i18n } = useTranslation();
@@ -33,49 +30,31 @@ export default function EmployeOrdersScreen() {
 
   const [activeTab, setActiveTab] = useState('Toutes');
   const [search, setSearch] = useState('');
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
 
-  const fetchOrders = async (pageNum: number, isRefresh = false) => {
-    try {
-      if (pageNum === 0) setLoading(true); else setLoadingMore(true);
-      const params = {
-        status: activeTab === 'Toutes' ? undefined : activeTab,
-        search: search.length > 2 ? search : undefined,
-        page: pageNum,
-        limit: 20,
-      };
+  const filters = useMemo(() => ({
+    status: activeTab === 'Toutes' ? undefined : activeTab,
+    search: search.length > 2 ? search : undefined,
+  }), [activeTab, search]);
 
-      const res = await adminApi.getOrders(params);
-      const newOrders = res.data.content || [];
+  const {
+    data: ordersPages,
+    isLoading: loading,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage: loadingMore,
+  } = useInfiniteOrders(filters);
 
-      if (isRefresh || pageNum === 0) setOrders(newOrders);
-      else setOrders(prev => [...prev, ...newOrders]);
+  const orders = useMemo(
+    () => (ordersPages?.pages ?? []).flatMap((p: any) => p.content || p || []),
+    [ordersPages]
+  );
+  const totalCount = ordersPages?.pages?.[0]?.totalElements ?? orders.length;
+  const refreshing = isFetching && !loading && !loadingMore;
 
-      setHasMore(newOrders.length === 20);
-      setTotalCount(res.data.totalElements || 0);
-    } catch (error) {
-      console.error('Fetch employe orders error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
-
-  useEffect(() => { fetchOrders(0, true); }, [activeTab, search]);
-
-  const onRefresh = () => { setRefreshing(true); setPage(0); fetchOrders(0, true); };
-  const loadMore = () => {
-    if (!loadingMore && hasMore && !loading) {
-      const next = page + 1; setPage(next); fetchOrders(next);
-    }
-  };
+  const onRefresh = () => { refetch(); };
+  const loadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
 
   const renderCard = ({ item }: { item: any }) => {
     const statusCfg = require('../../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' };
@@ -139,7 +118,7 @@ export default function EmployeOrdersScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.tab, activeTab === item.id && styles.activeTab]}
-              onPress={() => { setActiveTab(item.id); setPage(0); }}
+              onPress={() => { setActiveTab(item.id); }}
             >
               <Text style={[styles.tabText, activeTab === item.id && styles.activeTabText]}>{item.label}</Text>
             </TouchableOpacity>

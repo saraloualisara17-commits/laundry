@@ -1,17 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert, Platform, Linking, Dimensions,
+  ActivityIndicator, Platform, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store/store';
-import { fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useTranslation } from 'react-i18next';
+import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
 
 const C = {
   primary: '#0D7377',
@@ -38,25 +35,22 @@ function openNav(lat?: any, lng?: any, address?: string) {
 
 export default function MapViewScreen() {
   const { t } = useTranslation();
-  const dispatch = useDispatch<AppDispatch>();
-  const { readyDeliveries, readyOrders, loading } = useSelector((s: RootState) => s.livreur);
+
+  const { data: readyDeliveries = [], isLoading: loadingDeliveries } = useReadyDeliveries();
+  const { data: readyOrders = [], isLoading: loadingPickups } = usePendingPickups();
+  const loading = loadingDeliveries || loadingPickups;
 
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<any>(null);
   const mapRef = useRef<MapView>(null);
 
-  useFocusEffect(useCallback(() => {
-    dispatch(fetchReadyDeliveries());
-    dispatch(fetchPendingPickups());
-  }, [dispatch]));
-
   const allMissions = useMemo(() => {
-    const deliveries = (readyDeliveries || []).map((o: any) => ({ ...o, _type: 'delivery' }));
-    const pickups = (readyOrders || []).map((o: any) => ({ ...o, _type: 'pickup' }));
+    const deliveries = readyDeliveries.map((o: any) => ({ ...o, _type: 'delivery' }));
+    const pickups = readyOrders.map((o: any) => ({ ...o, _type: 'pickup' }));
     if (filter === 'delivery') return deliveries;
     if (filter === 'pickup') return pickups;
     return [...deliveries, ...pickups];
-  }, [readyDeliveries, readyOrders, filter]);
+  }, [readyDeliveries, readyOrders, filter]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resolve lat/lng for an order: prefer snapshotted delivery coords, fall back to client profile
   const resolveCoords = (o: any) => {

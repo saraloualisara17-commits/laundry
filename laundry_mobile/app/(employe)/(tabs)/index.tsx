@@ -1,21 +1,23 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Animated, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../src/store/store';
 import { logOut } from '../../../src/store/authSlice';
+import { useSettings } from '../../../src/hooks/query/useSettings';
 import * as SecureStore from 'expo-secure-store';
-import { adminApi } from '../../../src/services/adminApi';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
 import { useOrderCreation } from '../../../src/context/OrderCreationContext';
 import i18n from '../../../src/i18n';
+import { useStatusOverview, useUnpaidOverview } from '../../../src/hooks/query/useDashboard';
+import { useOrders } from '../../../src/hooks/query/useOrders';
 
 function changeLanguage(lang: string) {
   i18n.changeLanguage(lang);
@@ -32,14 +34,10 @@ export default function EmployeDashboard() {
   const isArabic = i18nHook.language === 'ar';
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { settings } = useSelector((state: RootState) => state.settings);
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
   const { clearOrder, setMode } = useOrderCreation();
 
-  const [overview, setOverview] = useState<any>(null);
-  const [unpaid, setUnpaid] = useState<any>(null);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const readyAnim = useRef(new Animated.Value(0.4)).current;
 
@@ -52,26 +50,19 @@ export default function EmployeDashboard() {
     ).start();
   }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [ovRes, unpaidRes, ordersRes] = await Promise.all([
-        adminApi.getStatusOverview(),
-        adminApi.getUnpaidOverview(),
-        adminApi.getOrders({ limit: 5 }),
-      ]);
-      setOverview(ovRes.data.data);
-      setUnpaid(unpaidRes.data);
-      const raw = ordersRes.data.content || ordersRes.data || [];
-      setRecentOrders(raw.filter((o: any) => o.status !== 'DELIVERED').slice(0, 5));
-    } catch (e) {
-      console.error('Employe dashboard error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { data: overviewRes, isFetching: fetchingOverview, refetch: refetchOverview } = useStatusOverview();
+  const { data: unpaidData, refetch: refetchUnpaid } = useUnpaidOverview();
+  const { data: recentOrdersData, isLoading: loading, isFetching: fetchingOrders, refetch: refetchOrders } = useOrders({ limit: 5 });
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  const overview = overviewRes?.data ?? overviewRes ?? null;
+  const unpaid = unpaidData ?? null;
+  const recentOrders = useMemo(() => {
+    const raw = recentOrdersData?.content || recentOrdersData || [];
+    return (Array.isArray(raw) ? raw : []).filter((o: any) => o.status !== 'DELIVERED').slice(0, 5);
+  }, [recentOrdersData]);
+
+  const refreshing = (fetchingOverview || fetchingOrders) && !loading;
+  const onRefresh = () => { refetchOverview(); refetchUnpaid(); refetchOrders(); };
 
   const handleLogout = async () => {
     dispatch(logOut());
@@ -136,7 +127,7 @@ export default function EmployeDashboard() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); fetchData(); }}
+            onRefresh={onRefresh}
             tintColor={AdminColors.primary}
           />
         }

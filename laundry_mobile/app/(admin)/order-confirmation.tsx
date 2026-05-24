@@ -5,13 +5,7 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Animated,
-  Linking,
-  Platform,
-  Dimensions,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Share
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,10 +14,7 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { adminApi } from '../../src/services/adminApi';
-import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 
 export default function OrderConfirmationScreen() {
   const { t, i18n } = useTranslation();
@@ -31,8 +22,13 @@ export default function OrderConfirmationScreen() {
   const insets = useSafeAreaInsets();
   const { orderId, orderNumber } = useLocalSearchParams();
   const { clearOrder } = useOrderCreation();
-  const [sharing, setSharing] = useState(false);
-  
+  const { sharingAction, handleShareWhatsApp, handlePrint } = useReceiptActions(
+    orderId as string,
+    'PENDING_PICKUP',
+    orderNumber as string,
+    t
+  );
+
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -67,64 +63,6 @@ export default function OrderConfirmationScreen() {
     router.replace(`/order/${id}`);
   };
 
-  const getAuthHeaders = (): Record<string, string> => {
-    try {
-      const { store } = require('../../src/store/store');
-      const token: string | null = store.getState().auth.token;
-      return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch {
-      return {};
-    }
-  };
-
-  const handleWhatsApp = async () => {
-    const pdfUrl = adminApi.getOrderPdfUrl(orderId as string);
-    const localUri = `${FileSystem.cacheDirectory}recu_${orderNumber}.pdf`;
-
-    try {
-      setSharing(true);
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: getAuthHeaders(),
-      });
-
-      if (download.status !== 200) throw new Error('Download failed');
-
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
-        return;
-      }
-
-      await Sharing.shareAsync(download.uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `${t('admin.orders.create.confirmation.send_receipt')} #${orderNumber}`,
-        UTI: 'com.adobe.pdf',
-      });
-    } catch (e) {
-      console.error('WhatsApp/PDF share error:', e);
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setSharing(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    const pdfUrl = adminApi.getOrderPdfUrl(orderId as string);
-    const localUri = `${FileSystem.cacheDirectory}receipt_${orderNumber}.pdf`;
-
-    try {
-      setSharing(true);
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: getAuthHeaders(),
-      });
-      if (download.status !== 200) throw new Error('Download failed');
-      await Print.printAsync({ uri: download.uri });
-    } catch (e) {
-      console.error('Print error:', e);
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setSharing(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -147,22 +85,26 @@ export default function OrderConfirmationScreen() {
 
           {/* Quick Receipts */}
           <View style={[styles.receiptActions, isArabic && { flexDirection: 'row-reverse' }]}>
-            <TouchableOpacity 
-              style={[styles.receiptBtn, { backgroundColor: '#E8F5E9' }]} 
-              onPress={handleWhatsApp}
-              disabled={sharing}
+            <TouchableOpacity
+              style={[styles.receiptBtn, { backgroundColor: '#E8F5E9' }]}
+              onPress={handleShareWhatsApp}
+              disabled={!!sharingAction}
             >
-              <Ionicons name="logo-whatsapp" size={24} color="#2E7D32" />
+              {sharingAction === 'whatsapp'
+                ? <ActivityIndicator color="#2E7D32" />
+                : <Ionicons name="logo-whatsapp" size={24} color="#2E7D32" />}
               <Text style={[styles.receiptBtnText, { color: '#2E7D32' }]}>WhatsApp</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.receiptBtn, { backgroundColor: '#F3E5F5' }]} 
+            <TouchableOpacity
+              style={[styles.receiptBtn, { backgroundColor: '#F3E5F5' }]}
               onPress={handlePrint}
-              disabled={sharing}
+              disabled={!!sharingAction}
             >
-              <Ionicons name="print" size={24} color="#7B1FA2" />
-              <Text style={[styles.receiptBtnText, { color: '#7B1FA2' }]}>{t('admin.orders.create.items.print')}</Text>
+              {sharingAction === 'print'
+                ? <ActivityIndicator color="#7B1FA2" />
+                : <Ionicons name="print" size={24} color="#7B1FA2" />}
+              <Text style={[styles.receiptBtnText, { color: '#7B1FA2' }]}>{t('common.print')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -180,11 +122,6 @@ export default function OrderConfirmationScreen() {
         </View>
       </View>
 
-      {sharing && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={AdminColors.primary} />
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -284,11 +221,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-  }
 });

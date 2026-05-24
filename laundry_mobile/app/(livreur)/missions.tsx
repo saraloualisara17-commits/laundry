@@ -1,23 +1,22 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, Linking, Platform,
-  Modal, TextInput, ScrollView, KeyboardAvoidingView,
+  RefreshControl, ActivityIndicator, Alert, Linking, Platform, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 
-import { ordersApi } from '../../src/services/api/ordersApi';
 import { AdminColors as Colors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 import DeliveryConfirmModal from '../../components/orders/modals/DeliveryConfirmModal';
+import ReceiptActionsModal from '../../components/orders/modals/ReceiptActionsModal';
+import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { isScheduledToday, isScheduledOverdue } from '../../src/utils/deliveryDateUtils';
+import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } from '../../src/hooks/queries/useLivreur';
+import { ordersApi } from '../../src/services/api';
 
 // --- Constants ---
 const C = {
@@ -258,11 +257,6 @@ export default function LivreurMissionsScreen() {
   
   const [activeTab, setActiveTab] = useState<'delivery' | 'pickup'>('delivery');
   const [deliverySubTab, setDeliverySubTab] = useState<'today' | 'overdue'>('today');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [pickupOrders, setPickupOrders] = useState<any[]>([]);
-  const [deliveryOrders, setDeliveryOrders] = useState<any[]>([]);
-
   const [collectingId, setCollectingId] = useState<string | null>(null);
   const [selOrder, setSelOrder] = useState<any>(null);
 
@@ -275,134 +269,60 @@ export default function LivreurMissionsScreen() {
   // Shared flow state
   const [collectedAmount, setCollectedAmount] = useState('0');
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [updating, setUpdating] = useState(false);
-  const [sharingAction, setSharingAction] = useState<'whatsapp' | 'print' | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [pickupRes, deliveryRes] = await Promise.all([
-        ordersApi.getPendingPickups(),
-        ordersApi.getReadyDeliveries(),
-      ]);
-      setPickupOrders(pickupRes.data.data || pickupRes.data || []);
-      setDeliveryOrders(deliveryRes.data.data || deliveryRes.data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { data: pickupOrders = [], isLoading: loadingPickups, isFetching: fetchingPickups, refetch: refetchPickups } = usePendingPickups();
+  const { data: deliveryOrders = [], isLoading: loadingDeliveries, isFetching: fetchingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
+  const updateStatusMutation = useUpdateOrderStatusMission();
 
-  useEffect(() => { loadData(); }, [loadData]);
-  const onRefresh = () => { setRefreshing(true); loadData(); };
+  // isLoading = true only on the very first fetch (no cached data yet)
+  // isFetching = true on any refetch including background — used for pull-to-refresh indicator
+  const loading = loadingPickups || loadingDeliveries;
+  const refreshing = (fetchingPickups || fetchingDeliveries) && !loading;
+  const updating = updateStatusMutation.isPending;
 
-  const handleStatusUpdate = async (orderId: number, status: string, extraData?: any) => {
-    try {
-      setUpdating(true);
-      const res = await ordersApi.updateStatus(orderId, {
-        status,
-        amount: extraData?.amount,
-        notesPaiement: extraData?.notesPaiement,
-      });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      setShowPaymentModal(false);
-      const updatedOrder = res.data.data || res.data;
-      setSelOrder(updatedOrder);
-      setShowReceiptModal(true);
-      loadData();
-    } catch (e) {
-      Alert.alert(t('common.error'), t('livreur.action_failed'));
-    } finally {
-      setUpdating(false);
-    }
-  };
+  const { sharingAction, handleShareWhatsApp, handlePrint } = useReceiptActions(
+    selOrder?.id,
+    selOrder?.status,
+    selOrder?.numeroCommande,
+    t
+  );
 
-  const handleShareWhatsApp = async () => {
-    if (!selOrder) return;
-    setSharingAction('whatsapp');
-    try {
-      const isDelivery = selOrder.status === 'DELIVERED';
-      const pdfUrl = isDelivery 
-        ? ordersApi.getDeliveryPdfUrl(selOrder.id)
-        : ordersApi.getOrderPdfUrl(selOrder.id);
-        
-      const localUri = `${FileSystem.cacheDirectory}recu_${selOrder.id}.pdf`;
-      const { store } = require('../../src/store/store');
-      const token = store.getState().auth.token;
-      
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      
-      if (download.status !== 200) throw new Error('Download failed');
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refetchPickups(), refetchDeliveries()]);
+  }, [refetchPickups, refetchDeliveries]);
 
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
-        return;
+  const handleStatusUpdate = (orderId: number, status: 'PICKED_UP' | 'DELIVERED', extraData?: any) => {
+    updateStatusMutation.mutate(
+      { orderId, status, amount: extraData?.amount, notesPaiement: extraData?.notesPaiement },
+      {
+        onSuccess: async (res) => {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setShowPaymentModal(false);
+          const updatedOrder = (res as any).data ?? selOrder;
+          setSelOrder(updatedOrder);
+          setShowReceiptModal(true);
+        },
+        onError: () => Alert.alert(t('common.error'), t('livreur.action_failed')),
       }
-
-      await Sharing.shareAsync(download.uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `${t('admin.orders.create.confirmation.send_receipt')} #${selOrder.numeroCommande}`,
-        UTI: 'com.adobe.pdf',
-      });
-      setShowReceiptModal(false);
-    } catch (e) {
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setSharingAction(null);
-    }
+    );
   };
 
-  const handlePrintReceipt = async () => {
-    if (!selOrder) return;
-    setSharingAction('print');
-    try {
-      const isDelivery = selOrder.status === 'DELIVERED';
-      const pdfUrl = isDelivery 
-        ? ordersApi.getDeliveryPdfUrl(selOrder.id)
-        : ordersApi.getOrderPdfUrl(selOrder.id);
-        
-      const localUri = `${FileSystem.cacheDirectory}receipt_${selOrder.id}.pdf`;
-      const { store } = require('../../src/store/store');
-      const token = store.getState().auth.token;
-      
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      
-      if (download.status !== 200) {
-        console.error('Livreur print download failed. Status:', download.status, 'URL:', pdfUrl);
-        throw new Error(`Download failed: ${download.status}`);
-      }
-
-      await Print.printAsync({ uri: download.uri });
-      setShowReceiptModal(false);
-    } catch (e) {
-      console.error('Livreur print error:', e);
-      Alert.alert(t('common.error'), t('livreur.print_failed'));
-    } finally {
-      setSharingAction(null);
-    }
-  };
-
-  const handleCollect = async (order: any) => {
+  const handleCollect = (order: any) => {
     setCollectingId(String(order.id));
     setSelOrder(order);
-    try {
-      const res = await ordersApi.updateStatus(order.id, { status: 'PICKED_UP' });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSelOrder(res.data.data || res.data);
-      setShowReceiptModal(true);
-      loadData();
-    } catch (e) {
-      Alert.alert(t('common.error'), t('livreur.action_failed'));
-    } finally {
-      setCollectingId(null);
-    }
+    updateStatusMutation.mutate(
+      { orderId: order.id, status: 'PICKED_UP' },
+      {
+        onSuccess: async (res) => {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          const updatedOrder = (res as any).data ?? order;
+          setSelOrder(updatedOrder);
+          setShowReceiptModal(true);
+        },
+        onError: () => Alert.alert(t('common.error'), t('livreur.action_failed')),
+        onSettled: () => setCollectingId(null),
+      }
+    );
   };
 
   const todayOrders = deliveryOrders.filter(o => isScheduledToday(o.scheduledDeliveryDate));
@@ -555,67 +475,17 @@ export default function LivreurMissionsScreen() {
         />
       )}
 
-      <FailedAttemptModal visible={showProb} order={selOrder} attemptType={probType} onClose={() => setShowProb(false)} onSuccess={loadData} />
+      <FailedAttemptModal visible={showProb} order={selOrder} attemptType={probType} onClose={() => setShowProb(false)} onSuccess={onRefresh} />
 
-      {/* --- Standardized Receipt Actions Modal (Success Modal) --- */}
-      <Modal visible={showReceiptModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowReceiptModal(false)} />
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            
-            <View style={styles.successIconBox}>
-              <Ionicons name="checkmark-circle" size={60} color={C.success} />
-            </View>
-            
-            <Text style={styles.receiptTitle}>
-              {selOrder?.status === 'PICKED_UP'
-                ? t('livreur.confirm_pickup_title')
-                : t('livreur.confirm_delivery_title')
-              }
-            </Text>
-
-            <Text style={styles.receiptSub}>
-              {t('livreur.send_receipt_prompt')}
-            </Text>
-
-            <View style={styles.receiptActions}>
-              <TouchableOpacity 
-                style={[styles.receiptBtn, { backgroundColor: '#E8F5E9' }]} 
-                onPress={handleShareWhatsApp}
-                disabled={!!sharingAction}
-              >
-                {sharingAction === 'whatsapp' ? <ActivityIndicator color="#2E7D32" /> : (
-                  <>
-                    <Ionicons name="logo-whatsapp" size={24} color="#2E7D32" />
-                    <Text style={[styles.receiptBtnText, { color: '#2E7D32' }]}>WhatsApp</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.receiptBtn, { backgroundColor: '#F3E5F5' }]} 
-                onPress={handlePrintReceipt}
-                disabled={!!sharingAction}
-              >
-                {sharingAction === 'print' ? <ActivityIndicator color="#7B1FA2" /> : (
-                  <>
-                    <Ionicons name="print" size={24} color="#7B1FA2" />
-                    <Text style={[styles.receiptBtnText, { color: '#7B1FA2' }]}>{t('common.print')}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.closeModalBtn} 
-              onPress={() => setShowReceiptModal(false)}
-            >
-              <Text style={styles.closeModalText}>{t('common.done')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <ReceiptActionsModal
+        visible={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        confirmedStatus={selOrder?.status}
+        sharingAction={sharingAction}
+        onWhatsApp={handleShareWhatsApp}
+        onPrint={handlePrint}
+        t={t}
+      />
     </View>
   );
 }
@@ -670,12 +540,4 @@ const styles = StyleSheet.create({
   confirmBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
   reasonItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
   reasonText: { fontSize: 15, color: Colors.textPrimary },
-  successIconBox: { alignItems: 'center', marginBottom: 12 },
-  receiptTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 },
-  receiptSub: { fontSize: 15, color: Colors.textSecondary, textAlign: 'center', marginBottom: 32 },
-  receiptActions: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  receiptBtn: { flex: 1, height: 80, borderRadius: 20, alignItems: 'center', justifyContent: 'center', gap: 8, ...AdminShadows.shadowSmall },
-  receiptBtnText: { fontSize: 13, fontWeight: '700' },
-  closeModalBtn: { height: 56, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  closeModalText: { fontSize: 16, fontWeight: '700', color: Colors.textSecondary },
 });

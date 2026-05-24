@@ -6,42 +6,31 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchClientCommandes, fetchClientById } from '../../src/store/adminThunks';
-import { clearSelectedClient } from '../../src/store/adminSlice';
-import { RootState, AppDispatch } from '../../src/store/store';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Radius, StatusColors } from '../../constants/theme';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
-import { adminApi } from '../../src/services/adminApi';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { useClient, useClientOrders, useSaveClient } from '../../src/hooks/query/useClients';
 
 export default function ClientDetailsScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
-  const { clientCommandes, selectedClient, loading } = useSelector((state: RootState) => state.admin);
   const { clearOrder, setMode, setClient } = useOrderCreation();
 
-  const [refreshing, setRefreshing] = useState(false);
+  const clientId = id as string;
+  const { data: selectedClient, isLoading: loadingClient, refetch: refetchClient } = useClient(clientId);
+  const { data: clientCommandes = [], isLoading: loadingOrders, refetch: refetchOrders } = useClientOrders(clientId);
+  const saveClient = useSaveClient();
+
+  const loading = loadingClient && !selectedClient;
+  const refreshing = !loading && (loadingClient || loadingOrders);
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phone: '', email: '', address: '' });
-
-  const load = () => {
-    if (id) {
-      dispatch(fetchClientById(id as string));
-      dispatch(fetchClientCommandes(id as string));
-    }
-  };
-
-  useEffect(() => {
-    load();
-    return () => { dispatch(clearSelectedClient()); };
-  }, [id, dispatch]);
 
   useEffect(() => {
     if (selectedClient) {
@@ -55,11 +44,8 @@ export default function ClientDetailsScreen() {
   }, [selectedClient]);
 
   const onRefresh = () => {
-    setRefreshing(true);
-    Promise.all([
-      dispatch(fetchClientById(id as string)),
-      dispatch(fetchClientCommandes(id as string)),
-    ]).finally(() => setRefreshing(false));
+    refetchClient();
+    refetchOrders();
   };
 
   const client = selectedClient;
@@ -89,14 +75,16 @@ export default function ClientDetailsScreen() {
     }
     setEditLoading(true);
     try {
-      await adminApi.updateClient(id as string, {
-        name: editForm.name.trim(),
-        phones: editForm.phone.trim() ? [{ phoneNumber: editForm.phone.trim() }] : [],
-        email: editForm.email.trim() || null,
-        addresses: editForm.address.trim() ? [{ address: editForm.address.trim() }] : [],
+      await saveClient.mutateAsync({
+        id: clientId,
+        data: {
+          name: editForm.name.trim(),
+          phones: editForm.phone.trim() ? [{ phoneNumber: editForm.phone.trim() }] : [],
+          email: editForm.email.trim() || null,
+          addresses: editForm.address.trim() ? [{ address: editForm.address.trim() }] : [],
+        },
       });
       setShowEditModal(false);
-      dispatch(fetchClientById(id as string));
     } catch {
       Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,16 +18,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { StatusColors } from '../../../constants/StatusColors';
-import { adminApi } from '../../../src/services/adminApi';
 import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router } from 'expo-router';
-
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { useInfiniteOrders } from '../../../src/hooks/query/useOrders';
+import { useDriversList } from '../../../src/hooks/query/useDrivers';
+import { useUpdateOrderStatus } from '../../../src/hooks/query/useOrder';
 
 const { width } = Dimensions.get('window');
 
@@ -48,93 +49,46 @@ export default function OrdersScreen() {
 
   const [activeTab, setActiveTab] = useState('Toutes');
   const [search, setSearch] = useState('');
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-
-  // Filters State
-  const [drivers, setDrivers] = useState<any[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  useEffect(() => {
-    adminApi.getUsers().then(res => {
-      setDrivers(res.data.filter((u: any) => u.role?.toLowerCase() === 'livreur'));
-    }).catch(console.error);
-  }, []);
+  const filters = useMemo(() => ({
+    status: activeTab === 'Toutes' ? undefined : activeTab,
+    search: search.length > 2 ? search : undefined,
+    dateDebut: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
+    dateFin: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
+  }), [activeTab, search, selectedDate]);
 
-  const fetchOrders = async (pageNum: number, isRefresh: boolean = false) => {
-    try {
-      if (pageNum === 0) setLoading(true);
-      else setLoadingMore(true);
+  const {
+    data: ordersPages,
+    isLoading: loading,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage: loadingMore,
+  } = useInfiniteOrders(filters);
 
-      const params = {
-        status: activeTab === 'Toutes' ? undefined : activeTab,
-        search: search.length > 2 ? search : undefined,
-        page: pageNum,
-        limit: 20,
-        dateDebut: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
-        dateFin: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined
-      };
+  const { data: driverUsers = [] } = useDriversList();
+  const drivers = useMemo(
+    () => driverUsers.filter((u: any) => u.role?.toLowerCase() === 'livreur'),
+    [driverUsers]
+  );
 
-      const res = await adminApi.getOrders(params);
-      const newOrders = res.data.content || res.data || [];
-      const ordersArray = Array.isArray(newOrders) ? newOrders : [];
+  const updateStatusMutation = useUpdateOrderStatus();
 
-      if (isRefresh || pageNum === 0) {
-        setOrders(ordersArray);
-      } else {
-        setOrders(prev => {
-          const combined = [...prev, ...ordersArray];
-          const unique = combined.filter((item, index, self) =>
-            index === self.findIndex((t) => t.id === item.id)
-          );
-          return unique;
-        });
-      }
+  const orders = useMemo(() => {
+    const pages = ordersPages?.pages ?? [];
+    return pages.flatMap((p: any) => p.content || p || []);
+  }, [ordersPages]);
 
-      setHasMore(ordersArray.length === 20);
-      setTotalCount(res.data.totalElements || (isRefresh || pageNum === 0 ? ordersArray.length : totalCount));
-    } catch (error) {
-      console.error('Fetch orders error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  };
+  const totalCount = ordersPages?.pages?.[0]?.totalElements ?? orders.length;
+  const refreshing = isFetching && !loading && !loadingMore;
 
-  useEffect(() => {
-    fetchOrders(0, true);
-  }, [activeTab, search, selectedDate]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    setPage(0);
-    fetchOrders(0, true);
-  };
-
-  const loadMore = () => {
-    if (!loadingMore && hasMore && !loading) {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchOrders(nextPage);
-    }
-  };
-
-  const onDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (date) {
-      setSelectedDate(date);
-    }
-  };
+  const onRefresh = () => { refetch(); };
+  const loadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
 
   const handleValidateOrder = (id: number) => {
     Alert.alert(
@@ -144,42 +98,23 @@ export default function OrdersScreen() {
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.confirm'),
-          onPress: async () => {
-            try {
-              await adminApi.updateOrderStatus(id, 'PICKED_UP');
-              onRefresh();
-            } catch (error) {
-              Alert.alert(t('common.error'), t('common.error_msg'));
-            }
+          onPress: () => {
+            updateStatusMutation.mutate(
+              { id, status: 'PICKED_UP' },
+              { onError: () => Alert.alert(t('common.error'), t('common.error_msg')) }
+            );
           }
         }
       ]
     );
   };
 
-  const sameDay = (d1: string | Date, d2: Date) => {
-    const date1 = new Date(d1);
-    return date1.getFullYear() === d2.getFullYear() &&
-           date1.getMonth() === d2.getMonth() &&
-           date1.getDate() === d2.getDate();
-  };
-
   const filteredOrders = useMemo(() => {
-    return orders.filter(o => {
-      let match = true;
-      if (selectedDriver) {
-        if (o.livreur?.id !== selectedDriver.id && o.deliveryDriver?.id !== selectedDriver.id) {
-          match = false;
-        }
-      }
-      if (selectedDate && o.dateCreation) {
-        if (!sameDay(o.dateCreation, selectedDate)) {
-          match = false;
-        }
-      }
-      return match;
-    });
-  }, [orders, selectedDriver, selectedDate]);
+    if (!selectedDriver) return orders;
+    return orders.filter(o =>
+      o.livreur?.id === selectedDriver.id || o.deliveryDriver?.id === selectedDriver.id
+    );
+  }, [orders, selectedDriver]);
 
 
   const renderStatsBanner = () => {
@@ -306,7 +241,7 @@ export default function OrdersScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.tab, activeTab === item.id && styles.activeTab]}
-              onPress={() => { setActiveTab(item.id); setPage(0); }}
+              onPress={() => { setActiveTab(item.id); }}
             >
               <Text style={[styles.tabText, activeTab === item.id && styles.activeTabText]}>
                 {item.label}

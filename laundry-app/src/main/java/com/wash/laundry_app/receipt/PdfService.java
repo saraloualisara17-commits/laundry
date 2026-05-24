@@ -6,6 +6,7 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.itextpdf.html2pdf.ConverterProperties;
 import com.itextpdf.html2pdf.HtmlConverter;
+import com.itextpdf.layout.font.FontProvider;
 import com.wash.laundry_app.clients.Client;
 import com.wash.laundry_app.command.Commande;
 import com.wash.laundry_app.command.CommandeStatus;
@@ -16,6 +17,7 @@ import com.wash.laundry_app.command.attempts.OrderAttempt;
 import com.wash.laundry_app.config.SystemSettings;
 import com.wash.laundry_app.config.SystemSettingsService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,11 +27,13 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PdfService {
@@ -39,25 +43,53 @@ public class PdfService {
     @Value("${app.business.address:Casablanca, Maroc}")
     private String businessAddress;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    // Resolved upload directory — same value as file.upload-dir so the logo path
+    // stays consistent with where FileStorageService writes files.
+    @Value("${file.upload-dir:./uploads}")
+    private String uploadDir;
+
+    // Frontend URL used in QR codes.  Override via APP_FRONTEND_URL env var in prod.
+    @Value("${app.frontend.url:${webSiteUrl:http://localhost:3000}}")
     private String frontendUrl;
 
     private String logoToBase64ImgTag(String logoFileName) {
-        if (logoFileName == null || logoFileName.isEmpty()) return "";
+        if (logoFileName == null || logoFileName.isEmpty()) {
+            log.debug("[pdf] No logo configured — skipping logo embed");
+            return "";
+        }
         try {
-            java.nio.file.Path logoPath = Paths.get("uploads").toAbsolutePath().normalize().resolve(logoFileName);
-            if (!Files.exists(logoPath)) return "";
+            // Resolve against the configured upload dir (same as file.upload-dir).
+            // This works both locally (./uploads) and on Railway (/app/uploads).
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path logoPath   = uploadPath.resolve(logoFileName).normalize();
+
+            // Prevent path traversal outside upload dir
+            if (!logoPath.startsWith(uploadPath)) {
+                log.warn("[pdf] Logo path traversal attempt blocked: {}", logoFileName);
+                return "";
+            }
+
+            if (!Files.exists(logoPath)) {
+                log.warn("[pdf] Logo file not found: {} (resolved: {}). " +
+                         "If running on Railway, the ephemeral filesystem may have been reset.",
+                         logoFileName, logoPath);
+                return "";
+            }
+
             byte[] bytes = Files.readAllBytes(logoPath);
-            String ext = logoFileName.toLowerCase();
-            String mime = ext.endsWith(".png") ? "image/png" : ext.endsWith(".webp") ? "image/webp" : "image/jpeg";
+            String ext  = logoFileName.toLowerCase();
+            String mime = ext.endsWith(".png") ? "image/png"
+                        : ext.endsWith(".webp") ? "image/webp"
+                        : "image/jpeg";
             String b64 = Base64.getEncoder().encodeToString(bytes);
+            log.debug("[pdf] Logo loaded OK — file={} bytes={} mime={}", logoFileName, bytes.length, mime);
             return "<img src='data:" + mime + ";base64," + b64 + "' style='height:70px; object-fit:contain;'/>";
         } catch (Exception e) {
+            log.error("[pdf] Failed to load logo '{}': {}", logoFileName, e.getMessage(), e);
             return "";
         }
     }
 
-    // Generate QR code as base64 image
     private String generateQrCodeBase64(String content) {
         try {
             QRCodeWriter writer = new QRCodeWriter();
@@ -65,21 +97,60 @@ public class PdfService {
             BufferedImage image = MatrixToImageWriter.toBufferedImage(matrix);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(image, "PNG", baos);
-            return Base64.getEncoder().encodeToString(baos.toByteArray());
+            String b64 = Base64.getEncoder().encodeToString(baos.toByteArray());
+            log.debug("[pdf] QR code generated OK — content={} bytes={}", content, baos.size());
+            return b64;
         } catch (Exception e) {
+            log.error("[pdf] QR code generation failed: {}", e.getMessage(), e);
             return "";
         }
     }
 
+    // Shared ConverterProperties with standard fonts registered.
+    // iTextPDF's default ConverterProperties has no FontProvider, so it falls
+    // back to built-in Type1 fonts (Helvetica/Courier/Times) which have no Arabic
+    // glyphs — Arabic text renders as empty boxes. Registering the standard font
+    // set gives iText access to all fonts it ships with, which covers Latin and
+    // basic Unicode. For full Arabic shaping you'd need an Arabic TTF registered
+    // here (e.g. Cairo, Amiri); for now this at minimum prevents iText crashes.
+    private ConverterProperties buildConverterProperties() {
+        ConverterProperties props = new ConverterProperties();
+        try {
+            FontProvider fontProvider = new FontProvider();
+            fontProvider.addStandardPdfFonts();  // Helvetica, Times, Courier
+            fontProvider.addSystemFonts();        // OS fonts — includes Arial on most servers
+            props.setFontProvider(fontProvider);
+            log.debug("[pdf] FontProvider configured with standard + system fonts");
+        } catch (Exception e) {
+            log.warn("[pdf] Could not configure FontProvider ({}), using iText default. Arabic may not render.", e.getMessage());
+        }
+        return props;
+    }
+
     public byte[] generatePdf(Commande commande, String receiptType) {
+        log.info("[pdf] Generating {} PDF — orderId={} orderNum={}",
+                receiptType, commande.getId(), commande.getNumeroCommande());
+        long t0 = System.currentTimeMillis();
         try {
             String html = buildReceiptHtml(commande, receiptType);
+            log.debug("[pdf] HTML built — length={} chars", html.length());
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ConverterProperties props = new ConverterProperties();
+            ConverterProperties props = buildConverterProperties();
             HtmlConverter.convertToPdf(html, baos, props);
-            return baos.toByteArray();
+
+            byte[] result = baos.toByteArray();
+            log.info("[pdf] {} PDF ready — orderId={} bytes={} durationMs={}",
+                    receiptType, commande.getId(), result.length, System.currentTimeMillis() - t0);
+
+            if (result.length == 0) {
+                throw new RuntimeException("iText returned empty PDF byte array");
+            }
+            return result;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to generate PDF: " + e.getMessage());
+            log.error("[pdf] {} PDF generation FAILED — orderId={} error={}",
+                    receiptType, commande.getId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to generate PDF: " + e.getMessage(), e);
         }
     }
 
@@ -327,13 +398,19 @@ public class PdfService {
     }
 
     public byte[] generatePaymentReceiptPdf(Paiement paiement) {
+        log.info("[pdf] Generating PAYMENT PDF — paiementId={} commandeId={}",
+                paiement.getId(), paiement.getCommande() != null ? paiement.getCommande().getId() : "?");
         try {
             String html = buildPaymentReceiptHtml(paiement);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            HtmlConverter.convertToPdf(html, baos, new ConverterProperties());
-            return baos.toByteArray();
+            HtmlConverter.convertToPdf(html, baos, buildConverterProperties());
+            byte[] result = baos.toByteArray();
+            log.info("[pdf] PAYMENT PDF ready — paiementId={} bytes={}", paiement.getId(), result.length);
+            return result;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to generate payment receipt PDF: " + e.getMessage());
+            log.error("[pdf] PAYMENT PDF generation FAILED — paiementId={} error={}",
+                    paiement.getId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to generate payment receipt PDF: " + e.getMessage(), e);
         }
     }
 

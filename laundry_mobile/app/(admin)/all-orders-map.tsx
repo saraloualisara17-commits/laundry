@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   FlatList,
   Dimensions,
-  ScrollView,
   Platform,
   Linking
 } from 'react-native';
@@ -15,13 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { adminApi } from '../../src/services/adminApi';
+import { router, useLocalSearchParams } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
-import { STATUS_COLORS, STATUS_LABELS } from '../../constants/StatusColors';
+import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useDirections } from '../../src/hooks/useDirections';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useOrdersForMap } from '../../src/hooks/query/useOrders';
 
 const { width, height } = Dimensions.get('window');
 
@@ -29,12 +27,8 @@ export default function AllOrdersMapScreen() {
   const { t, i18n } = useTranslation();
   const { livreurId } = useLocalSearchParams();
   const isArabic = i18n.language === 'ar';
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatuses] = useState<string[]>([
-    'PENDING_PICKUP', 'READY_FOR_DELIVERY', 'DELIVERED'
-  ]);
+  const SELECTED_STATUSES = ['PENDING_PICKUP', 'PICKED_UP', 'IN_PROCESS', 'READY_FOR_DELIVERY', 'DELIVERED'];
+
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showList, setShowList] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
@@ -42,20 +36,24 @@ export default function AllOrdersMapScreen() {
   const mapRef = useRef<MapView>(null);
   const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getOrdersForMap(livreurId as string);
-      if (res.data.success) {
-        setOrders(res.data.data);
+  const { data: mapData, isLoading: loading } = useOrdersForMap(livreurId as string);
+  const orders: any[] = useMemo(() => {
+    if (!mapData) return [];
+    return mapData.success ? (mapData.data || []) : (Array.isArray(mapData) ? mapData : []);
+  }, [mapData]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const location = await Location.getCurrentPositionAsync({});
+        setUserLocation(location.coords);
+      } catch {
+        // location unavailable
       }
-    } catch (e) {
-      console.error('Fetch map orders error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    })();
+  }, []);
 
   const getUserLocation = async () => {
     try {
@@ -63,18 +61,10 @@ export default function AllOrdersMapScreen() {
       if (status !== 'granted') return;
       const location = await Location.getCurrentPositionAsync({});
       setUserLocation(location.coords);
-      return location.coords;
-    } catch (e) {
-      console.error('Error getting location:', e);
+    } catch {
+      // location unavailable
     }
   };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-      getUserLocation();
-    }, [])
-  );
 
   const filteredOrders = useMemo(() => {
     return (orders || []).map((o) => {
@@ -96,8 +86,8 @@ export default function AllOrdersMapScreen() {
         resolvedLng: jitterLng,
         resolvedAddress: o.deliveryAddress ?? o.clientAddress ?? '',
       };
-    }).filter(o => o !== null && (selectedStatuses || []).includes(o.status));
-  }, [orders, selectedStatuses]);
+    }).filter(o => o !== null && SELECTED_STATUSES.includes(o.status));
+  }, [orders]);
 
   const markers = useMemo(() => {
     return (filteredOrders || []).map((order) => (
@@ -339,7 +329,7 @@ export default function AllOrdersMapScreen() {
         </View>
       )}
 
-      {loading && !refreshing && (
+      {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={AdminColors.primary} />
         </View>

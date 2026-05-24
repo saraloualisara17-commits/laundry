@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,26 +13,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
-import { adminApi } from '../../../src/services/adminApi';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../../src/store/store';
-import { fetchSettings } from '../../../src/store/settingsSlice';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
-import { router, useFocusEffect } from 'expo-router';
+import { useSettings } from '../../../src/hooks/query/useSettings';
+import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { changeLanguage } from '../../../src/i18n';
 import { useOrderCreation } from '../../../src/context/OrderCreationContext';
 import { ScannerModal } from '../../../components/admin/ScannerModal';
-import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
+import { useDashboardStats, useStatusOverview, useUnpaidOverview } from '../../../src/hooks/query/useDashboard';
+import { useReadyDeliveries, usePendingPickups } from '../../../src/hooks/queries/useLivreur';
 
 const { width: screenWidth } = Dimensions.get('window');
-
-interface DashboardStats {
-  totalCommandesToday: number;
-  totalCommandes: number;
-  revenuesToday: number;
-  totalClients: number;
-}
 
 interface StatusStats {
   count: number;
@@ -52,93 +42,45 @@ interface OverviewData {
   PAID_DEBTS: StatusStats;
 }
 
-interface UnpaidOverview {
-  totalRemaining: number;
-  totalOrders: number;
-  clientsWithDebt: number;
-}
 
 export default function AdminDashboard() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
-  
-  const dispatch = useDispatch<any>();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { settings } = useSelector((state: RootState) => state.settings);
 
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const [overview, setOverview] = useState<OverviewData | null>(null);
-  const [unpaidOverview, setUnpaidOverview] = useState<UnpaidOverview | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+
   const [showScanner, setShowScanner] = useState(false);
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const { clearOrder, setMode } = useOrderCreation();
-  const [isLoadingOverview, setIsLoadingOverview] = useState(true);
-  const [overviewError, setOverviewError] = useState(false);
-  const [myMissionCount, setMyMissionCount] = useState(0);
 
   const readyPulsingAnim = useRef(new Animated.Value(1)).current;
 
-  const loadOverviewData = async () => {
-    // Only admins may call these endpoints — bail out early for other roles
-    const role = user?.role?.toLowerCase();
-    if (role !== 'admin') return;
+  const { data: stats } = useDashboardStats();
+  const { data: overviewRes, isLoading: isLoadingOverview, isFetching: isFetchingOverview, isError: overviewError, refetch: refetchOverview } = useStatusOverview();
+  const { data: unpaidOverviewData, refetch: refetchUnpaid } = useUnpaidOverview();
+  const { data: pendingPickups = [], refetch: refetchPickups } = usePendingPickups();
+  const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
 
-    setIsLoadingOverview(true);
-    try {
-      const [ovRes, unovRes, pickupsRes, deliveriesRes] = await Promise.all([
-        adminApi.getStatusOverview(),
-        adminApi.getUnpaidOverview(),
-        user?.id ? adminApi.getOrders({ livreurId: user.id, status: 'PENDING_PICKUP', size: 100 }) : Promise.resolve({ data: { content: [] } }),
-        user?.id ? adminApi.getOrders({ livreurId: user.id, status: 'READY_FOR_DELIVERY', size: 100 }) : Promise.resolve({ data: { content: [] } })
-      ]);
-      setOverview(ovRes.data.data);
-      setUnpaidOverview(unovRes.data);
-      const pickupCount = (pickupsRes.data.content || []).length;
-      const deliveryCount = (deliveriesRes.data.content || []).filter((o: any) => {
-        const assignedDriverId = o.deliveryDriver?.id;
-        return !assignedDriverId || Number(assignedDriverId) === Number(user?.id);
-      }).length;
-      setMyMissionCount(pickupCount + deliveryCount);
-      setLastUpdated(
-        new Date().toLocaleTimeString(i18n.language === 'ar' ? 'fr-FR' : 'fr-FR', {
-          hour: '2-digit', minute: '2-digit'
-        })
-      );
-    } catch (error) {
-      console.error('Overview fetch error:', error);
-      setOverviewError(true);
-    } finally {
-      setIsLoadingOverview(false);
-    }
-  };
+  const overview = overviewRes?.data ?? overviewRes ?? null;
+  const unpaidOverview = unpaidOverviewData ?? null;
+  const myMissionCount = pendingPickups.length + readyDeliveries.length;
+  const refreshing = isFetchingOverview && !isLoadingOverview;
 
-  const fetchData = async () => {
-    // Only admins may call these endpoints — bail out early for other roles
-    const role = user?.role?.toLowerCase();
-    if (role !== 'admin') return;
-
-    try {
-      const statsRes = await adminApi.getStats();
-      setStats(statsRes.data);
-    } catch (error) {
-      console.error('Fetch dashboard data error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-      loadOverviewData();
-      dispatch(fetchSettings());
-    }, [])
+  const lastUpdated = useMemo(
+    () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    [overviewRes]
   );
+
+
+  const onRefresh = () => {
+    refetchOverview();
+    refetchUnpaid();
+    refetchPickups();
+    refetchDeliveries();
+  };
+
+  const loadOverviewData = refetchOverview;
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -151,11 +93,6 @@ export default function AdminDashboard() {
     return () => pulse.stop();
   }, []);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-    loadOverviewData();
-  }, []);
 
   const handleSelectMode = (mode: 'immediate' | 'scheduled') => {
     clearOrder();
@@ -334,7 +271,7 @@ export default function AdminDashboard() {
             </View>
           </View>
         ) : overviewError ? (
-          <TouchableOpacity style={styles.errorContainer} onPress={loadOverviewData}>
+          <TouchableOpacity style={styles.errorContainer} onPress={() => loadOverviewData()}>
             <Text style={styles.errorText}>⚠️ {t('dashboard.stats_error')}</Text>
             <Text style={styles.retryText}>{t('dashboard.retry')}</Text>
           </TouchableOpacity>

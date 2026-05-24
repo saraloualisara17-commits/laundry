@@ -45,6 +45,17 @@ export const useClientsWithDebt = () => {
 };
 
 /**
+ * Hook for all orders belonging to a single client.
+ */
+export const useClientOrders = (id: string | number) => {
+  return useQuery({
+    queryKey: [...queryKeys.clients.detail(id), 'orders'] as const,
+    queryFn: () => adminApi.getClientCommandes(String(id)).then(res => res.data),
+    enabled: !!id,
+  });
+};
+
+/**
  * Mutation for creating/updating a client.
  */
 export const useSaveClient = () => {

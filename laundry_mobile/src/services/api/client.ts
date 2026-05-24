@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { ApiError } from './types';
 import { connectivity } from '../offline/connectivity';
 
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.105:8080';
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
 
 const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,

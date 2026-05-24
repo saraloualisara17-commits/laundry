@@ -1,10 +1,9 @@
-import { Tabs, Stack } from 'expo-router';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../src/store/store';
 import { useTranslation } from 'react-i18next';
+import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
 
 const PRIMARY = '#0D7377';
 const TEXT_MUTED = '#94A3B8';
@@ -12,8 +11,9 @@ const TEXT_MUTED = '#94A3B8';
 export default function LivreurLayout() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { readyDeliveries, readyOrders } = useSelector((s: RootState) => s.livreur);
-  const missionCount = (readyDeliveries?.length || 0) + (readyOrders?.length || 0);
+  const { data: readyDeliveries = [] } = useReadyDeliveries();
+  const { data: readyOrders = [] } = usePendingPickups();
+  const missionCount = readyDeliveries.length + readyOrders.length;
 
   return (
     <Tabs

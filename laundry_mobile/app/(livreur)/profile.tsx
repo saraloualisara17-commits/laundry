@@ -1,19 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Alert, Platform, ScrollView, RefreshControl,
+  Alert, ScrollView, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { logOut } from '../../src/store/authSlice';
-import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import { RootState, AppDispatch } from '../../src/store/store';
-import { useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { authApi } from '../../src/services/api';
 import { changeLanguage } from '../../src/i18n';
 import { useTranslation } from 'react-i18next';
+import { useLivreurStats, useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
 
 const C = {
   primary: '#0D7377',
@@ -34,23 +33,18 @@ export default function LivreurProfile() {
   const { t, i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
-  const { dashboardStats, readyDeliveries, readyOrders } = useSelector((s: RootState) => s.livreur);
+
+  const { data: dashboardStats, refetch: refetchStats } = useLivreurStats();
+  const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
+  const { data: readyOrders = [], refetch: refetchPickups } = usePendingPickups();
+
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    dispatch(fetchLivreurDashboardStats());
-    dispatch(fetchReadyDeliveries());
-    dispatch(fetchPendingPickups());
-  }, [dispatch]));
-
-  const onRefresh = () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    Promise.all([
-      dispatch(fetchLivreurDashboardStats()),
-      dispatch(fetchReadyDeliveries()),
-      dispatch(fetchPendingPickups()),
-    ]).finally(() => setRefreshing(false));
-  };
+    await Promise.all([refetchStats(), refetchDeliveries(), refetchPickups()]);
+    setRefreshing(false);
+  }, [refetchStats, refetchDeliveries, refetchPickups]);
 
   const handleLogout = () => {
     Alert.alert(t('common.logout_confirm_title'), t('common.logout_confirm_msg'), [
@@ -68,8 +62,8 @@ export default function LivreurProfile() {
     ]);
   };
 
-  const deliveriesCount = readyDeliveries?.length || 0;
-  const pickupsCount = readyOrders?.length || 0;
+  const deliveriesCount = readyDeliveries.length;
+  const pickupsCount = readyOrders.length;
   const totalCollected = dashboardStats?.totalCollectedToday || 0;
   const initials = (user?.name || 'L').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
 

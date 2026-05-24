@@ -18,12 +18,51 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     @Query("SELECT c FROM Commande c LEFT JOIN FETCH c.client WHERE c.id = :id")
     Optional<Commande> findWithClientDetailsById(@Param("id") Long id);
 
+    // Receipt loading — split across 6 queries to avoid Hibernate "cannot fetch multiple bags" error.
+    // Hibernate forbids JOIN FETCH on more than one @OneToMany List<> (bag) per query.
+    // Client.phones and Client.addresses are both bags, so they must be fetched separately.
+    //
+    // Query 1: Commande scalars + ManyToOne associations only (no bags at all).
     @Query("SELECT DISTINCT c FROM Commande c " +
            "LEFT JOIN FETCH c.client cl " +
+           "LEFT JOIN FETCH c.livreur " +
+           "LEFT JOIN FETCH c.deliveryDriver " +
+           "WHERE c.id = :id")
+    Optional<Commande> findForReceiptById(@Param("id") Long id);
+
+    // Query 1b: client phones bag (one bag — safe to fetch alone).
+    @Query("SELECT DISTINCT c FROM Commande c " +
+           "LEFT JOIN FETCH c.client cl " +
+           "LEFT JOIN FETCH cl.phones " +
+           "WHERE c.id = :id")
+    Optional<Commande> findWithClientPhonesById(@Param("id") Long id);
+
+    // Query 1c: client addresses bag (one bag — safe to fetch alone).
+    @Query("SELECT DISTINCT c FROM Commande c " +
+           "LEFT JOIN FETCH c.client cl " +
+           "LEFT JOIN FETCH cl.addresses " +
+           "WHERE c.id = :id")
+    Optional<Commande> findWithClientAddressesById(@Param("id") Long id);
+
+    // Query 2: order items + product (one bag).
+    @Query("SELECT DISTINCT c FROM Commande c " +
            "LEFT JOIN FETCH c.commandeTapis ct " +
            "LEFT JOIN FETCH ct.product " +
            "WHERE c.id = :id")
-    Optional<Commande> findForReceiptById(@Param("id") Long id);
+    Optional<Commande> findWithItemsById(@Param("id") Long id);
+
+    // Query 3: payments (one bag).
+    @Query("SELECT DISTINCT c FROM Commande c " +
+           "LEFT JOIN FETCH c.paiements " +
+           "WHERE c.id = :id")
+    Optional<Commande> findWithPaiementsById(@Param("id") Long id);
+
+    // Query 4: attempts + attempt driver (one bag).
+    @Query("SELECT DISTINCT c FROM Commande c " +
+           "LEFT JOIN FETCH c.attempts att " +
+           "LEFT JOIN FETCH att.driver " +
+           "WHERE c.id = :id")
+    Optional<Commande> findWithAttemptsById(@Param("id") Long id);
 
     @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = :status")
     long countByStatus(@Param("status") CommandeStatus status);

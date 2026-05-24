@@ -1,76 +1,54 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
-import { adminApi } from '../../src/services/adminApi';
 import { StatusColors } from '../../constants/StatusColors';
+import { useInfiniteOrders } from '../../src/hooks/query/useOrders';
 
 export default function SelfSubmittedOrdersScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState('');
   const [searchText, setSearchText] = useState('');
 
-  const fetchOrders = useCallback(async (pageNum = 0, searchVal = search, replace = true) => {
-    if (pageNum === 0) replace ? setLoading(true) : setRefreshing(true);
-    else setLoadingMore(true);
+  const filters = useMemo(() => ({
+    selfSubmitted: true,
+    search: search || undefined,
+    sort: 'desc',
+  }), [search]);
 
-    try {
-      const res = await adminApi.getOrders({
-        selfSubmitted: true,
-        search: searchVal || undefined,
-        page: pageNum,
-        size: 20,
-        sort: 'desc',
-      });
-      const data = res.data;
-      const allItems = data.content || data.commandes || [];
-      // Only show orders that still have no pickup driver assigned
-      const items = allItems.filter((o: any) => !o.livreur);
-      if (replace || pageNum === 0) {
-        setOrders(items);
-      } else {
-        setOrders(prev => [...prev, ...items]);
-      }
-      setHasMore(!data.last && items.length > 0);
-      setPage(pageNum);
-    } catch (e) {
-      console.error('Self-submitted orders error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, [search]);
+  const {
+    data: ordersPages,
+    isLoading: loading,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage: loadingMore,
+  } = useInfiniteOrders(filters);
 
-  useFocusEffect(useCallback(() => { fetchOrders(0, search, true); }, []));
+  const orders = useMemo(() => {
+    const pages = ordersPages?.pages ?? [];
+    return pages
+      .flatMap((p: any) => p.content || p.commandes || p || [])
+      .filter((o: any) => !o.livreur);
+  }, [ordersPages]);
 
-  const onRefresh = () => fetchOrders(0, search, true);
-
-  const onLoadMore = () => {
-    if (!loadingMore && hasMore) fetchOrders(page + 1, search, false);
-  };
+  const refreshing = isFetching && !loading && !loadingMore;
+  const onRefresh = () => { refetch(); };
+  const onLoadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
 
   const onSearch = (text: string) => {
     setSearchText(text);
-    if (text.length === 0 || text.length > 2) {
-      setSearch(text);
-      fetchOrders(0, text, true);
-    }
+    if (text.length === 0 || text.length > 2) setSearch(text);
   };
 
   const statusColor = (status: string) => (StatusColors as any)[status]?.bg || '#94A3B8';

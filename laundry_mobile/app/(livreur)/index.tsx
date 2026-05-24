@@ -4,15 +4,16 @@ import {
   RefreshControl, ActivityIndicator, Animated, Linking, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { logOut } from '../../src/store/authSlice';
-import { fetchLivreurDashboardStats, fetchReadyDeliveries, fetchPendingPickups } from '../../src/store/livreurThunks';
 import * as SecureStore from 'expo-secure-store';
+import { authApi } from '../../src/services/api';
 import { useTranslation } from 'react-i18next';
 import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
+import { useLivreurStats, useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
 
 const C = {
   primary: '#0D7377',
@@ -49,8 +50,12 @@ export default function LivreurDashboard() {
   const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
-  const { dashboardStats, readyDeliveries, readyOrders, loading } = useSelector((s: RootState) => s.livreur);
 
+  const { data: dashboardStats, refetch: refetchStats } = useLivreurStats();
+  const { data: readyDeliveries = [], isLoading: loadingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
+  const { data: readyOrders = [], isLoading: loadingPickups, refetch: refetchPickups } = usePendingPickups();
+
+  const loading = loadingDeliveries || loadingPickups;
   const [refreshing, setRefreshing] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
 
@@ -63,15 +68,11 @@ export default function LivreurDashboard() {
     ).start();
   }, []);
 
-  const loadData = useCallback(() => {
-    dispatch(fetchLivreurDashboardStats());
-    dispatch(fetchReadyDeliveries());
-    dispatch(fetchPendingPickups());
-  }, [dispatch]);
-
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
-
-  const onRefresh = () => { setRefreshing(true); loadData(); setTimeout(() => setRefreshing(false), 1200); };
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refetchStats(), refetchDeliveries(), refetchPickups()]);
+    setRefreshing(false);
+  }, [refetchStats, refetchDeliveries, refetchPickups]);
 
   const handleLogout = async () => {
     Alert.alert(t('common.logout_confirm_title'), t('common.logout_confirm_msg'), [
@@ -90,17 +91,17 @@ export default function LivreurDashboard() {
   };
 
   // Filter delivery orders to only those due today or overdue — not future-scheduled
-  const visibleDeliveries = (readyDeliveries || []).filter((o: any) => isVisibleToday(o.scheduledDeliveryDate));
+  const visibleDeliveries = readyDeliveries.filter((o: any) => isVisibleToday(o.scheduledDeliveryDate));
 
   // Build "next mission" from existing data
-  const allMissions = [...visibleDeliveries, ...(readyOrders || [])];
+  const allMissions = [...visibleDeliveries, ...readyOrders];
   const deliveryCount = visibleDeliveries.length;
-  const pickupCount = readyOrders?.length || 0;
+  const pickupCount = readyOrders.length;
   const totalCollected = dashboardStats?.totalCollectedToday || 0;
 
   const nextMission = allMissions.length > 0 ? (() => {
-    const first = visibleDeliveries[0] || readyOrders?.[0];
-    const isDelivery = readyDeliveries?.length > 0;
+    const first = visibleDeliveries[0] || readyOrders[0];
+    const isDelivery = readyDeliveries.length > 0;
     const addr = first?.client?.addresses?.[0];
     return first ? {
       type: isDelivery ? 'delivery' : 'pickup',

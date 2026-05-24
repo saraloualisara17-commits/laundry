@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  FlatList, 
-  ActivityIndicator, 
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
   RefreshControl,
   Modal,
   ScrollView,
@@ -20,7 +20,6 @@ import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { StatusBadge } from '../../components/admin/StatusBadge';
-import { adminApi } from '../../src/services/adminApi';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useDirections } from '../../src/hooks/useDirections';
@@ -29,6 +28,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 import { useFormStyles } from '../../src/hooks/useFormStyles';
+import { useDriversList } from '../../src/hooks/query/useDrivers';
+import { useOrders } from '../../src/hooks/query/useOrders';
 
 export default function OrdersByStatusScreen() {
   const { t, i18n } = useTranslation();
@@ -38,27 +39,17 @@ export default function OrdersByStatusScreen() {
   const isEmploye = user?.role?.toUpperCase() === 'EMPLOYE';
 
   const { status, mode, specialFilter } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [ordersData, setOrdersData] = useState<any>(null);
   const [showMap, setShowMap] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
-  
-  // Missing states
   const [dateDebut, setDateDebut] = useState<Date | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
-  const [staffList, setStaffList] = useState<any[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStaffModal, setShowStaffModal] = useState(false);
 
   const mapRef = useRef<MapView>(null);
   const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
-
-  const ordersWithGps = useMemo(() => {
-    return (ordersData?.content || []).filter((o: any) => o.clientLatitude && o.clientLongitude);
-  }, [ordersData]);
 
   // Status configuration lookup
   const statusConfig = useMemo(() => {
@@ -101,6 +92,30 @@ export default function OrdersByStatusScreen() {
     };
   }, [status, mode, specialFilter, i18n.language]);
 
+  const orderFilters = useMemo(() => {
+    const base: any = {
+      page: 0,
+      size: 50,
+      dateDebut: dateDebut ? dateDebut.toISOString().split('T')[0] : undefined,
+      livreurId: selectedStaffId || undefined,
+    };
+    if (specialFilter === 'PAID_DEBTS') return { ...base, paidDebts: true };
+    return {
+      ...base,
+      status: status as string,
+      mode: mode as string,
+      activeOnly: mode === 'IMMEDIATE' ? true : undefined,
+    };
+  }, [status, mode, specialFilter, dateDebut, selectedStaffId]);
+
+  const { data: ordersData, isLoading: loading, isFetching, refetch } = useOrders(orderFilters);
+  const refreshing = isFetching && !loading;
+  const { data: allUsers = [] } = useDriversList();
+
+  const ordersWithGps = useMemo(() => {
+    return (ordersData?.content || []).filter((o: any) => o.clientLatitude && o.clientLongitude);
+  }, [ordersData]);
+
   const markers = useMemo(() => {
     return ordersWithGps.map((order: any) => {
       const lat = parseFloat(order.clientLatitude);
@@ -118,59 +133,16 @@ export default function OrdersByStatusScreen() {
       );
     }).filter(Boolean);
   }, [ordersWithGps, selectedOrder?.id, statusConfig]);
-  
-  const fetchStaff = async () => {
-    try {
-      const res = await adminApi.getUsers();
-      setStaffList(res.data.filter((u: any) => u.role?.toLowerCase() === 'livreur' || u.role?.toLowerCase() === 'employe'));
-    } catch (e) {
-      console.error('Fetch staff error:', e);
-    }
-  };
 
-  const fetchData = async (isRefresh = false) => {
-    if (!isRefresh) setLoading(true);
-    try {
-      let res;
-      const params: any = {
-        page: 0,
-        size: 50,
-        dateDebut: dateDebut ? dateDebut.toISOString().split('T')[0] : undefined,
-        livreurId: selectedStaffId || undefined
-      };
+  const staffList = useMemo(
+    () => (allUsers as any[]).filter((u: any) => {
+      const r = u.role?.toLowerCase();
+      return r === 'livreur' || r === 'employe';
+    }),
+    [allUsers]
+  );
 
-      if (specialFilter === 'PAID_DEBTS') {
-        res = await adminApi.getOrders({ ...params, paidDebts: true });
-      } else {
-        res = await adminApi.getOrders({
-          ...params,
-          status: status as string,
-          mode: mode as string,
-          activeOnly: mode === 'IMMEDIATE' ? true : undefined
-        });
-      }
-
-      setOrdersData(res.data);
-    } catch (e) {
-      console.error('Fetch orders error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [status, mode, specialFilter, dateDebut, selectedStaffId]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData(true);
-  };
+  const onRefresh = () => { refetch(); };
 
   const clearFilters = () => {
     setDateDebut(null);

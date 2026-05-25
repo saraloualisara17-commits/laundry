@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView,
   Modal, TextInput, ActivityIndicator, Alert, Dimensions,
   Platform, KeyboardAvoidingView,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -182,7 +183,7 @@ export default function LivreurEditOrderItemsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerRow, row(isArabic)]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={22} color="white" />
           </TouchableOpacity>
@@ -216,7 +217,7 @@ export default function LivreurEditOrderItemsScreen() {
                   {t('admin.orders.create.items.cart', { defaultValue: 'Panier' })} ({cart.length})
                 </Text>
                 {cart.map(item => (
-                  <View key={item.cartId} style={[styles.cartItem, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View key={item.cartId} style={[styles.cartItem, row(isArabic)]}>
                     <Text style={styles.cartIcon}>{item.categoryIcon}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.cartItemName, isArabic && { textAlign: 'right' }]}>{item.nom}</Text>
@@ -234,7 +235,7 @@ export default function LivreurEditOrderItemsScreen() {
                     </TouchableOpacity>
                   </View>
                 ))}
-                <View style={[styles.cartTotal, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.cartTotal, row(isArabic)]}>
                   <Text style={styles.cartTotalLabel}>{t('financial.total')}</Text>
                   <Text style={styles.cartTotalValue}>{total.toFixed(2)} {t('common.dh')}</Text>
                 </View>
@@ -246,7 +247,7 @@ export default function LivreurEditOrderItemsScreen() {
             const inCart = cart.filter(c => c.productId === item.id).length;
             return (
               <TouchableOpacity
-                style={[styles.productCard, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.productCard, row(isArabic)]}
                 onPress={() => openConfig(item)}
                 activeOpacity={0.75}
               >
@@ -292,7 +293,7 @@ export default function LivreurEditOrderItemsScreen() {
       <Modal visible={configModal.open} transparent animationType="slide" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setConfigModal({ open: false, product: null, editCartId: null })} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
             <View style={[styles.modalSheet, { maxHeight: SCREEN_HEIGHT * 0.85 }]}>
               <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>{configModal.product?.nom}</Text>

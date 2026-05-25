@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -24,7 +25,7 @@ export default function CreateOrderEntry() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.header, row(isArabic)]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
@@ -48,7 +49,7 @@ export default function CreateOrderEntry() {
           <Text style={[styles.cardDesc, isArabic && { textAlign: 'right' }]}>
             {t('admin.orders.create.mode_immediate_desc')}
           </Text>
-          <View style={[styles.tagRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.tagRow, row(isArabic)]}>
             <View style={styles.tag}>
               <Text style={styles.tagText}>📍 {t('admin.orders.create.tags.on_site')}</Text>
             </View>
@@ -73,7 +74,7 @@ export default function CreateOrderEntry() {
           <Text style={[styles.cardDesc, isArabic && { textAlign: 'right' }]}>
             {t('admin.orders.create.mode_scheduled_desc')}
           </Text>
-          <View style={[styles.tagRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.tagRow, row(isArabic)]}>
             <View style={[styles.tag, { backgroundColor: AdminColors.accent100, borderColor: AdminColors.accent }]}>
               <Text style={[styles.tagText, { color: AdminColors.accent }]}>🚚 {t('admin.orders.create.tags.pickup')}</Text>
             </View>

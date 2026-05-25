@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Platform, Modal, TextInput, Alert,
   KeyboardAvoidingView, RefreshControl,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -122,7 +123,7 @@ export default function ClientDetailsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerRow, row(isArabic)]}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
             <Feather name={isArabic ? 'arrow-right' : 'arrow-left'} size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -146,15 +147,15 @@ export default function ClientDetailsScreen() {
           </View>
           <Text style={styles.clientName}>{getClientDisplayName(client)}</Text>
 
-          <View style={[styles.contactRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.contactRow, row(isArabic)]}>
             {getClientPhone(client) ? (
-              <View style={[styles.contactChip, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.contactChip, row(isArabic)]}>
                 <Feather name="phone" size={13} color={Colors.success} />
                 <Text style={styles.contactChipText}>{getClientPhone(client)}</Text>
               </View>
             ) : null}
             {client?.email ? (
-              <View style={[styles.contactChip, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.contactChip, row(isArabic)]}>
                 <Feather name="mail" size={13} color={Colors.primary} />
                 <Text style={styles.contactChipText} numberOfLines={1}>{client.email}</Text>
               </View>
@@ -162,7 +163,7 @@ export default function ClientDetailsScreen() {
           </View>
 
           {client?.addresses?.[0]?.address ? (
-            <View style={[styles.addressRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.addressRow, row(isArabic)]}>
               <Feather name="map-pin" size={13} color={Colors.textMuted} />
               <Text style={[styles.addressText, isArabic && { textAlign: 'right' }]} numberOfLines={2}>
                 {client.addresses[0].address}
@@ -171,7 +172,7 @@ export default function ClientDetailsScreen() {
           ) : null}
 
           {/* New order buttons */}
-          <View style={[styles.orderBtnRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.orderBtnRow, row(isArabic)]}>
             <TouchableOpacity
               style={[styles.orderBtn, { backgroundColor: Colors.primary }]}
               onPress={() => handleNewOrder('immediate')}
@@ -192,7 +193,7 @@ export default function ClientDetailsScreen() {
         </View>
 
         {/* Stats */}
-        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.statsRow, row(isArabic)]}>
           <View style={styles.statBox}>
             <Text style={styles.statVal}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
             <Text style={styles.statLbl}>{t('dashboard.orders_count')}</Text>
@@ -208,7 +209,7 @@ export default function ClientDetailsScreen() {
         </View>
 
         {/* Orders list */}
-        <View style={[styles.sectionRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.sectionRow, row(isArabic)]}>
           <Text style={styles.sectionTitle}>{t('dashboard.recent_orders')}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
@@ -228,7 +229,7 @@ export default function ClientDetailsScreen() {
               onPress={() => router.push(`/order/${commande.id}`)}
               activeOpacity={0.75}
             >
-              <View style={[styles.orderTop, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.orderTop, row(isArabic)]}>
                 <View>
                   <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{commande.numeroCommande}</Text>
                   <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>
@@ -237,8 +238,8 @@ export default function ClientDetailsScreen() {
                 </View>
                 <StatusBadge status={commande.status} />
               </View>
-              <View style={[styles.orderBottom, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.itemsChip, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.orderBottom, row(isArabic)]}>
+                <View style={[styles.itemsChip, row(isArabic)]}>
                   <Feather name="shopping-bag" size={13} color={Colors.textSecondary} />
                   <Text style={styles.itemsChipText}>{commande.commandeTapis?.length || 0} {t('admin.catalog.products_count')}</Text>
                 </View>
@@ -296,7 +297,7 @@ export default function ClientDetailsScreen() {
                 numberOfLines={2}
               />
 
-              <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.modalActions, row(isArabic)]}>
                 <TouchableOpacity style={[styles.cancelBtn, { flex: 1 }]} onPress={() => setShowEditModal(false)}>
                   <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>

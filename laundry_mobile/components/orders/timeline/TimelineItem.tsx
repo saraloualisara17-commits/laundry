@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { format } from 'date-fns';
-import { fr, ar } from 'date-fns/locale';
+import { fr, arDZ as ar } from 'date-fns/locale';
 import { Colors, StatusColors } from '../../../constants/theme';
+import { row, textAlign } from '../../../src/utils/rtl';
 
 export interface TimelineEvent {
   id: string | number;
@@ -23,28 +24,28 @@ interface TimelineItemProps {
 
 const TimelineItem: React.FC<TimelineItemProps> = ({ event, isLast, isArabic, t }) => {
   return (
-    <View style={[styles.timelineItem, isArabic && { flexDirection: 'row-reverse' }]}>
+    <View style={[styles.timelineItem, row(isArabic)]}>
       <View style={styles.timelineLeft}>
-        <View 
+        <View
           style={[
-            styles.timelineDot, 
+            styles.timelineDot,
             { backgroundColor: StatusColors[event.nouveauStatut]?.dot || Colors.primary }
-          ]} 
+          ]}
         />
         {!isLast && <View style={styles.timelineLine} />}
       </View>
-      <View style={[styles.timelineRight, isArabic ? { paddingLeft: 0, paddingRight: 12 } : { paddingLeft: 12 }]}>
-        <Text style={[styles.timelineStatus, isArabic && { textAlign: 'right' }]}>
-          {StatusColors[event.nouveauStatut]?.label 
-            ? t(`status.${event.nouveauStatut}`) 
+      <View style={[styles.timelineRight, { paddingStart: 12 }]}>
+        <Text style={[styles.timelineStatus, textAlign(isArabic)]}>
+          {StatusColors[event.nouveauStatut]?.label
+            ? t(`status.${event.nouveauStatut}`)
             : event.nouveauStatut}
         </Text>
-        <Text style={[styles.timelineMeta, isArabic && { textAlign: 'right' }]}>
+        <Text style={[styles.timelineMeta, textAlign(isArabic)]}>
           {t('common.by')} {event.user?.name || t('common.system', { defaultValue: 'Système' })} • {format(new Date(event.createdAt), 'dd MMM, HH:mm', { locale: isArabic ? ar : fr })}
         </Text>
         {event.commentaire && (
-          <View style={[styles.timelineCommentBox, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.timelineComment, isArabic && { textAlign: 'right' }]}>
+          <View style={[styles.timelineCommentBox, row(isArabic)]}>
+            <Text style={[styles.timelineComment, textAlign(isArabic)]}>
               {event.commentaire}
             </Text>
           </View>
@@ -78,10 +79,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0', 
     marginVertical: -4 
   },
-  timelineRight: { 
-    flex: 1, 
-    paddingLeft: 12, 
-    paddingBottom: 20 
+  timelineRight: {
+    flex: 1,
+    paddingBottom: 20,
   },
   timelineStatus: { 
     fontSize: 14, 

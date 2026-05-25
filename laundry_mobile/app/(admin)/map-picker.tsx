@@ -17,6 +17,9 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('map-picker');
 
 export default function MapPickerScreen() {
   const { t } = useTranslation();
@@ -44,7 +47,7 @@ export default function MapPickerScreen() {
       const data = await res.json();
       setSearchResults(data);
     } catch(e) {
-      console.warn('Search failed:', e);
+      log.warn('Search failed', { err: String(e) });
     } finally {
       setSearching(false);
     }
@@ -94,7 +97,7 @@ export default function MapPickerScreen() {
       setResolvedRegion(region);
       setSearchQuery(data.display_name?.split(',')[0] || '');
     } catch(e) {
-      console.warn('Reverse geocode failed:', e);
+      log.warn('Reverse geocode failed', { err: String(e) });
       setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     }
   };

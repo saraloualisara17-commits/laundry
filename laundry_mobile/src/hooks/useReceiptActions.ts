@@ -4,25 +4,18 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { adminApi } from '../services/adminApi';
+import { logger } from '../lib/logger';
 
 type SharingAction = 'whatsapp' | 'print' | null;
 
-// ─── Diagnostics ─────────────────────────────────────────────────────────────
-
-const TAG = '[ReceiptActions]';
+const _log = logger.ns('receipt');
 
 function log(msg: string, data?: Record<string, unknown>) {
-  if (__DEV__) {
-    if (data) {
-      console.log(`${TAG} ${msg}`, JSON.stringify(data, null, 2));
-    } else {
-      console.log(`${TAG} ${msg}`);
-    }
-  }
+  _log.debug(msg, data);
 }
 
 function logError(msg: string, err: unknown) {
-  console.error(`${TAG} ${msg}`, err);
+  _log.error(msg, { err: String(err) });
 }
 
 // ─── Auth token ───────────────────────────────────────────────────────────────

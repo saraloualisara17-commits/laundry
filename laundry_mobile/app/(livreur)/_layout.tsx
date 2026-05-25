@@ -83,6 +83,7 @@ export default function LivreurLayout() {
       <Tabs.Screen name="map-view" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       {/* Hidden screens — accessible via Stack push */}
       <Tabs.Screen name="create-order" options={{ href: null }} />
+      <Tabs.Screen name="edit-order-items" options={{ href: null }} />
     </Tabs>
   );
 }

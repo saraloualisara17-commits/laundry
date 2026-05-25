@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
-import { useTranslation } from 'react-i18next';
 import { useSettings } from '../../src/hooks/query/useSettings';
+import { useRTL, row, textAlign } from '../../src/utils/rtl';
 
 interface AdminHeaderProps {
   title: string;
@@ -12,28 +12,27 @@ interface AdminHeaderProps {
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, rightAction }) => {
-  const { i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { isRTL: isArabic } = useRTL();
   const { data: settingsData } = useSettings();
   const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.content}>
-        <View style={[styles.titleRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={[styles.titleGroup, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.titleRow, row(isArabic)]}>
+          <View style={[styles.titleGroup, row(isArabic)]}>
             {settings.logoUrl && (
-              <Image 
-                source={{ uri: settings.logoUrl }} 
-                style={styles.logo} 
-                resizeMode="contain" 
+              <Image
+                source={{ uri: settings.logoUrl }}
+                style={styles.logo}
+                resizeMode="contain"
               />
             )}
-            <Text style={[styles.title, isArabic && { textAlign: 'right' }]}>{title}</Text>
+            <Text style={[styles.title, textAlign(isArabic)]}>{title}</Text>
           </View>
           {rightAction}
         </View>
-        {subtitle && <Text style={[styles.subtitle, isArabic && { textAlign: 'right' }]}>{subtitle}</Text>}
+        {subtitle && <Text style={[styles.subtitle, textAlign(isArabic)]}>{subtitle}</Text>}
       </View>
     </SafeAreaView>
   );

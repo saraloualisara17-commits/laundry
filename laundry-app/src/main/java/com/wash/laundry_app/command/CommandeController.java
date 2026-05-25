@@ -47,7 +47,7 @@ public class CommandeController {
     @PostMapping("/{id}/payments")
     public ResponseEntity<PaiementDTO> addPayment(@PathVariable Long id,
             @RequestBody RecordPaymentRequest request) {
-        return ResponseEntity.ok(commandeService.addPayment(id, request.getMontant(), request.getNote(), request.getModePaiement()));
+        return ResponseEntity.ok(commandeService.addPayment(id, request.getMontant(), request.getNote(), request.getModePaiement(), request.getIdempotencyKey()));
     }
 
     @GetMapping("/{id}/payments")

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AdminColors } from '../../constants/AdminColors';
 
-import { useTranslation } from 'react-i18next';
+import { useRTL, row } from '../../src/utils/rtl';
 
 interface ScannerModalProps {
   visible: boolean;
@@ -22,8 +22,7 @@ interface ScannerModalProps {
 }
 
 export const ScannerModal: React.FC<ScannerModalProps> = ({ visible, onClose }) => {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t, isRTL: isArabic } = useRTL();
   
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -79,11 +78,11 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ visible, onClose }) 
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
-        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.header, row(isArabic)]}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={28} color="white" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, isArabic ? { marginLeft: 28, marginRight: 0 } : { marginRight: 28 }]}>{t('dashboard.scan_title')}</Text>
+          <Text style={[styles.headerTitle, { marginEnd: 28 }]}>{t('dashboard.scan_title')}</Text>
         </View>
 
         {!permission ? (

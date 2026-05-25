@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Linking
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -169,7 +170,7 @@ export default function AllOrdersMapScreen() {
       }}
     >
       <View style={[styles.listCardAccent, { backgroundColor: STATUS_COLORS[item.status] || AdminColors.primary }]} />
-      <View style={[styles.listCardContent, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.listCardContent, row(isArabic)]}>
         <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
           <Text style={styles.listCardName}>{item.clientName || item.clientNom || t('common.unknown')}</Text>
           <Text style={styles.listCardStatus}>{t(`status.${item.status}`, { defaultValue: item.status })} • {item.numeroCommande}</Text>
@@ -222,7 +223,7 @@ export default function AllOrdersMapScreen() {
 
       {/* HEADER OVERLAY */}
       <SafeAreaView style={styles.headerOverlay}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <TouchableOpacity 
             style={styles.circleBtn}
             onPress={() => router.back()}
@@ -230,7 +231,7 @@ export default function AllOrdersMapScreen() {
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
           
-          <View style={[styles.titleBubble, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.titleBubble, row(isArabic)]}>
             <View style={styles.liveDot} />
             <Text style={styles.titleText}>{filteredOrders.length} {t('tabs.orders')}</Text>
           </View>
@@ -276,16 +277,16 @@ export default function AllOrdersMapScreen() {
 
       {/* SELECTED ORDER MINI CARD */}
       {selectedOrder && !showList && (
-        <View style={[styles.miniCardFloating, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.miniCardFloating, row(isArabic)]}>
           <View style={[styles.miniCardIcon, { backgroundColor: (STATUS_COLORS[selectedOrder.status] || AdminColors.primary) + '20' }]}>
             <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[selectedOrder.status] || AdminColors.primary }]} />
           </View>
 
           <View style={[{ flex: 1, marginLeft: 12 }, isArabic && { marginLeft: 0, marginRight: 12, alignItems: 'flex-end' }]}>
-            <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
               <Text style={styles.miniCardName}>{selectedOrder.clientName || selectedOrder.clientNom || t('common.unknown')}</Text>
               {route && (
-                <View style={[styles.routeBadge, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.routeBadge, row(isArabic)]}>
                   <Ionicons name="car-outline" size={12} color={AdminColors.primary} />
                   <Text style={styles.routeText}>{route.distanceKm}km • {route.durationMin}min</Text>
                 </View>
@@ -300,7 +301,7 @@ export default function AllOrdersMapScreen() {
             </Text>
           </View>
 
-          <View style={[styles.cardActionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.cardActionsRow, row(isArabic)]}>
             <TouchableOpacity 
               style={[styles.navBtn, { backgroundColor: AdminColors.primary }]}
               onPress={() => openInExternalMap(selectedOrder)}
@@ -473,7 +474,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginLeft: 12,
+    marginStart: 12,
   },
   navBtn: {
     width: 40,

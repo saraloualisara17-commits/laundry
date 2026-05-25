@@ -1,10 +1,9 @@
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/adminApi';
 import { queryKeys } from '../../services/query/queryKeys';
+import { useAppMutation } from '../../lib/query/mutationFactory';
+import { invalidateAfterOrderCreate } from '../../lib/query/invalidationHelpers';
 
-/**
- * Hook for list of orders with optional filtering (non-paginated, for small result sets).
- */
 export const useOrders = (filters?: any) => {
   return useQuery({
     queryKey: queryKeys.orders.list(filters),
@@ -12,10 +11,6 @@ export const useOrders = (filters?: any) => {
   });
 };
 
-/**
- * Hook for paginated order lists with infinite scroll.
- * Replaces the manual page/setState pattern in list screens.
- */
 export const useInfiniteOrders = (filters?: any) => {
   const baseFilters = filters || {};
   return useInfiniteQuery({
@@ -31,9 +26,6 @@ export const useInfiniteOrders = (filters?: any) => {
   });
 };
 
-/**
- * Hook for orders with GPS coordinates (for Map).
- */
 export const useOrdersForMap = (livreurId?: string | number) => {
   return useQuery({
     queryKey: [...queryKeys.orders.map(), { livreurId }],
@@ -41,9 +33,6 @@ export const useOrdersForMap = (livreurId?: string | number) => {
   });
 };
 
-/**
- * Hook for unpaid orders list.
- */
 export const useUnpaidOrders = () => {
   return useQuery({
     queryKey: queryKeys.orders.unpaid(),
@@ -51,30 +40,24 @@ export const useUnpaidOrders = () => {
   });
 };
 
-/**
- * Mutation for creating a new order.
- */
 export const useCreateOrder = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: any) => adminApi.createOrder(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
-    },
+  const qc = useQueryClient();
+  return useAppMutation<any, any>({
+    name: 'createOrder',
+    // dedupKey derived from the creationIdempotencyKey the caller embeds in
+    // the payload — prevents double-submission if the user taps Submit twice.
+    // The server uses the same key to return the existing order on retry.
+    mutationFn: (data) => adminApi.createOrder(data),
+    dedupKey: (data) => `createOrder:${data?.creationIdempotencyKey ?? 'unknown'}`,
+    onSettled: () => invalidateAfterOrderCreate(qc),
   });
 };
 
-/**
- * Mutation for deleting an order.
- */
 export const useDeleteOrder = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string | number) => adminApi.deleteOrder(String(id)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
-    },
+  const qc = useQueryClient();
+  return useAppMutation<any, string | number>({
+    name: 'deleteOrder',
+    mutationFn: (id) => adminApi.deleteOrder(String(id)),
+    onSettled: () => invalidateAfterOrderCreate(qc),
   });
 };

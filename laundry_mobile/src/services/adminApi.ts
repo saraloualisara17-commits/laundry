@@ -32,8 +32,13 @@ export const adminApi = {
   assignDeliveryDriver: (id: number | string, driverId: string | number, scheduledDeliveryDate?: string) =>
     ordersApi.assignDeliveryDriver(id, driverId, scheduledDeliveryDate),
   getOrderPayments: (id: number | string) => paymentsApi.getOrderPayments(id),
-  addOrderPayment: (id: number | string, amount: number, note?: string) => 
-    paymentsApi.addPayment(id, { amount, note }),
+  addOrderPayment: (
+    id: number | string,
+    amount: number,
+    note?: string,
+    modePaiement?: string,
+    idempotencyKey?: string
+  ) => paymentsApi.addPayment(id, { amount, note, modePaiement, idempotencyKey }),
   getOrderHistory: (id: number | string) => ordersApi.getHistory(id),
   createOrder: (data: any) => ordersApi.createOrder(data),
   updateOrder: (id: number | string, data: any) => ordersApi.updateOrder(id, data),

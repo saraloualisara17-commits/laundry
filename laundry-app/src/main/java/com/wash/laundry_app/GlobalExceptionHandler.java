@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -93,6 +94,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DisabledException.class)
     public ResponseEntity<Map<String, Object>> handleDisabledAccount(DisabledException ex) {
         return buildErrorResponse(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "Votre compte est désactivé. Contactez l'administrateur.");
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT, "Concurrent Update",
+                "Cette commande a été modifiée par un autre utilisateur. Veuillez recharger et réessayer.");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

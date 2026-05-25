@@ -8,10 +8,14 @@ export const paymentsApi = {
     client.get(`/api/commandes/${orderId}/payments`),
 
   /**
-   * Add a payment to an order
+   * Add a payment to an order.
+   * idempotencyKey must be a per-attempt UUID — the server deduplicates on it
+   * so a network retry never creates a second payment record.
    */
-  addPayment: (orderId: number | string, data: { amount: number; note?: string; modePaiement?: string }) =>
-    client.post(`/api/commandes/${orderId}/payments`, data),
+  addPayment: (
+    orderId: number | string,
+    data: { amount: number; note?: string; modePaiement?: string; idempotencyKey?: string }
+  ) => client.post(`/api/commandes/${orderId}/payments`, data),
 
   /**
    * Get overall unpaid debt overview

@@ -44,4 +44,13 @@ public class AuditLog {
 
     @Column(nullable = false)
     private LocalDateTime timestamp;
+
+    @Column(name = "ip_address", length = 64)
+    private String ipAddress;
+
+    @Column(name = "user_agent", length = 512)
+    private String userAgent;
+
+    @Column(name = "request_id", length = 64)
+    private String requestId;
 }

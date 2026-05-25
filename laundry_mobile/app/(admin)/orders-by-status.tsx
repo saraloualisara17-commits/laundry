@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -197,10 +198,10 @@ export default function OrdersByStatusScreen() {
       >
         <View style={[isArabic ? styles.accentBarAr : styles.accentBar, { backgroundColor: statusCfg.dot }]} />
 
-        <View style={[styles.orderTop, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.orderTop, row(isArabic)]}>
           <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
           {isReady ? (
-            <View style={[styles.readyBadge, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.readyBadge, row(isArabic)]}>
               <View style={styles.readyDot} />
               <Text style={styles.readyText}>{t('admin.orders.ready')}</Text>
             </View>
@@ -211,22 +212,22 @@ export default function OrdersByStatusScreen() {
 
         <Text style={[styles.orderClientName, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
 
-        <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.infoRow, row(isArabic)]}>
+          <View style={[styles.infoItem, row(isArabic)]}>
             <Ionicons name="cube-outline" size={14} color={AdminColors.textSecondary} />
             <Text style={styles.infoText}>{itemsSummary}</Text>
           </View>
-          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoItem, row(isArabic)]}>
             <Ionicons name="calendar-outline" size={14} color={AdminColors.textSecondary} />
             <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
           </View>
         </View>
 
-        <View style={[styles.cardBottom, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardBottom, row(isArabic)]}>
           <View style={isArabic && { alignItems: 'flex-end' }}>
             <Text style={styles.amountText}>{item.montantTotal} {t('common.dh')}</Text>
             {(item.montantPaye > 0 || item.resteAPayer > 0) && (
-              <View style={[styles.financialRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.financialRow, row(isArabic)]}>
                 <Text style={styles.payeText}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
                 {item.resteAPayer > 0 && (
                   <Text style={styles.resteText}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
@@ -242,7 +243,7 @@ export default function OrdersByStatusScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       {!showMap && (
-        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.header, row(isArabic)]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
@@ -356,16 +357,16 @@ export default function OrdersByStatusScreen() {
 
           {/* SELECTED ORDER MINI CARD */}
           {selectedOrder && (
-            <View style={[styles.miniCardFloating, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.miniCardFloating, row(isArabic)]}>
               <View style={[styles.miniCardIcon, { backgroundColor: (STATUS_COLORS[selectedOrder.status] || statusConfig.color) + '20' }]}>
                 <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[selectedOrder.status] || statusConfig.color }]} />
               </View>
 
               <View style={[{ flex: 1, marginLeft: 12 }, isArabic && { marginLeft: 0, marginRight: 12, alignItems: 'flex-end' }]}>
-                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
                   <Text style={styles.miniCardName}>{selectedOrder.client?.name || selectedOrder.clientName}</Text>
                   {route && (
-                    <View style={[styles.routeBadge, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.routeBadge, row(isArabic)]}>
                       <Ionicons name="car-outline" size={12} color={AdminColors.primary} />
                       <Text style={styles.routeText}>{route.distanceKm}km • {route.durationMin}min</Text>
                     </View>
@@ -379,7 +380,7 @@ export default function OrdersByStatusScreen() {
                   {selectedOrder.montantTotal?.toFixed(2)} {t('common.dh')}</Text>
               </View>
 
-              <View style={[styles.cardActionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.cardActionsRow, row(isArabic)]}>
                 <TouchableOpacity
                   style={[styles.navBtn, { backgroundColor: AdminColors.primary }]}
                   onPress={() => openInExternalMap(selectedOrder)}
@@ -405,7 +406,7 @@ export default function OrdersByStatusScreen() {
         <>
           {/* Summary Card */}
           <View style={[styles.summaryCard, { borderColor: statusConfig.bg }]}>
-            <View style={[styles.summaryTop, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.summaryTop, row(isArabic)]}>
               <View style={styles.summaryCol}>
                 <Text style={[styles.summaryLabel, f.statLabel]}>{t('common.total')} {t('tabs.orders')}</Text>
                 <Text style={[styles.summaryValue, { color: statusConfig.color }]}>
@@ -438,9 +439,9 @@ export default function OrdersByStatusScreen() {
           </View>
 
           {/* Filters */}
-          <View style={[styles.filtersContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.filtersContainer, row(isArabic)]}>
             <TouchableOpacity
-              style={[styles.filterBtn, selectedStaffId && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.filterBtn, selectedStaffId && styles.filterBtnActive, row(isArabic)]}
               onPress={() => setShowStaffModal(true)}
             >
               <Ionicons name="person" size={16} color={selectedStaffId ? AdminColors.primary : AdminColors.textMuted} />
@@ -455,7 +456,7 @@ export default function OrdersByStatusScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterBtn, dateDebut && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.filterBtn, dateDebut && styles.filterBtnActive, row(isArabic)]}
               onPress={() => setShowDatePicker(true)}
             >
               <Ionicons name="calendar-outline" size={16} color={dateDebut ? AdminColors.primary : AdminColors.textMuted} />
@@ -502,7 +503,7 @@ export default function OrdersByStatusScreen() {
           <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ ...row(isArabic), justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={[styles.modalTitle, { marginBottom: 0 }]}>{t('admin.orders.filter_date')}</Text>
               <TouchableOpacity onPress={() => { setDateDebut(null); setShowDatePicker(false); }}>
                 <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>
@@ -549,7 +550,7 @@ export default function OrdersByStatusScreen() {
             
             <ScrollView style={{ maxHeight: 300, width: '100%' }}>
               <TouchableOpacity 
-                style={[styles.staffOption, !selectedStaffId && styles.staffOptionActive, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.staffOption, !selectedStaffId && styles.staffOptionActive, row(isArabic)]}
                 onPress={() => { setSelectedStaffId(null); setShowStaffModal(false); }}
               >
                 <Text style={[styles.staffOptionText, !selectedStaffId && styles.staffOptionTextActive]}>{t('admin.orders.all_drivers')}</Text>
@@ -559,7 +560,7 @@ export default function OrdersByStatusScreen() {
               {staffList.map(staff => (
                 <TouchableOpacity 
                   key={staff.id} 
-                  style={[styles.staffOption, selectedStaffId === staff.id && styles.staffOptionActive, isArabic && { flexDirection: 'row-reverse' }]}
+                  style={[styles.staffOption, selectedStaffId === staff.id && styles.staffOptionActive, row(isArabic)]}
                   onPress={() => { setSelectedStaffId(staff.id); setShowStaffModal(false); }}
                 >
                   <Text style={[styles.staffOptionText, selectedStaffId === staff.id && styles.staffOptionTextActive]}>{staff.name}</Text>

@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Animated, Image
 } from 'react-native';
+import { row, textAlign } from '../../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -134,7 +135,7 @@ export default function EmployeDashboard() {
       >
         {/* Ready notification banner */}
         {readyCount > 0 && (
-          <View style={[styles.readyBanner, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.readyBanner, row(isArabic)]}>
             <Animated.View style={[styles.readyDot, { opacity: readyAnim }]} />
             <Text style={styles.readyText}>
               {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready')}
@@ -189,7 +190,7 @@ export default function EmployeDashboard() {
         <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
           {t('dashboard.overview')}
         </Text>
-        <View style={[styles.statusRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.statusRow, row(isArabic)]}>
           {STATUS_CARDS.map(({ key, color, bg }) => (
             <TouchableOpacity
               key={key}
@@ -214,7 +215,7 @@ export default function EmployeDashboard() {
             onPress={() => router.push('/(employe)/(tabs)/unpaid')}
             activeOpacity={0.8}
           >
-            <View style={[styles.unpaidRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.unpaidRow, row(isArabic)]}>
               <View style={styles.unpaidIcon}>
                 <Text style={{ fontSize: 22 }}>{unpaid.totalRemaining > 0 ? '💰' : '✅'}</Text>
               </View>
@@ -251,7 +252,7 @@ export default function EmployeDashboard() {
           recentOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
-              style={[styles.orderRow, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.orderRow, row(isArabic)]}
               onPress={() => router.push(`/order/${order.id}`)}
               activeOpacity={0.7}
             >

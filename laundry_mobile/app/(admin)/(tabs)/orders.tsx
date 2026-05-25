@@ -22,8 +22,8 @@ import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { router } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useRTL, row, font, arabicSafe, pos, textAlign, textProps } from '../../../src/utils/rtl';
 import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
 import { useInfiniteOrders } from '../../../src/hooks/query/useOrders';
@@ -33,9 +33,8 @@ import { useUpdateOrderStatus } from '../../../src/hooks/query/useOrder';
 const { width } = Dimensions.get('window');
 
 export default function OrdersScreen() {
-  const { t } = useTranslation();
+  const { t, isRTL: isArabic } = useRTL();
   const f = useFormStyles();
-  const isArabic = f.isArabic;
 
   const TABS = [
     { id: 'Toutes', label: t('common.all') },
@@ -124,21 +123,21 @@ export default function OrdersScreen() {
 
     return (
       <View style={styles.statsBanner}>
-        <View style={styles.statsDecoCircle} />
-        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.statsDecoCircle, pos.end(-30, isArabic), { top: -30 }]} />
+        <View style={[styles.statsRow, row(isArabic)]}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalOrders}</Text>
-            <Text style={[styles.statLabel, f.statLabel]}>{t('common.all')}</Text>
+            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalOrders}</Text>
+            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('common.all')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalAmount} <Text style={{fontSize: 14}}>{t('common.dh')}</Text></Text>
-            <Text style={[styles.statLabel, f.statLabel]}>{t('common.total')}</Text>
+            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalAmount} <Text style={{fontSize: 14}}>{t('common.dh')}</Text></Text>
+            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('common.total')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalPending}</Text>
-            <Text style={[styles.statLabel, f.statLabel]}>{t('status.PENDING_PICKUP')}</Text>
+            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalPending}</Text>
+            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('status.PENDING_PICKUP')}</Text>
           </View>
         </View>
       </View>
@@ -156,53 +155,44 @@ export default function OrdersScreen() {
         onPress={() => router.push(`/order/${item.id}`)}
         activeOpacity={0.7}
       >
-        {/* Top row: badge left in AR, ref right in AR (and vice versa in FR) */}
-        <View style={styles.cardTop}>
-          {isArabic ? (
-            <>
-              <StatusBadge status={item.status} />
-              <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
-              <StatusBadge status={item.status} />
-            </>
-          )}
+        {/* Top row: status badge + order ref, direction respects RTL */}
+        <View style={[styles.cardTop, row(isArabic)]}>
+          <StatusBadge status={item.status} />
+          <Text style={[styles.orderRef, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.numeroCommande}</Text>
         </View>
 
         {/* Client name */}
-        <Text style={[styles.clientName, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
+        <Text style={[styles.clientName, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.client?.name || item.clientNom}</Text>
 
         {/* Address */}
         {address && (
-          <View style={[styles.infoItem, { marginTop: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoItem, { marginTop: 4 }, row(isArabic)]}>
             <Ionicons name="location-outline" size={13} color={AdminColors.textMuted} />
-            <Text style={[styles.addressText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>{address}</Text>
+            <Text style={[styles.addressText, textAlign(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{address}</Text>
           </View>
         )}
 
         {/* Items + date */}
-        <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
-          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.infoRow, row(isArabic)]}>
+          <View style={[styles.infoItem, row(isArabic)]}>
             <Ionicons name="cube-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{itemsSummary}</Text>
+            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{itemsSummary}</Text>
           </View>
-          <View style={[styles.infoItem, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoItem, row(isArabic)]}>
             <Ionicons name="calendar-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString('fr-FR')}</Text>
+            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{new Date(item.dateCreation).toLocaleDateString('fr-FR')}</Text>
           </View>
         </View>
 
         {/* Bottom row: amount + financial */}
-        <View style={[styles.cardBottom, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardBottom, row(isArabic)]}>
           <View style={isArabic ? { alignItems: 'flex-end' } : {}}>
-            <Text style={styles.amountText}>{item.montantTotal} {t('common.dh')}</Text>
+            <Text style={[styles.amountText, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.montantTotal} {t('common.dh')}</Text>
             {(item.montantPaye > 0 || item.resteAPayer > 0) && (
-              <View style={[styles.financialRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.payeText}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
+              <View style={[styles.financialRow, row(isArabic)]}>
+                <Text style={[styles.payeText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
                 {item.resteAPayer > 0 && (
-                  <Text style={styles.resteText}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
+                  <Text style={[styles.resteText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
                 )}
               </View>
             )}
@@ -213,7 +203,7 @@ export default function OrdersScreen() {
               style={styles.validateBtnInline}
               onPress={() => handleValidateOrder(item.id)}
             >
-              <Text style={styles.validateBtnTextInline}>{t('admin.orders.validate')}</Text>
+              <Text style={[styles.validateBtnTextInline, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.validate')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -224,10 +214,10 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.headerTitle}>{t('admin.orders.title')}</Text>
+        <View style={[styles.headerContent, row(isArabic)]}>
+          <Text style={[styles.headerTitle, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.title')}</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{totalCount} {t('common.all')}</Text>
+            <Text style={[styles.countText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalCount} {t('common.all')}</Text>
           </View>
         </View>
 
@@ -250,10 +240,10 @@ export default function OrdersScreen() {
           )}
         />
 
-        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.searchContainer, row(isArabic)]}>
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
-            style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
+            style={[styles.searchInput, textAlign(isArabic), font.regular(isArabic)]}
             placeholder={t('admin.orders.search_placeholder')}
             placeholderTextColor={AdminColors.textMuted}
             value={search}
@@ -279,17 +269,17 @@ export default function OrdersScreen() {
           <>
             {renderStatsBanner()}
             
-            <View style={[styles.filterRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity style={[styles.filterBtn, isArabic && { flexDirection: 'row-reverse' }]} onPress={() => setShowDriverPicker(true)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, ...(isArabic && { flexDirection: 'row-reverse' }) }}>
+            <View style={[styles.filterRow, row(isArabic)]}>
+              <TouchableOpacity style={[styles.filterBtn, row(isArabic)]} onPress={() => setShowDriverPicker(true)}>
+                <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
                   <Feather name="chevron-down" size={14} color={AdminColors.textMuted} />
-                  <Text style={[selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                  <Text style={[selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                     {selectedDriver ? selectedDriver.name : t('admin.orders.filter_driver')}
                   </Text>
                 </View>
                 {selectedDriver && (
-                  <TouchableOpacity 
-                    onPress={(e) => { e.stopPropagation(); setSelectedDriver(null); }} 
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); setSelectedDriver(null); }}
                     style={{ padding: 4 }}
                   >
                     <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
@@ -298,13 +288,13 @@ export default function OrdersScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.filterBtn, selectedDate && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.filterBtn, selectedDate && styles.filterBtnActive, row(isArabic)]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, ...(isArabic && { flexDirection: 'row-reverse' }) }}>
+                <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
                   <Ionicons name="calendar-outline" size={14} color={selectedDate ? AdminColors.primary : AdminColors.textMuted} />
-                  <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
-                    {selectedDate ? selectedDate.toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
+                  <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                    {selectedDate ? selectedDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
                   </Text>
                 </View>
                 {selectedDate && (
@@ -330,6 +320,10 @@ export default function OrdersScreen() {
           )
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={AdminColors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 40 }} />}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={15}
       />
 
       {/* Driver Modal */}
@@ -339,22 +333,22 @@ export default function OrdersScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>{t('admin.orders.filter_driver')}</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              <TouchableOpacity 
-                style={[styles.modalItem, isArabic && { flexDirection: 'row-reverse' }]}
+            <ScrollView style={{ maxHeight: Math.min(300, Dimensions.get('window').height * 0.45) }}>
+              <TouchableOpacity
+                style={[styles.modalItem, row(isArabic)]}
                 onPress={() => { setSelectedDriver(null); setShowDriverPicker(false); }}
               >
-                <Text style={[styles.modalItemText, !selectedDriver && styles.modalItemTextActive]}>{t('admin.orders.all_drivers')}</Text>
+                <Text style={[styles.modalItemText, !selectedDriver && styles.modalItemTextActive, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.all_drivers')}</Text>
                 {!selectedDriver && <Ionicons name="checkmark-circle" size={20} color={AdminColors.primary} />}
               </TouchableOpacity>
-              
+
               {drivers.map(d => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={d.id}
-                  style={[styles.modalItem, isArabic && { flexDirection: 'row-reverse' }]}
+                  style={[styles.modalItem, row(isArabic)]}
                   onPress={() => { setSelectedDriver(d); setShowDriverPicker(false); }}
                 >
-                  <Text style={[styles.modalItemText, selectedDriver?.id === d.id && styles.modalItemTextActive]}>{d.name}</Text>
+                  <Text style={[styles.modalItemText, selectedDriver?.id === d.id && styles.modalItemTextActive, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{d.name}</Text>
                   {selectedDriver?.id === d.id && <Ionicons name="checkmark-circle" size={20} color={AdminColors.primary} />}
                 </TouchableOpacity>
               ))}
@@ -373,10 +367,10 @@ export default function OrdersScreen() {
           <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }, isArabic && { flexDirection: 'row-reverse' }]}>
-              <Text style={styles.modalTitle}>{t('admin.orders.filter_date')}</Text>
+            <View style={[{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }, row(isArabic)]}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.filter_date')}</Text>
               <TouchableOpacity onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}>
-                 <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>
+                <Text style={[{ color: AdminColors.primary, fontWeight: '700' }, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.reset_btn')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -503,8 +497,6 @@ const styles = StyleSheet.create({
   },
   statsDecoCircle: {
     position: 'absolute',
-    right: -30,
-    top: -30,
     width: 120,
     height: 120,
     borderRadius: 60,
@@ -586,7 +578,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: AdminColors.textMuted,
-    letterSpacing: 0.3,
   },
   clientName: {
     fontSize: 17,

@@ -55,8 +55,8 @@ public class CommandeService {
         return paymentService.recordPayment(id, request);
     }
 
-    public PaiementDTO addPayment(Long id, BigDecimal amount, String note, ModePaiement modePaiement) {
-        return paymentService.addPayment(id, amount, note, modePaiement);
+    public PaiementDTO addPayment(Long id, BigDecimal amount, String note, ModePaiement modePaiement, String idempotencyKey) {
+        return paymentService.addPayment(id, amount, note, modePaiement, idempotencyKey);
     }
 
     public List<PaiementDTO> getPayments(Long id) {

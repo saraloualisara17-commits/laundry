@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useRef, useState, useMemo } from 'react';
+import { randomUUID } from '../utils/uuid';
 
 export type OrderMode = 'immediate' | 'scheduled';
 
@@ -60,7 +61,10 @@ interface OrderCreationContextType {
   paidAmount: number;
   pendingLocation: PendingLocation | null;
   editingOrderId: number | string | null;
-  
+  // Stable UUID for the current creation session. Injected into the submit
+  // payload so the backend can deduplicate retries. Reset on clearOrder().
+  creationIdempotencyKey: string;
+
   setMode: (mode: OrderMode | null) => void;
   setClient: (client: ClientData | null) => void;
   setDeliveryType: (type: string | null) => void;
@@ -100,6 +104,10 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [paidAmount, setPaidAmount] = useState(0);
   const [pendingLocation, setPendingLocation] = useState<PendingLocation | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<number | string | null>(null);
+  // One UUID per creation session — stays stable across wizard steps so that
+  // tapping Submit multiple times or retrying after a network drop all carry
+  // the same key and the backend returns the existing order on duplicate.
+  const creationIdempotencyKeyRef = useRef<string>(randomUUID());
 
   const totalAmount = useMemo(() => items.reduce((sum, item) => sum + item.prixFinal, 0), [items]);
   const itemCount = items.length;
@@ -177,10 +185,13 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setPaidAmount(0);
     setPendingLocation(null);
     setEditingOrderId(null);
+    // Rotate the key so the next creation flow starts fresh
+    creationIdempotencyKeyRef.current = randomUUID();
   };
 
   const value = {
     mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId,
+    creationIdempotencyKey: creationIdempotencyKeyRef.current,
     setMode, setClient, setDeliveryType, setLivreur, setScheduledDate,
     addItem, removeItem, updateItem, setOrderNotes, setOrderImages, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId,
     loadOrderForEditing, clearOrder,

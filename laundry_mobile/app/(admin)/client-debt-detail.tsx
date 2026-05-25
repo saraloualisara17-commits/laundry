@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -10,6 +10,7 @@ import {
   Linking,
   Alert
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,6 +19,9 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import AddPaymentModal from '../../components/admin/AddPaymentModal';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('client-debt');
 
 export default function ClientDebtDetailScreen() {
   const { t, i18n } = useTranslation();
@@ -49,7 +53,7 @@ export default function ClientDebtDetailScreen() {
           [{ text: 'OK', onPress: () => router.back() }]
         );
       } else {
-        console.error('Error fetching client debt detail:', error);
+        log.error('Error fetching client debt detail', { err: String(error) });
       }
     } finally {
       setLoading(false);
@@ -124,7 +128,7 @@ export default function ClientDebtDetailScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerTop, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerTop, row(isArabic)]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
@@ -135,7 +139,7 @@ export default function ClientDebtDetailScreen() {
         </View>
 
         <View style={styles.clientProfileBox}>
-           <View style={[styles.profileMain, isArabic && { flexDirection: 'row-reverse' }]}>
+           <View style={[styles.profileMain, row(isArabic)]}>
               <View style={[styles.avatar, { backgroundColor: debtColor.bg, borderColor: debtColor.main }]}>
                 <Text style={[styles.avatarText, { color: debtColor.main }]}>{clientData.clientName.charAt(0).toUpperCase()}</Text>
               </View>
@@ -145,7 +149,7 @@ export default function ClientDebtDetailScreen() {
               </View>
            </View>
 
-           <View style={[styles.debtStatsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+           <View style={[styles.debtStatsRow, row(isArabic)]}>
               <View style={styles.debtStat}>
                 <Text style={[styles.debtStatValue, { color: debtColor.main }]}>{clientData.totalRemaining} {t('common.dh')}</Text>
                 <Text style={styles.debtStatLabel}>{t('financial.remaining')}</Text>
@@ -173,7 +177,7 @@ export default function ClientDebtDetailScreen() {
             onPress={() => router.push(`/order/${order.orderId}`)}
             activeOpacity={0.7}
           >
-            <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.orderHeader, row(isArabic)]}>
               <View>
                 <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{order.reference}</Text>
                 <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>{new Date(order.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
@@ -181,7 +185,7 @@ export default function ClientDebtDetailScreen() {
               <StatusBadge status={order.status} />
             </View>
 
-            <View style={[styles.financialBar, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.financialBar, row(isArabic)]}>
                <View style={styles.finItem}>
                  <Text style={styles.finLabel}>{t('common.total')}</Text>
                  <Text style={styles.finValue}>{order.montantTotal} {t('common.dh')}</Text>
@@ -197,7 +201,7 @@ export default function ClientDebtDetailScreen() {
             </View>
 
             <TouchableOpacity 
-              style={[styles.payBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.payBtn, row(isArabic)]}
               onPress={(e) => {
                 e.stopPropagation();
                 setSelectedOrderId(order.orderId);

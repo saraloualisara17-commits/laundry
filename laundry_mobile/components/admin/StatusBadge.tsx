@@ -1,20 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { StatusColors } from '../../constants/StatusColors';
-import { useTranslation } from 'react-i18next';
+import { useRTL, row, font, textProps } from '../../src/utils/rtl';
 
 interface StatusBadgeProps {
   status: string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  const { t } = useTranslation();
+  const { t, isRTL } = useRTL();
   const config = StatusColors[status] || StatusColors.PENDING_PICKUP;
 
   return (
-    <View style={[styles.container, { backgroundColor: config.dot }]}>
+    <View style={[styles.container, { backgroundColor: config.dot }, row(isRTL)]}>
       <View style={styles.dot} />
-      <Text style={styles.text}>
+      <Text style={[styles.text, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
         {t(`status.${status}`)}
       </Text>
     </View>
@@ -23,7 +23,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,

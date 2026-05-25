@@ -35,10 +35,15 @@ export const ordersApi = {
     client.put(`/api/admin/commandes/${id}`, data),
 
   /**
-   * Update order status
+   * Update order status.
+   * For DELIVERED transitions that include a payment amount, pass
+   * `paymentIdempotencyKey` — the server stores it on the Paiement record so
+   * a retry after a network drop never creates a duplicate payment.
    */
-  updateStatus: (id: number | string, data: { status: string; [key: string]: any }) =>
-    client.patch(`/api/commandes/${id}/status`, data),
+  updateStatus: (
+    id: number | string,
+    data: { status: string; amount?: number; notesPaiement?: string; paymentIdempotencyKey?: string; [key: string]: any }
+  ) => client.patch(`/api/commandes/${id}/status`, data),
 
   /**
    * Delete an order

@@ -19,7 +19,9 @@ export interface UpdateSettingsRequest {
 const toFullLogoUrl = (raw: string | null | undefined): string | null => {
   if (!raw) return null;
   if (raw.startsWith('http')) return raw;
-  return `${BASE_URL}/uploads/${raw}`;
+  // Server stores bare filename (UUID.jpg). Guard against double /uploads/ prefix.
+  const path = raw.startsWith('/uploads/') ? raw : `/uploads/${raw}`;
+  return `${BASE_URL}${path}`;
 };
 
 export const settingsApi = {

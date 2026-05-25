@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { randomUUID } from '../../src/utils/uuid';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
@@ -24,7 +26,7 @@ import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { BASE_URL } from '../../src/services/api/client';
 import { Colors, Shadows, StatusColors } from '../../constants/theme';
 import { format } from 'date-fns';
-import { fr, ar } from 'date-fns/locale';
+import { fr, arDZ as ar } from 'date-fns/locale';
 import * as ImagePicker from 'expo-image-picker';
 import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { uploadManager } from '../../src/services/uploads';
@@ -38,11 +40,15 @@ import useOrderPermissions from '../../src/hooks/useOrderPermissions';
 import ArticlesTab from '../../components/orders/tabs/ArticlesTab';
 import ClientTab from '../../components/orders/tabs/ClientTab';
 import SuiviTab from '../../components/orders/tabs/SuiviTab';
+import HistoriqueTab from '../../components/orders/tabs/HistoriqueTab';
 import { getWorkflowAction, OrderStatus, WorkflowAction, isDelivered } from '../../constants/orderWorkflow';
 import { useOrder, useUpdateOrderStatus, useAddPayment, useAddOrderImages } from '../../src/hooks/query/useOrder';
 import { useDriversList, usePickupDriversList, useAssignDeliveryDriver, useAssignPickupDriver } from '../../src/hooks/query/useDrivers';
 import { useDeleteOrder } from '../../src/hooks/query/useOrders';
 import * as Haptics from 'expo-haptics';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('order-detail');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -85,8 +91,23 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
   const assignPickupDriverMutation = useAssignPickupDriver();
   const deleteOrderMutation = useDeleteOrder();
 
-  const [activeTab, setActiveTab] = useState<'articles' | 'client' | 'suivi'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'client' | 'suivi' | 'historique'>('articles');
   const [viewImage, setViewImage] = useState<string | null>(null);
+
+  // If the order is deleted while this screen is open (e.g. another admin
+  // deletes it and the WebSocket event removes it from cache), navigate back
+  // rather than leaving the user stuck on a blank/loading screen.
+  const hadOrderRef = useRef(!!order);
+  useEffect(() => {
+    if (hadOrderRef.current && !order) {
+      Alert.alert(
+        t('common.deleted', { defaultValue: 'Supprimée' }),
+        t('order.deleted_notice', { defaultValue: 'Cette commande a été supprimée.' }),
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    }
+    if (order) hadOrderRef.current = true;
+  }, [order, router, t]);
 
   const permissions = useOrderPermissions(currentUser, order);
   const {
@@ -218,30 +239,55 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
   }, [id, selectedPickupDriverId, assignPickupDriverMutation, t]);
 
   const handleAddPhotos = useCallback(async (type: 'reception' | 'apres_traitement') => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.7
-    });
-
-    if (result.canceled) return;
-
-    setUploadingImage(true);
-    try {
-      await Promise.all(result.assets.map(async (a) => {
-        return uploadManager.addImage(a.uri, id as string, type);
-      }));
-
-      Alert.alert(
-        t('common.info'), 
-        t('admin.orders.upload_queued')
-      );
-    } catch (e) {
-      console.error('Photo queue error:', e);
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setUploadingImage(false);
-    }
+    Alert.alert(
+      t('common.add_photo', { defaultValue: 'Ajouter une photo' }),
+      '',
+      [
+        {
+          text: t('common.camera', { defaultValue: 'Caméra' }),
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+            if (result.canceled) return;
+            setUploadingImage(true);
+            try {
+              await Promise.all(result.assets.map(a => uploadManager.addImage(a.uri, id as string, type)));
+              Alert.alert(t('common.info'), t('admin.orders.upload_queued'));
+            } catch (e) {
+              log.error('Photo queue error', { err: String(e) });
+              Alert.alert(t('common.error'), t('common.error_msg'));
+            } finally {
+              setUploadingImage(false);
+            }
+          },
+        },
+        {
+          text: t('common.gallery', { defaultValue: 'Galerie' }),
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsMultipleSelection: true,
+              quality: 1,
+            });
+            if (result.canceled) return;
+            setUploadingImage(true);
+            try {
+              await Promise.all(result.assets.map(a => uploadManager.addImage(a.uri, id as string, type)));
+              Alert.alert(t('common.info'), t('admin.orders.upload_queued'));
+            } catch (e) {
+              log.error('Photo queue error', { err: String(e) });
+              Alert.alert(t('common.error'), t('common.error_msg'));
+            } finally {
+              setUploadingImage(false);
+            }
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
   }, [id, t]);
 
   const handleDeleteOrder = useCallback(() => {
@@ -297,7 +343,11 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       await updateStatusMutation.mutateAsync({
         id: id as string,
         status: 'DELIVERED',
-        data: { amount: amount, notesPaiement: deliveryNotes }
+        data: {
+          amount: amount,
+          notesPaiement: deliveryNotes,
+          paymentIdempotencyKey: randomUUID(),
+        }
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowDeliveryModal(false);
@@ -341,7 +391,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     <View style={styles.container}>
       {/* ── Header ── */}
       <SafeAreaView style={styles.header}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -351,7 +401,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               <Text style={styles.headerSubtitle} numberOfLines={1}>{order.client.name}</Text>
             )}
           </View>
-          <View style={[styles.headerActions, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.headerActions, row(isArabic)]}>
             {canDelete && (
               <TouchableOpacity onPress={handleDeleteOrder} style={styles.deleteBtn}>
                 <Feather name="trash-2" size={18} color={Colors.danger} />
@@ -378,7 +428,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
 
         {/* ── Financial Summary ── */}
         <View style={styles.financialCard}>
-          <View style={[styles.financialRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.financialRow, row(isArabic)]}>
             <View style={[styles.financialCol, isArabic && { alignItems: 'flex-end' }]}>
               <Text style={styles.financialLabel}>{t('financial.total')}</Text>
               <Text style={styles.totalValue}>{totalAmount.toFixed(2)} <Text style={styles.currency}>{t('common.dh')}</Text></Text>
@@ -599,7 +649,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
         </View>
 
         {/* ── Tabs ── */}
-        <View style={[styles.tabsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.tabsContainer, row(isArabic)]}>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'articles' && styles.tabBtnActive]} onPress={() => setActiveTab('articles')}>
             <Ionicons name="layers-outline" size={18} color={activeTab === 'articles' ? Colors.primary : Colors.textMuted} />
             <Text style={[styles.tabText, activeTab === 'articles' && styles.tabTextActive]}>{t('admin.orders.title')}</Text>
@@ -617,6 +667,12 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             <Ionicons name="time-outline" size={18} color={activeTab === 'suivi' ? Colors.primary : Colors.textMuted} />
             <Text style={[styles.tabText, activeTab === 'suivi' && styles.tabTextActive]}>{t('admin.orders.history')}</Text>
           </TouchableOpacity>
+          {(permissions.isAdmin || permissions.isEmploye) && (
+            <TouchableOpacity style={[styles.tabBtn, activeTab === 'historique' && styles.tabBtnActive]} onPress={() => setActiveTab('historique')}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={activeTab === 'historique' ? Colors.primary : Colors.textMuted} />
+              <Text style={[styles.tabText, activeTab === 'historique' && styles.tabTextActive]}>{t('audit.tab', { defaultValue: 'Audit' })}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Tab Content ── */}
@@ -626,7 +682,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               {(order.images && order.images.length > 0) && (
                 <View style={styles.infoCard}>
                   <Text style={[styles.sectionLabel, f.sectionLabel]}>{t('admin.orders.create.items.photos')}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[isArabic && { flexDirection: 'row-reverse' }, { gap: 10 }]}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[row(isArabic), { gap: 10 }]}>
                     {order.images.map((img: any, idx: number) => (
                       <TouchableOpacity key={idx} onPress={() => setViewImage(`${BASE_URL}${img.imageUrl}`)}>
                         <Image source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={styles.galleryImg} />
@@ -670,6 +726,10 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               setShowPaymentModal={setShowPaymentModal}
             />
           )}
+
+          {activeTab === 'historique' && (
+            <HistoriqueTab orderId={id} />
+          )}
         </View>
 
         <View style={{ height: 100 }} />
@@ -677,7 +737,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
 
       {/* ── Sticky Bottom Bar ── */}
       {(permissions.isAdmin || permissions.isEmploye) && (
-        <View style={[styles.bottomBar, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.bottomBar, row(isArabic)]}>
           <TouchableOpacity style={styles.bottomBarBtn} onPress={handleShareWhatsApp} disabled={!!sharingAction}>
             {sharingAction === 'whatsapp'
               ? <ActivityIndicator size="small" color="#25D366" />
@@ -717,7 +777,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             <View style={styles.modalHandle} />
 
             {/* Header */}
-            <View style={[styles.modalHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.modalHeaderRow, row(isArabic)]}>
               <View style={styles.modalIconBadge}>
                 <Feather name="truck" size={20} color={Colors.primary} />
               </View>
@@ -735,7 +795,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               <View style={styles.modalBody}>
 
                 {/* Date picker — inline calendar (same style as orders filter) */}
-                <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }, row(isArabic)]}>
                   <Text style={[styles.inputLabel, { marginBottom: 0 }, isArabic && { textAlign: 'right' }]}>
                     {t('admin.orders.create.delivery_date')}
                   </Text>
@@ -785,7 +845,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                   return (
                     <TouchableOpacity
                       key={driver.id}
-                      style={[styles.driverOption, selected && styles.driverOptionSelected, isArabic && { flexDirection: 'row-reverse' }]}
+                      style={[styles.driverOption, selected && styles.driverOptionSelected, row(isArabic)]}
                       onPress={() => setSelectedDriverId(driver.id)}
                       activeOpacity={0.75}
                     >
@@ -815,7 +875,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             </ScrollView>
 
             {/* Actions */}
-            <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.modalActions, row(isArabic)]}>
               <TouchableOpacity
                 style={[styles.secondaryModalBtn, { flex: 1 }]}
                 onPress={() => setShowDriverModal(false)}
@@ -844,7 +904,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
           <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={() => setShowPickupDriverModal(false)} />
           <View style={[styles.modalSheet, { height: '70%' }]}>
             <View style={styles.modalHandle} />
-            <View style={[styles.modalHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.modalHeaderRow, row(isArabic)]}>
               <View style={[styles.modalIconBadge, { backgroundColor: '#FEF3C7' }]}>
                 <Feather name="package" size={20} color="#D97706" />
               </View>
@@ -876,7 +936,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                   return (
                     <TouchableOpacity
                       key={driver.id}
-                      style={[styles.driverOption, selected && styles.driverOptionSelected, isArabic && { flexDirection: 'row-reverse' }]}
+                      style={[styles.driverOption, selected && styles.driverOptionSelected, row(isArabic)]}
                       onPress={() => setSelectedPickupDriverId(String(driver.id))}
                       activeOpacity={0.75}
                     >
@@ -900,7 +960,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                 })}
               </View>
             </ScrollView>
-            <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.modalActions, row(isArabic)]}>
               <TouchableOpacity style={[styles.secondaryModalBtn, { flex: 1 }]} onPress={() => setShowPickupDriverModal(false)}>
                 <Text style={styles.secondaryModalBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
@@ -969,23 +1029,7 @@ function DriverOrderDetail({ order }: { order: any }) {
   const fullyPaid = total > 0 && remaining < 0.05;
   const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
 
-  const handleAddReceptionPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.7
-    });
-    if (result.canceled) return;
-    setUploadingImage(true);
-    try {
-      await Promise.all(result.assets.map((a) => uploadManager.addImage(a.uri, order.id?.toString(), 'reception')));
-      Alert.alert(t('common.info'), t('admin.orders.upload_queued'));
-    } catch (e) {
-      Alert.alert(t('common.error'), t('common.error_msg'));
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  const handleAddReceptionPhoto = () => handleAddPhotos('reception');
 
   return (
     <View style={styles.container}>

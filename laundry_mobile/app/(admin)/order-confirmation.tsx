@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -7,6 +7,7 @@ import {
   Animated,
   ActivityIndicator
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -84,7 +85,7 @@ export default function OrderConfirmationScreen() {
           </Text>
 
           {/* Quick Receipts */}
-          <View style={[styles.receiptActions, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.receiptActions, row(isArabic)]}>
             <TouchableOpacity
               style={[styles.receiptBtn, { backgroundColor: '#E8F5E9' }]}
               onPress={handleShareWhatsApp}

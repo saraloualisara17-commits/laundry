@@ -35,7 +35,9 @@ public class AuditService {
     public void log(String actionType, String entityType, Long entityId,
                     String previousValue, String newValue, String metadata) {
         User currentUser = authService.currentUser();
-        
+
+        AuditContext.AuditMeta ctx = AuditContext.get();
+
         AuditLog log = AuditLog.builder()
                 .actionType(actionType)
                 .entityType(entityType)
@@ -45,8 +47,11 @@ public class AuditService {
                 .metadata(metadata)
                 .user(currentUser)
                 .timestamp(LocalDateTime.now())
+                .ipAddress(ctx != null ? ctx.ipAddress() : null)
+                .userAgent(ctx != null ? ctx.userAgent() : null)
+                .requestId(ctx != null ? ctx.requestId() : null)
                 .build();
-        
+
         auditLogRepository.save(log);
     }
 }

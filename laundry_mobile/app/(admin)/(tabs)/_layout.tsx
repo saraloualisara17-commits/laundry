@@ -3,15 +3,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { AdminColors } from '../../../constants/AdminColors';
 import { View, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../src/store/store';
 import { useEffect } from 'react';
+import { useRTL, row } from '../../../src/utils/rtl';
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t, isRTL: isArabic } = useRTL();
   const { user } = useSelector((state: RootState) => state.auth);
 
   // Guard: employees and livreurs should never be in the admin TABS — redirect to their zone
@@ -37,7 +36,7 @@ export default function AdminTabsLayout() {
           height: 72 + insets.bottom,
           paddingBottom: insets.bottom + 8,
           paddingTop: 12,
-          flexDirection: isArabic ? 'row-reverse' : 'row',
+          ...row(isArabic),
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -83,6 +82,12 @@ export default function AdminTabsLayout() {
               <Ionicons name={focused ? "people" : "people-outline"} size={24} color={color} />
             </View>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="audit"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

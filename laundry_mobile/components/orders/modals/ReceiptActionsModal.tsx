@@ -6,13 +6,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRTL, row, font, textProps } from '../../../src/utils/rtl';
+import { Colors } from '../../../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ReceiptActionsModalProps {
   visible: boolean;
   onClose: () => void;
-  /** The resolved status of the order after mutation — drives the title. */
   confirmedStatus: string | undefined;
   sharingAction: 'whatsapp' | 'print' | null;
   onWhatsApp: () => void;
@@ -37,30 +40,45 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
   onPrint,
   t,
 }) => {
+  const { isRTL } = useRTL();
+  const insets = useSafeAreaInsets();
+
   const isPickup = confirmedStatus === 'PICKED_UP';
+  // Bottom padding: safe area on devices with home indicator
+  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 12);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.dismiss} onPress={onClose} />
-        <View style={styles.sheet}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+
+        <View style={[styles.sheet, { paddingBottom: bottomPad + 12 }]}>
           <View style={styles.handle} />
 
+          {/* Success icon */}
           <View style={styles.iconBox}>
             <Ionicons name="checkmark-circle" size={60} color={C.success} />
           </View>
 
-          <Text style={styles.title}>
+          {/* Title — centered on confirmation screens is intentional */}
+          <Text
+            style={[styles.title, font.bold(isRTL)]}
+            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+          >
             {isPickup
               ? t('livreur.confirm_pickup_title', { defaultValue: 'Collecte confirmée !' })
               : t('livreur.confirm_delivery_title', { defaultValue: 'Livraison confirmée !' })}
           </Text>
 
-          <Text style={styles.subtitle}>
+          <Text
+            style={[styles.subtitle, font.regular(isRTL)]}
+            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+          >
             {t('livreur.send_receipt_prompt', { defaultValue: 'Voulez-vous envoyer le reçu au client ?' })}
           </Text>
 
-          <View style={styles.actions}>
+          {/* Action buttons — row direction flips in RTL */}
+          <View style={[styles.actions, row(isRTL)]}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: C.whatsappBg }]}
               onPress={onWhatsApp}
@@ -71,7 +89,12 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
               ) : (
                 <>
                   <Ionicons name="logo-whatsapp" size={24} color={C.whatsappColor} />
-                  <Text style={[styles.actionText, { color: C.whatsappColor }]}>WhatsApp</Text>
+                  <Text
+                    style={[styles.actionText, { color: C.whatsappColor }, font.bold(isRTL)]}
+                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+                  >
+                    WhatsApp
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -86,7 +109,10 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
               ) : (
                 <>
                   <Ionicons name="print" size={24} color={C.printColor} />
-                  <Text style={[styles.actionText, { color: C.printColor }]}>
+                  <Text
+                    style={[styles.actionText, { color: C.printColor }, font.bold(isRTL)]}
+                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+                  >
                     {t('common.print')}
                   </Text>
                 </>
@@ -94,8 +120,12 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Done / dismiss */}
           <TouchableOpacity style={styles.doneBtn} onPress={onClose}>
-            <Text style={styles.doneBtnText}>
+            <Text
+              style={[styles.doneBtnText, font.semibold(isRTL)]}
+              maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+            >
               {t('common.done', { defaultValue: 'Terminé' })}
             </Text>
           </TouchableOpacity>
@@ -113,14 +143,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
-  dismiss: { flex: 1 },
+  backdrop: { flex: 1 },
   sheet: {
     backgroundColor: 'white',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 12,
-    paddingBottom: 36,
     alignItems: 'center',
   },
   handle: {
@@ -134,18 +163,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0D1B2A',
+    color: Colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: Colors.textSecondary,
     marginBottom: 24,
     textAlign: 'center',
+    lineHeight: 20,
   },
   actions: {
-    flexDirection: 'row',
     gap: 12,
     width: '100%',
     marginBottom: 16,
@@ -167,5 +196,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  doneBtnText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  doneBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
 });

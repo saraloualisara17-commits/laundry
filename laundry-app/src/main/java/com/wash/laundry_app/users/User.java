@@ -46,6 +46,10 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** NULL = all branches / admin; set when multi-branch is activated. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
     // Explicit Getters/Setters to bypass Lombok failures
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

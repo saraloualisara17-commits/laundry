@@ -13,28 +13,17 @@ import { authApi } from '../../src/services/api';
 import { changeLanguage } from '../../src/i18n';
 import { useTranslation } from 'react-i18next';
 import { useLivreurStats, useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
-
-const C = {
-  primary: '#0D7377',
-  success: '#10B981',
-  successBg: 'rgba(16,185,129,0.1)',
-  warning: '#F59E0B',
-  warningBg: 'rgba(245,158,11,0.1)',
-  danger: '#EF4444',
-  dangerBg: 'rgba(239,68,68,0.08)',
-  bg: '#F4F6F8',
-  surface: '#FFFFFF',
-  textPrimary: '#0D1B2A',
-  textSecondary: '#4A5568',
-  textMuted: '#94A3B8',
-};
+import { queryClient } from '../../src/services/query/queryClient';
+import { socketClient } from '../../src/services/realtime';
+import { Colors as C } from '../../constants/theme';
+import Constants from 'expo-constants';
 
 export default function LivreurProfile() {
   const { t, i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
 
-  const { data: dashboardStats, refetch: refetchStats } = useLivreurStats();
+  const { refetch: refetchStats } = useLivreurStats();
   const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
   const { data: readyOrders = [], refetch: refetchPickups } = usePendingPickups();
 
@@ -56,6 +45,8 @@ export default function LivreurProfile() {
           await SecureStore.deleteItemAsync('user');
           await SecureStore.deleteItemAsync('accessToken');
           await SecureStore.deleteItemAsync('refreshToken');
+          socketClient.disconnect();
+          queryClient.clear();
           dispatch(logOut());
         },
       },
@@ -64,7 +55,6 @@ export default function LivreurProfile() {
 
   const deliveriesCount = readyDeliveries.length;
   const pickupsCount = readyOrders.length;
-  const totalCollected = dashboardStats?.totalCollectedToday || 0;
   const initials = (user?.name || 'L').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
 
   return (
@@ -104,11 +94,6 @@ export default function LivreurProfile() {
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryVal, { color: C.warning }]}>{pickupsCount}</Text>
               <Text style={styles.summaryLabel}>{t('livreur.pickups')}</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryVal, { color: C.primary }]}>{totalCollected} DH</Text>
-              <Text style={styles.summaryLabel}>{t('livreur.collected')}</Text>
             </View>
           </View>
         </View>
@@ -154,6 +139,8 @@ export default function LivreurProfile() {
           <Ionicons name="log-out-outline" size={20} color={C.danger} />
           <Text style={styles.logoutText}>{t('common.logout')}</Text>
         </TouchableOpacity>
+
+        <Text style={styles.versionText}>v{Constants.expoConfig?.version ?? '—'}</Text>
       </ScrollView>
     </View>
   );
@@ -206,4 +193,5 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginTop: 4, paddingVertical: 16, borderRadius: 14,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+  versionText: { textAlign: 'center', fontSize: 12, color: C.textMuted, marginTop: 20, marginBottom: 8 },
 });

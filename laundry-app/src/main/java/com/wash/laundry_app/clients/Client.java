@@ -44,6 +44,10 @@ public class Client {
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
 
+    /** NULL = single-branch mode; set when multi-branch is activated. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

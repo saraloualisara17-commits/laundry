@@ -2,16 +2,55 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import * as SecureStore from 'expo-secure-store';
 import { ApiError } from './types';
 import { connectivity } from '../offline/connectivity';
+import { logger } from '../../lib/logger';
 
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
 
 const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000, // 15 seconds timeout
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+/**
+ * Single in-flight refresh promise shared across all concurrent 401 failures.
+ * Without this, three parallel requests that all get 401 would each independently
+ * call /auth/refresh — the first would succeed, the second and third would hit a
+ * now-invalid token and log the user out unnecessarily.
+ */
+let _refreshPromise: Promise<string> | null = null;
+
+const refreshAccessToken = async (): Promise<string> => {
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = (async () => {
+    const refreshToken = await SecureStore.getItemAsync('refreshToken');
+    if (!refreshToken) throw new Error('No refresh token available');
+
+    const refreshClient = axios.create({ baseURL: BASE_URL });
+    const res = await refreshClient.post('/auth/refresh', null, {
+      headers: { 'X-Refresh-Token': refreshToken },
+    });
+
+    const newAccessToken: string = res.data.token;
+    if (!newAccessToken) {
+      throw new Error('Refresh response contained no token — forcing logout');
+    }
+    const newRefreshToken: string = res.data.refreshToken || refreshToken;
+
+    const { store } = require('../../store/store');
+    const { setCredentials } = require('../../store/authSlice');
+    await SecureStore.setItemAsync('refreshToken', newRefreshToken);
+    store.dispatch(setCredentials({ token: newAccessToken }));
+    return newAccessToken;
+  })().finally(() => {
+    _refreshPromise = null;
+  });
+
+  return _refreshPromise;
+};
 
 /**
  * Normalizes error responses from the API
@@ -31,28 +70,18 @@ export const normalizeError = (error: any): ApiError => {
   };
 };
 
-/**
- * Interceptor to add Authorization header
- */
 client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  // We need to avoid circular dependencies with the store
-  // so we'll try to get the token directly if possible, or use a dynamic import/injection
   try {
-    // Attempt to get token from SecureStore if it's not passed in some other way
-    // In this app's architecture, we might still want to peek at the Redux state
-    // but for now let's use a placeholder for the strategy.
-    
-    // NOTE: The original app imports the store inside the interceptor.
-    // This is generally safe in JS but can be tricky in TS with circular deps.
     const { store } = require('../../store/store');
     const token = store.getState().auth.token;
-    
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch (e) {
-    console.error('Request interceptor error:', e);
+    logger.network.error('Request interceptor failed to attach token', { err: String(e) });
   }
+
+  logger.network.debug(`${config.method?.toUpperCase()} ${config.url}`);
   return config;
 });
 
@@ -72,6 +101,7 @@ client.interceptors.response.use(
         errorData?.message?.includes('désactivé');
 
       if (isAccountDisabled) {
+        logger.auth.warn('Account disabled — logging out');
         const { store } = require('../../store/store');
         const { logOut } = require('../../store/authSlice');
         store.dispatch(logOut());
@@ -93,33 +123,15 @@ client.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = await SecureStore.getItemAsync('refreshToken');
-
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-
-        // Dedicated refresh client to avoid interceptors loops
-        const refreshClient = axios.create({ baseURL: BASE_URL });
-        const res = await refreshClient.post('/auth/refresh', null, {
-          headers: { 'X-Refresh-Token': refreshToken },
-        });
-
-        const newAccessToken = res.data.token;
-        const newRefreshToken = res.data.refreshToken || refreshToken;
-
-        const { store } = require('../../store/store');
-        const { setCredentials } = require('../../store/authSlice');
-
-        await SecureStore.setItemAsync('refreshToken', newRefreshToken);
-        store.dispatch(setCredentials({ token: newAccessToken }));
-
+        logger.auth.info('Refreshing access token');
+        const newAccessToken = await refreshAccessToken();
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }
+        logger.auth.info('Token refreshed — retrying original request');
         return client(originalRequest);
       } catch (err) {
-        // Refresh failed, logout user
+        logger.auth.warn('Token refresh failed — logging out');
         const { store } = require('../../store/store');
         const { logOut } = require('../../store/authSlice');
         store.dispatch(logOut());

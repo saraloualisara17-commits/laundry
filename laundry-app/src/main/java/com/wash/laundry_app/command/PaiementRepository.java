@@ -11,6 +11,8 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long> {
 
     List<Paiement> findByCommandeIdOrderByDatePaiementDesc(Long commandeId);
 
+    java.util.Optional<Paiement> findByIdempotencyKey(String idempotencyKey);
+
     @Query("SELECT COALESCE(SUM(p.montant), 0) FROM Paiement p WHERE p.commande.id = :commandeId")
     BigDecimal sumByCommandeId(@Param("commandeId") Long commandeId);
 

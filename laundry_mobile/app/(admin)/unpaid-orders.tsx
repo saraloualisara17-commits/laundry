@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -10,6 +10,7 @@ import {
   Linking,
   Alert
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -18,6 +19,9 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('unpaid-orders');
 
 export default function UnpaidOrdersScreen() {
   const { t, i18n } = useTranslation();
@@ -44,7 +48,7 @@ export default function UnpaidOrdersScreen() {
         setOrders(ordersRes.data);
       }
     } catch (error) {
-      console.error('Error fetching unpaid data:', error);
+      log.error('Error fetching unpaid data', { err: String(error) });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -95,7 +99,7 @@ export default function UnpaidOrdersScreen() {
       >
         <View style={[isArabic ? styles.accentBarAr : styles.accentBar, { backgroundColor: debtColor.main }]} />
         
-        <View style={[styles.clientTop, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.clientTop, row(isArabic)]}>
           <View style={[styles.avatar, { backgroundColor: debtColor.bg, borderColor: debtColor.main }]}>
             <Text style={[styles.avatarText, { color: debtColor.main }]}>
               {item.clientName?.charAt(0)?.toUpperCase()}
@@ -119,9 +123,9 @@ export default function UnpaidOrdersScreen() {
           </View>
         </View>
 
-        <View style={[styles.cardFooter, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardFooter, row(isArabic)]}>
           <TouchableOpacity 
-            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, row(isArabic)]}
             onPress={() => openWhatsApp(item.clientPhone, item.clientName, item.totalRemaining, item.orderCount)}
           >
             <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
@@ -131,7 +135,7 @@ export default function UnpaidOrdersScreen() {
           <View style={styles.footerDivider} />
           
           <TouchableOpacity 
-            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, row(isArabic)]}
             onPress={() => router.push({ pathname: '/(admin)/client-debt-detail', params: { clientId: item.clientId, clientName: item.clientName } })}
           >
             <Ionicons name="list" size={18} color={AdminColors.primary} />
@@ -150,7 +154,7 @@ export default function UnpaidOrdersScreen() {
         style={styles.orderCard}
         onPress={() => router.push(`/order/${item.orderId || item.id}`)}
       >
-        <View style={[styles.orderHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.orderHeader, row(isArabic)]}>
           <View>
             <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference || item.numeroCommande}</Text>
             <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.clientName || item.clientNom || item.client?.name}</Text>
@@ -163,7 +167,7 @@ export default function UnpaidOrdersScreen() {
           <Text style={styles.infoText}>{itemsSummary}</Text>
         </View>
         
-        <View style={[styles.orderFinancials, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.orderFinancials, row(isArabic)]}>
           <View style={styles.finCol}>
             <Text style={styles.finLabel}>{t('common.total')}</Text>
             <Text style={styles.finValue}>{item.montantTotal} {t('common.dh')}</Text>
@@ -188,7 +192,7 @@ export default function UnpaidOrdersScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerTop, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerTop, row(isArabic)]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
@@ -196,7 +200,7 @@ export default function UnpaidOrdersScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        <View style={[styles.summaryBox, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.summaryBox, row(isArabic)]}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{overview?.totalRemaining || 0} <Text style={{ fontSize: 14 }}>{t('common.dh')}</Text></Text>
             <Text style={styles.summaryLabel}>{t('dashboard.unpaid_balance')}</Text>
@@ -208,7 +212,7 @@ export default function UnpaidOrdersScreen() {
           </View>
         </View>
 
-        <View style={[styles.tabs, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.tabs, row(isArabic)]}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'client' && styles.activeTab]}
             onPress={() => setActiveTab('client')}
@@ -369,7 +373,7 @@ const styles = StyleSheet.create({
   },
   clientInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginStart: 12,
   },
   clientName: {
     fontSize: 16,

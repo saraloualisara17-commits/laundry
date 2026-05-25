@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class AnalyticsService {
     private final ClientRepository clientRepository;
     private final UserRepository userRepository;
     private final PaiementRepository paiementRepository;
+    private final HistoriqueStatutRepository historiqueStatutRepository;
 
     @Transactional(readOnly = true)
     public RevenueAnalyticsDTO getRevenueAnalytics(LocalDate start, LocalDate end) {
@@ -112,34 +114,47 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public OperationalKPIDTO getOperationalKPIs() {
-        List<Commande> allOrders = commandeRepository.findAll();
-        
-        // Avg Processing Time (Ready - PickedUp)
-        // This requires parsing history logs or adding dates to Commande. 
-        // For foundation, I'll use a simplified version if dates exist.
-        // Assuming dateCreation as PickedUp for Immediate mode.
-        
+        LocalDateTime since = LocalDateTime.now().minusDays(30);
+
         long activeClients = clientRepository.count();
         long newClients = clientRepository.countCreatedAfter(LocalDateTime.now().minusDays(30));
 
-        // Simplified unpaid ratio
-        BigDecimal totalPotential = allOrders.stream()
-                .map(o -> o.getMontantTotal() != null ? o.getMontantTotal() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        BigDecimal totalPaid = allOrders.stream()
-                .map(o -> o.getMontantPaye() != null ? o.getMontantPaye() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        double unpaidRatio = totalPotential.compareTo(BigDecimal.ZERO) == 0 ? 0.0 :
-                totalPotential.subtract(totalPaid).divide(totalPotential, 4, RoundingMode.HALF_UP).doubleValue();
+        // Unpaid ratio over delivered orders (not all orders — captures true debt exposure)
+        Object[] unpaidData = commandeRepository.getUnpaidOverview();
+        BigDecimal totalUnpaid = unpaidData != null && unpaidData[1] != null
+                ? (BigDecimal) unpaidData[1] : BigDecimal.ZERO;
+        BigDecimal totalRevenue = commandeRepository.sumTotalByStatus(CommandeStatus.DELIVERED);
+        double unpaidRatio = totalRevenue != null && totalRevenue.compareTo(BigDecimal.ZERO) > 0
+                ? totalUnpaid.divide(totalRevenue, 4, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+
+        // Average processing time: PICKED_UP → IN_PROCESS (last 30 days)
+        double avgProcessingHours = computeAvgHours("PICKED_UP", "IN_PROCESS", since);
+
+        // Average delivery time: READY_FOR_DELIVERY → DELIVERED (last 30 days)
+        double avgDeliveryHours = computeAvgHours("READY_FOR_DELIVERY", "DELIVERED", since);
 
         return OperationalKPIDTO.builder()
                 .activeClients(activeClients)
                 .newClientsLast30Days(newClients)
                 .unpaidRatio(unpaidRatio)
-                .averageProcessingTimeHours(24.5) // Placeholder for more complex calculation
-                .averageDeliveryTimeHours(12.0)   // Placeholder
+                .averageProcessingTimeHours(avgProcessingHours)
+                .averageDeliveryTimeHours(avgDeliveryHours)
                 .build();
+    }
+
+    private double computeAvgHours(String fromStatus, String toStatus, LocalDateTime since) {
+        List<Object[]> transitions = historiqueStatutRepository
+                .findStatusTransitionTimes(fromStatus, toStatus, since);
+        if (transitions.isEmpty()) return 0.0;
+        double totalHours = transitions.stream()
+                .mapToDouble(row -> {
+                    LocalDateTime t1 = (LocalDateTime) row[0];
+                    LocalDateTime t2 = (LocalDateTime) row[1];
+                    return ChronoUnit.MINUTES.between(t1, t2) / 60.0;
+                })
+                .filter(h -> h >= 0)
+                .sum();
+        return Math.round((totalHours / transitions.size()) * 10.0) / 10.0;
     }
 }

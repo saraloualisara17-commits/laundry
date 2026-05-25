@@ -26,6 +26,14 @@ public class UpdateCommandeStatusRequest {
 
     private String notesPaiement;
 
+    /**
+     * Client-generated UUID for the payment created at delivery.
+     * Only relevant when status = DELIVERED and montantCollecte > 0.
+     * Prevents a duplicate payment if the network drops after the server
+     * commits but before the client receives the 200 response.
+     */
+    private String paymentIdempotencyKey;
+
     // Explicit getters/setters to bypass Lombok edge cases
     public CommandeStatus getStatus() { return status; }
     public void setStatus(CommandeStatus status) { this.status = status; }
@@ -35,4 +43,6 @@ public class UpdateCommandeStatusRequest {
     public void setMontantCollecte(BigDecimal montantCollecte) { this.montantCollecte = montantCollecte; }
     public String getNotesPaiement() { return notesPaiement; }
     public void setNotesPaiement(String notesPaiement) { this.notesPaiement = notesPaiement; }
+    public String getPaymentIdempotencyKey() { return paymentIdempotencyKey; }
+    public void setPaymentIdempotencyKey(String paymentIdempotencyKey) { this.paymentIdempotencyKey = paymentIdempotencyKey; }
 }

@@ -6,6 +6,7 @@ import com.wash.laundry_app.command.CommandeMapper;
 import com.wash.laundry_app.command.CommandeRepository;
 import com.wash.laundry_app.command.ForbiddenOperationException;
 import com.wash.laundry_app.auth.AuthService;
+import com.wash.laundry_app.audit.AuditService;
 import com.wash.laundry_app.users.admin.ClientStatisticsDto;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ClientService {
     private final CommandeRepository commandeRepository;
     private final CommandeMapper commandeMapper;
     private final AuthService authService;
+    private final AuditService auditService;
 
     @Transactional
     public ClientDto createClient(ClientRegisterRequest request) {
@@ -48,8 +50,9 @@ public class ClientService {
     @Transactional
     public ClientDto updateClient(Long id, ClientRegisterRequest request) {
         var client = clientRepository.findById(id).orElseThrow(() -> new ClientNotFoundException("Client non trouvé"));
+        String previous = "Name: " + client.getName() + " | Email: " + client.getEmail();
         clientMapper.updateEntity(request, client);
-        
+
         // Re-link phones and addresses if they were updated/replaced
         if (client.getPhones() != null) {
             client.getPhones().forEach(phone -> phone.setClient(client));
@@ -57,8 +60,10 @@ public class ClientService {
         if (client.getAddresses() != null) {
             client.getAddresses().forEach(address -> address.setClient(client));
         }
-        
+
         clientRepository.save(client);
+        auditService.log("CLIENT_UPDATED", "CLIENT", id, previous,
+                "Name: " + client.getName() + " | Email: " + client.getEmail(), null);
         return clientMapper.toDto(client);
     }
 

@@ -1,5 +1,7 @@
 package com.wash.laundry_app.auth;
 
+import com.wash.laundry_app.audit.AuditContext;
+import com.wash.laundry_app.audit.LoginAuditService;
 import com.wash.laundry_app.users.Role;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserMapper;
@@ -33,6 +35,7 @@ public class AuthController {
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAuditService loginAuditService;
 
     @org.springframework.beans.factory.annotation.Value("${app.use-secure-cookies:true}")
     private boolean useSecureCookies;
@@ -40,17 +43,23 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<JwtResponse> Login(@Valid @RequestBody LoginRequest request, HttpServletRequest req, HttpServletResponse response){
 
+        AuditContext.AuditMeta ctx = AuditContext.get();
+        String ip = ctx != null ? ctx.ipAddress() : req.getRemoteAddr();
+        String userAgent = ctx != null ? ctx.userAgent() : req.getHeader("User-Agent");
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         } catch (org.springframework.security.authentication.BadCredentialsException |
                  org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+            loginAuditService.recordFailure(request.getEmail(), "BAD_CREDENTIALS", ip, userAgent);
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
         }
 
         var user = userService.getByEmail(request.getEmail());
 
         if (user.getIsActive() != null && !user.getIsActive()) {
+            loginAuditService.recordFailure(request.getEmail(), "ACCOUNT_DISABLED", ip, userAgent);
             throw new org.springframework.security.authentication.DisabledException("Compte désactivé. Contactez votre administrateur.");
         }
         var accessTocken = jwtService.generateAccessToken(user);
@@ -76,34 +85,63 @@ public class AuthController {
         rt.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(jwtConfig.getRefreshTokenExpiration()));
         refreshTokenService.save(rt);
 
+        loginAuditService.recordSuccess(user, ip, userAgent);
+
         return ResponseEntity.ok(new JwtResponse(accessTocken.toString(), refreshToken.toString()));
     }
 
     @PostMapping("/refresh")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<JwtResponse> refresh(
             @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
-            @RequestHeader(name = "X-Refresh-Token", required = false) String headerRefreshToken) {
-        
-        String refreshToken = cookieRefreshToken != null ? cookieRefreshToken : headerRefreshToken;
-        if (refreshToken == null || refreshToken.isBlank()) {
+            @RequestHeader(name = "X-Refresh-Token", required = false) String headerRefreshToken,
+            HttpServletResponse response) {
+
+        String incomingToken = cookieRefreshToken != null ? cookieRefreshToken : headerRefreshToken;
+        if (incomingToken == null || incomingToken.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        var jwt = jwtService.parseToken(refreshToken);
+        var jwt = jwtService.parseToken(incomingToken);
         if (jwt == null || jwt.isExpired()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        // HIGH-4: Verify token hasn't been revoked (is in DB)
-        String hash = jwtService.hashToken(refreshToken);
-        var storedToken = refreshTokenService.findByTokenHash(hash);
+        // Verify token hasn't been revoked (must exist in DB)
+        String incomingHash = jwtService.hashToken(incomingToken);
+        var storedToken = refreshTokenService.findByTokenHash(incomingHash);
         if (storedToken.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
+        // Rotate: revoke the old token and issue a fresh one (prevents replay after token theft)
+        refreshTokenService.deleteByTokenHash(incomingHash);
+
         var user = userService.getByIdEntity(jwt.getUserId());
-        var accessToken = jwtService.generateAccessToken(user);
-        return ResponseEntity.ok(new JwtResponse(accessToken.toString(), refreshToken));
+        var newAccessToken  = jwtService.generateAccessToken(user);
+        var newRefreshToken = jwtService.generateRefreshToken(user);
+
+        RefreshToken rt = new RefreshToken();
+        rt.setUser(user);
+        rt.setTokenHash(jwtService.hashToken(newRefreshToken.toString()));
+        rt.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(jwtConfig.getRefreshTokenExpiration()));
+        refreshTokenService.save(rt);
+
+        // Rotate the HttpOnly cookie as well (if the original came via cookie)
+        if (cookieRefreshToken != null) {
+            boolean isHttps = useSecureCookies;
+            ResponseCookie cookie = ResponseCookie
+                    .from("refreshToken", newRefreshToken.toString())
+                    .httpOnly(true)
+                    .secure(isHttps)
+                    .sameSite(isHttps ? "None" : "Lax")
+                    .path("/auth")
+                    .maxAge(java.time.Duration.ofDays(7))
+                    .build();
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        }
+
+        return ResponseEntity.ok(new JwtResponse(newAccessToken.toString(), newRefreshToken.toString()));
     }
 
     @PostMapping("/logout")

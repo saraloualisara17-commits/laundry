@@ -77,6 +77,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     Optional<Commande> findByNumeroCommande(String numeroCommande);
 
+    Optional<Commande> findByCreationIdempotencyKey(String creationIdempotencyKey);
+
     boolean existsByNumeroCommande(String numeroCommande);
 
     // ── Pickup driver queries (pickup_driver_id / "livreur" field) ────────────
@@ -349,6 +351,21 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     // ── Period-scoped aggregates on a provided list of commande IDs ───────────
     // Used by StatisticsService to compute totals for orders that passed through
     // a given status within a date window (event-based, not current-status-based).
+
+    // ── Operational alert queries ─────────────────────────────────────────────
+
+    /** Orders stuck in PENDING_PICKUP beyond a threshold (overdue pickup). */
+    @Query("SELECT c FROM Commande c WHERE c.status = 'PENDING_PICKUP' AND c.dateCreation <= :cutoff")
+    List<Commande> findOverduePickups(@Param("cutoff") LocalDateTime cutoff);
+
+    /** Orders stuck in READY_FOR_DELIVERY beyond a threshold (delayed delivery). */
+    @Query("SELECT c FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' AND c.dateCreation <= :cutoff")
+    List<Commande> findDelayedDeliveries(@Param("cutoff") LocalDateTime cutoff);
+
+    /** Delivered orders with outstanding balance (unpaid debt). */
+    @Query("SELECT c FROM Commande c WHERE c.status = 'DELIVERED' " +
+           "AND c.montantTotal > COALESCE(c.montantPaye, 0) AND c.dateLivraison <= :cutoff")
+    List<Commande> findDeliveredWithUnpaidBalance(@Param("cutoff") LocalDateTime cutoff);
 
     @Query("SELECT COALESCE(SUM(ct.quantite), 0) FROM CommandeTapis ct " +
            "WHERE ct.commande.id IN :ids")

@@ -3,6 +3,9 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import client from '../api/client';
 import { router } from 'expo-router';
+import { logger } from '../../lib/logger';
+
+const log = logger.ns('push');
 
 /**
  * Note: We use dynamic requires for expo-notifications because 
@@ -19,7 +22,7 @@ export const pushNotificationService = {
   async registerForPushNotificationsAsync(userId: number | string) {
     if (!Device.isDevice || isExpoGo) {
       if (isExpoGo) {
-        console.warn('[PushNotification] Registration skipped: Push notifications are not supported in Expo Go (SDK 53+).');
+        log.warn('Registration skipped — not supported in Expo Go (SDK 53+)');
       }
       return null;
     }
@@ -36,7 +39,7 @@ export const pushNotificationService = {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('Failed to get push token for push notification!');
+        log.warn('Permission not granted — push token unavailable');
         return null;
       }
 
@@ -46,7 +49,7 @@ export const pushNotificationService = {
         Constants?.easConfig?.projectId;
 
       if (!projectId) {
-        console.warn('[PushNotification] Registration skipped: No projectId found in app.json.');
+        log.warn('Registration skipped — no projectId in app.json');
         return null;
       }
 
@@ -68,14 +71,14 @@ export const pushNotificationService = {
       // Register token with the backend
       try {
         await client.post(`/api/users/${userId}/push-token`, { token });
-        console.log('Push token registered with backend successfully');
+        log.info('Push token registered with backend');
       } catch (error) {
-        console.error('Failed to register push token with backend', error);
+        log.error('Failed to register push token with backend', { err: String(error) });
       }
 
       return token;
     } catch (e) {
-      console.error('[PushNotification] Error during registration:', e);
+      log.error('Error during registration', { err: String(e) });
       return null;
     }
   },
@@ -100,14 +103,13 @@ export const pushNotificationService = {
 
       // This listener is fired whenever a notification is received while the app is foregrounded
       const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
-        console.log('Notification received in foreground:', notification);
+        log.debug('Notification received in foreground', { id: notification.request.identifier });
       });
 
       // This listener is fired whenever a user taps on or interacts with a notification 
       const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
         const { data } = response.notification.request.content;
-        console.log('Notification interaction:', data);
-        
+        log.info('Notification tapped', { type: data?.type });
         this.handleNotificationNavigation(data);
       });
 
@@ -116,7 +118,7 @@ export const pushNotificationService = {
         responseSubscription.remove();
       };
     } catch (e) {
-      console.error('[PushNotification] Failed to init handlers:', e);
+      log.error('Failed to init notification handlers', { err: String(e) });
       return () => {};
     }
   },
@@ -144,7 +146,7 @@ export const pushNotificationService = {
         break;
 
       default:
-        console.log('Unknown notification type or no reference ID:', type);
+        log.warn('Unknown notification type or no reference ID', { type });
     }
   }
 };

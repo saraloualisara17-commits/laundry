@@ -11,9 +11,11 @@ import { RootState, AppDispatch } from '../../src/store/store';
 import { logOut } from '../../src/store/authSlice';
 import * as SecureStore from 'expo-secure-store';
 import { authApi } from '../../src/services/api';
-import { useTranslation } from 'react-i18next';
 import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
+import { useRTL, row, font, arabicSafe, pos, textProps } from '../../src/utils/rtl';
 import { useLivreurStats, useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
+import { queryClient } from '../../src/services/query/queryClient';
+import { socketClient } from '../../src/services/realtime';
 
 const C = {
   primary: '#0D7377',
@@ -47,11 +49,11 @@ function openMapsNavigation(lat?: number, lng?: number, address?: string) {
 }
 
 export default function LivreurDashboard() {
-  const { t } = useTranslation();
+  const { t, isRTL } = useRTL();
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((s: RootState) => s.auth);
 
-  const { data: dashboardStats, refetch: refetchStats } = useLivreurStats();
+  const { refetch: refetchStats } = useLivreurStats();
   const { data: readyDeliveries = [], isLoading: loadingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
   const { data: readyOrders = [], isLoading: loadingPickups, refetch: refetchPickups } = usePendingPickups();
 
@@ -84,6 +86,8 @@ export default function LivreurDashboard() {
           await SecureStore.deleteItemAsync('user');
           await SecureStore.deleteItemAsync('accessToken');
           await SecureStore.deleteItemAsync('refreshToken');
+          socketClient.disconnect();
+          queryClient.clear();
           dispatch(logOut());
         },
       },
@@ -97,7 +101,6 @@ export default function LivreurDashboard() {
   const allMissions = [...visibleDeliveries, ...readyOrders];
   const deliveryCount = visibleDeliveries.length;
   const pickupCount = readyOrders.length;
-  const totalCollected = dashboardStats?.totalCollectedToday || 0;
 
   const nextMission = allMissions.length > 0 ? (() => {
     const first = visibleDeliveries[0] || readyOrders[0];
@@ -128,10 +131,10 @@ export default function LivreurDashboard() {
       {/* HEADER */}
       <SafeAreaView edges={['top']} style={{ backgroundColor: C.primary }}>
         <View style={styles.header}>
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, row(isRTL)]}>
             <View>
-              <Text style={styles.greeting}>{t('livreur.greeting')}</Text>
-              <Text style={styles.userName}>{user?.name || t('livreur.driver_fallback')}</Text>
+              <Text style={[styles.greeting, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.greeting')}</Text>
+              <Text style={[styles.userName, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{user?.name || t('livreur.driver_fallback')}</Text>
             </View>
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color="white" />
@@ -141,22 +144,18 @@ export default function LivreurDashboard() {
           {/* Stats chips */}
           <View style={styles.statsRow}>
             <View style={styles.statChip}>
-              <View style={styles.chipRow}>
+              <View style={[styles.chipRow, row(isRTL)]}>
                 <Animated.View style={[styles.dot, { backgroundColor: C.success, opacity: pulseAnim }]} />
-                <Text style={styles.chipNumber}>{deliveryCount}</Text>
+                <Text style={[styles.chipNumber, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{deliveryCount}</Text>
               </View>
-              <Text style={styles.chipLabel}>{t('livreur.deliveries')}</Text>
+              <Text style={[styles.chipLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.deliveries')}</Text>
             </View>
             <View style={styles.statChip}>
-              <View style={styles.chipRow}>
+              <View style={[styles.chipRow, row(isRTL)]}>
                 <Animated.View style={[styles.dot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
-                <Text style={styles.chipNumber}>{pickupCount}</Text>
+                <Text style={[styles.chipNumber, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{pickupCount}</Text>
               </View>
-              <Text style={styles.chipLabel}>{t('livreur.pickups')}</Text>
-            </View>
-            <View style={styles.statChip}>
-              <Text style={styles.chipAmount}>{totalCollected} DH</Text>
-              <Text style={styles.chipLabel}>{t('livreur.collected')}</Text>
+              <Text style={[styles.chipLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.pickups')}</Text>
             </View>
           </View>
         </View>
@@ -172,40 +171,40 @@ export default function LivreurDashboard() {
           {nextMission ? (
             <View style={[styles.missionCard, { backgroundColor: missionBg }]}>
               {/* BG circle decoration */}
-              <View style={styles.missionCircle} />
+              <View style={[styles.missionCircle, pos.end(-30, isRTL)]} />
 
-              <View style={styles.missionTop}>
+              <View style={[styles.missionTop, row(isRTL)]}>
                 <View style={styles.missionBadge}>
                   <Text style={[styles.missionBadgeText, { color: missionTextColor }]}>
                     {nextMission.type === 'delivery' ? t('livreur.delivery_badge') : t('livreur.pickup_badge')}
                   </Text>
                 </View>
-                <Text style={styles.missionLabel}>{t('livreur.next_mission')}</Text>
+                <Text style={[styles.missionLabel, arabicSafe(isRTL)]}>{t('livreur.next_mission')}</Text>
               </View>
 
               <Text style={[styles.missionClientName, { color: 'white' }]}>{nextMission.clientName}</Text>
 
-              <View style={styles.missionInfoRow}>
+              <View style={[styles.missionInfoRow, row(isRTL)]}>
                 <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.7)" />
                 <Text style={styles.missionInfoText} numberOfLines={1}>{nextMission.clientAddress}</Text>
               </View>
               {nextMission.clientPhone ? (
-                <View style={styles.missionInfoRow}>
+                <View style={[styles.missionInfoRow, row(isRTL)]}>
                   <Ionicons name="call-outline" size={14} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.missionInfoText}>{nextMission.clientPhone}</Text>
                 </View>
               ) : null}
 
               {nextMission.type === 'delivery' && (
-                <View style={styles.financialRow}>
+                <View style={[styles.financialRow, row(isRTL)]}>
                   <View>
-                    <Text style={styles.finLabel}>{t('common.total')}</Text>
-                    <Text style={styles.finValue}>{nextMission.montantTotal} DH</Text>
+                    <Text style={[styles.finLabel, font.semibold(isRTL)]}>{t('common.total')}</Text>
+                    <Text style={[styles.finValue, font.extrabold(isRTL)]}>{nextMission.montantTotal} DH</Text>
                   </View>
                   <View style={styles.finDivider} />
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.finLabel}>{t('livreur.remaining_to_collect')}</Text>
-                    <Text style={[styles.finValue, { fontSize: 18 }]}>{nextMission.montantRestant} DH</Text>
+                  <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+                    <Text style={[styles.finLabel, font.semibold(isRTL)]}>{t('livreur.remaining_to_collect')}</Text>
+                    <Text style={[styles.finValue, { fontSize: 18 }, font.extrabold(isRTL)]}>{nextMission.montantRestant} DH</Text>
                   </View>
                 </View>
               )}
@@ -214,14 +213,14 @@ export default function LivreurDashboard() {
                 <Text style={styles.itemsText}>{nextMission.itemCount} {t('livreur.items_to_collect')}</Text>
               )}
 
-              <View style={styles.missionActions}>
+              <View style={[styles.missionActions, row(isRTL)]}>
                 {nextMission.clientPhone ? (
                   <TouchableOpacity
-                    style={styles.callBtn}
+                    style={[styles.callBtn, row(isRTL)]}
                     onPress={() => Linking.openURL(`tel:${nextMission.clientPhone}`)}
                   >
                     <Ionicons name="call" size={16} color="white" />
-                    <Text style={styles.callBtnText}>{t('common.call')}</Text>
+                    <Text style={[styles.callBtnText, font.semibold(isRTL)]}>{t('common.call')}</Text>
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity
@@ -271,7 +270,7 @@ export default function LivreurDashboard() {
             </View>
             <Text style={styles.quickLabel}>{t('livreur.deliveries_tab')}</Text>
             {deliveryCount > 0 && (
-              <View style={[styles.quickBadge, { backgroundColor: C.success }]}>
+              <View style={[styles.quickBadge, { backgroundColor: C.success }, pos.end(8, isRTL), { top: 8 }]}>
                 <Text style={styles.quickBadgeText}>{deliveryCount}</Text>
               </View>
             )}
@@ -287,7 +286,7 @@ export default function LivreurDashboard() {
             </View>
             <Text style={styles.quickLabel}>{t('livreur.pickups_tab')}</Text>
             {pickupCount > 0 && (
-              <View style={[styles.quickBadge, { backgroundColor: C.warning }]}>
+              <View style={[styles.quickBadge, { backgroundColor: C.warning }, pos.end(8, isRTL), { top: 8 }]}>
                 <Text style={styles.quickBadgeText}>{pickupCount}</Text>
               </View>
             )}
@@ -297,10 +296,10 @@ export default function LivreurDashboard() {
         {/* TODAY'S MISSIONS PREVIEW */}
         {previewMissions.length > 0 && (
           <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('livreur.missions_today')}</Text>
+            <View style={[styles.sectionHeader, row(isRTL)]}>
+              <Text style={[styles.sectionTitle, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.missions_today')}</Text>
               <TouchableOpacity onPress={() => router.push('/(livreur)/missions')}>
-                <Text style={styles.seeAll}>{t('livreur.see_all')}</Text>
+                <Text style={[styles.seeAll, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.see_all')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -310,7 +309,7 @@ export default function LivreurDashboard() {
               return (
                 <TouchableOpacity
                   key={mission.id}
-                  style={styles.miniCard}
+                  style={[styles.miniCard, row(isRTL)]}
                   onPress={() => router.push(`/order/${mission.id}`)}
                   activeOpacity={0.7}
                 >
@@ -319,15 +318,15 @@ export default function LivreurDashboard() {
                     <Text style={{ fontSize: 18 }}>{isDelivery ? '🚚' : '📦'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.miniClientName}>{mission.client?.name || mission.clientNom || '—'}</Text>
-                    <Text style={styles.miniAddress} numberOfLines={1}>
+                    <Text style={[styles.miniClientName, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{mission.client?.name || mission.clientNom || '—'}</Text>
+                    <Text style={[styles.miniAddress, font.regular(isRTL)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                       {addr?.address || addr?.fullAddress || '—'}
                     </Text>
                   </View>
                   {isDelivery ? (
-                    <Text style={[styles.miniAmount, { color: C.success }]}>{mission.montantTotal} DH</Text>
+                    <Text style={[styles.miniAmount, { color: C.success }, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{mission.montantTotal} DH</Text>
                   ) : (
-                    <Text style={[styles.miniAmount, { color: C.warning }]}>
+                    <Text style={[styles.miniAmount, { color: C.warning }, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                       {t('livreur.items_count', { count: mission.commandeTapis?.length || 0 })}
                     </Text>
                   )}
@@ -389,7 +388,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
   },
   missionCircle: {
-    position: 'absolute', right: -30, top: -30,
+    position: 'absolute', top: -30,
     width: 120, height: 120, borderRadius: 60,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
@@ -438,7 +437,7 @@ const styles = StyleSheet.create({
   },
   quickLabel: { fontSize: 11, fontWeight: '600', color: C.textPrimary, textAlign: 'center' },
   quickBadge: {
-    position: 'absolute', top: 8, right: 8,
+    position: 'absolute',
     minWidth: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,

@@ -42,11 +42,11 @@ export const uploadsApi = {
       type: file.type || 'image/jpeg',
     });
 
-    return client.post<string>('/api/upload', formData, {
+    return client.post<{ imageUrl: string }>('/api/upload/single', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 30000,
+      timeout: 60000,
     });
   },
 };

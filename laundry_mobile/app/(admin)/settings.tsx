@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
@@ -73,7 +74,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
@@ -110,7 +111,7 @@ export default function SettingsScreen() {
             <View style={styles.divider} />
 
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Logo</Text>
-            <View style={[styles.logoContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.logoContainer, row(isArabic)]}>
               <View style={styles.logoPreview}>
                 {logoPreviewUri ? (
                   <Image source={{ uri: logoPreviewUri }} style={styles.logoImage} />

@@ -2,13 +2,12 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { AdminColors } from '../../../constants/AdminColors';
+import { useRTL, row } from '../../../src/utils/rtl';
 
 export default function EmployeTabsLayout() {
   const insets = useSafeAreaInsets();
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t, isRTL: isArabic } = useRTL();
 
   return (
     <Tabs
@@ -23,7 +22,7 @@ export default function EmployeTabsLayout() {
           height: 68 + insets.bottom,
           paddingBottom: insets.bottom + 10,
           paddingTop: 10,
-          flexDirection: isArabic ? 'row-reverse' : 'row',
+          ...row(isArabic),
         },
         tabBarLabelStyle: {
           fontSize: 11,

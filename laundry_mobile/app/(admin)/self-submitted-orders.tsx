@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -67,13 +68,13 @@ export default function SelfSubmittedOrdersScreen() {
 
     return (
       <TouchableOpacity
-        style={[styles.card, isArabic && { flexDirection: 'row-reverse' }]}
+        style={[styles.card, row(isArabic)]}
         onPress={() => router.push({ pathname: '/order/[id]', params: { id: item.id } })}
         activeOpacity={0.8}
       >
         <View style={[styles.cardLeft, { borderLeftColor: statusColor(item.status) }]} />
         <View style={{ flex: 1 }}>
-          <View style={[styles.cardTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.cardTopRow, row(isArabic)]}>
             <Text style={styles.orderNum}>{item.numeroCommande}</Text>
             <View style={[styles.statusBadge, { backgroundColor: statusColor(item.status) + '20' }]}>
               <Text style={[styles.statusText, { color: statusColor(item.status) }]}>
@@ -82,7 +83,7 @@ export default function SelfSubmittedOrdersScreen() {
             </View>
           </View>
 
-          <View style={[styles.clientRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.clientRow, row(isArabic)]}>
             <Ionicons name="person-outline" size={13} color={AdminColors.textMuted} />
             <Text style={styles.clientName}>{clientName}</Text>
             {phone ? (
@@ -101,13 +102,13 @@ export default function SelfSubmittedOrdersScreen() {
           )}
 
           {item.deliveryAddress ? (
-            <View style={[styles.addressRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.addressRow, row(isArabic)]}>
               <Ionicons name="location-outline" size={13} color={AdminColors.textMuted} />
               <Text style={styles.addressText} numberOfLines={1}>{item.deliveryAddress}</Text>
             </View>
           ) : null}
 
-          <View style={[styles.cardBottomRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.cardBottomRow, row(isArabic)]}>
             <Text style={styles.dateText}>{date}</Text>
             <View style={[styles.amountCol, isArabic && { alignItems: 'flex-start' }]}>
               <Text style={styles.totalText}>{total.toFixed(2)} {t('common.dh')}</Text>
@@ -127,7 +128,7 @@ export default function SelfSubmittedOrdersScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerRow, row(isArabic)]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={22} color="white" />
           </TouchableOpacity>
@@ -142,7 +143,7 @@ export default function SelfSubmittedOrdersScreen() {
         </View>
 
         {/* Search */}
-        <View style={[styles.searchBar, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.searchBar, row(isArabic)]}>
           <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.7)" />
           <TextInput
             style={[styles.searchInput, isArabic && { textAlign: 'right' }]}

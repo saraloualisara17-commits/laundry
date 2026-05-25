@@ -79,4 +79,14 @@ export const queryKeys = {
     pickups: () => [...queryKeys.livreur.all, 'pickups'] as const,
     cancelled: () => [...queryKeys.livreur.all, 'cancelled'] as const,
   },
+
+  // ─── AUDIT ─────────────────────────────────────────────────────────────────
+  audit: {
+    all: ['audit'] as const,
+    recent: () => [...['audit'], 'recent'] as const,
+    entity: (entityType: string, entityId: string | number) =>
+      [...['audit'], 'entity', entityType, String(entityId)] as const,
+    orderTimeline: (orderId: string | number) =>
+      [...['audit'], 'timeline', String(orderId)] as const,
+  },
 };

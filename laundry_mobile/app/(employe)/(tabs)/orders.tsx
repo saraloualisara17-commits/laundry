@@ -152,6 +152,10 @@ export default function EmployeOrdersScreen() {
           )
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={AdminColors.primary} style={{ marginVertical: 20 }} /> : null}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={15}
       />
     </View>
   );

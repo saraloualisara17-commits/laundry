@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Animated, Platform
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -11,6 +12,9 @@ import { Modal } from 'react-native';
 import statisticsApi from '../../src/services/statistics/statisticsApi';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('statistics');
 
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'all';
 
@@ -164,7 +168,7 @@ export default function StatisticsScreen() {
       setError(true);
       const msg = err?.message || err?.status || JSON.stringify(err);
       setErrorMsg(String(msg));
-      console.error('[Statistics] fetch error:', err);
+      log.error('Statistics fetch error', { err: String(err) });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -193,7 +197,7 @@ export default function StatisticsScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerWrap}>
-        <View style={[styles.headerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerRow, row(isArabic)]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={22} color="white" />
           </TouchableOpacity>
@@ -213,7 +217,7 @@ export default function StatisticsScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.tabsRow, isArabic && { flexDirection: 'row-reverse' }]}
+          contentContainerStyle={[styles.tabsRow, row(isArabic)]}
         >
           {PERIODS.map(({ key, labelKey }) => (
             <TouchableOpacity
@@ -264,15 +268,15 @@ export default function StatisticsScreen() {
               {fmtDH(stats?.revenue ?? 0)}{' '}
               <Text style={styles.heroCurrency}>{t('common.dh')}</Text>
             </Text>
-            <View style={[styles.heroMetaRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.heroMetaRow, row(isArabic)]}>
               {(stats?.totalClients ?? 0) > 0 && (
-                <View style={[styles.heroMeta, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.heroMeta, row(isArabic)]}>
                   <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.heroMetaText}>{stats!.totalClients} {t('dashboard.total_clients')}</Text>
                 </View>
               )}
               {(stats?.totalOrders ?? 0) > 0 && (
-                <View style={[styles.heroMeta, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.heroMeta, row(isArabic)]}>
                   <Ionicons name="cube-outline" size={13} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.heroMetaText}>{stats!.totalOrders} {t('dashboard.orders')}</Text>
                 </View>
@@ -407,11 +411,11 @@ function StatCard({ color, bg, icon, title, amount, currency, isArabic, fmtDH, r
     <View style={[styles.card, { backgroundColor: bg }]}>
       {/* Header */}
       <TouchableOpacity
-        style={[styles.cardHeader, { backgroundColor: color }, isArabic && { flexDirection: 'row-reverse' }]}
+        style={[styles.cardHeader, { backgroundColor: color }, row(isArabic)]}
         onPress={() => setExpanded(!expanded)}
         activeOpacity={0.85}
       >
-        <View style={[styles.cardHeaderLeft, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardHeaderLeft, row(isArabic)]}>
           <Ionicons name={icon} size={18} color="white" style={{ marginRight: isArabic ? 0 : 8, marginLeft: isArabic ? 8 : 0 }} />
           <Text style={styles.cardHeaderTitle}>{title}</Text>
         </View>
@@ -431,17 +435,17 @@ function StatCard({ color, bg, icon, title, amount, currency, isArabic, fmtDH, r
       {/* Rows */}
       {expanded && (
         <View style={styles.cardBody}>
-          {rows.map((row, i) => (
+          {rows.map((statRow, i) => (
             <View
               key={i}
               style={[
                 styles.cardRow,
-                isArabic && { flexDirection: 'row-reverse' },
+                row(isArabic),
                 i < rows.length - 1 && styles.cardRowBorder,
               ]}
             >
-              <Text style={[styles.cardRowLabel, isArabic && { textAlign: 'right' }]}>{row.label}</Text>
-              <Text style={[styles.cardRowValue, isArabic && { textAlign: 'left' }]}>{row.value}</Text>
+              <Text style={[styles.cardRowLabel, textAlign(isArabic)]}>{statRow.label}</Text>
+              <Text style={[styles.cardRowValue, textAlign(isArabic)]}>{statRow.value}</Text>
             </View>
           ))}
         </View>

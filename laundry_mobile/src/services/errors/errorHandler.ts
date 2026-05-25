@@ -1,21 +1,34 @@
 import { Alert } from 'react-native';
-import { AppError } from './AppError';
+import { AppError, ErrorType } from './AppError';
 import { parseError, getFriendlyMessage } from './errorParser';
 import i18n from '../../i18n';
 
 /**
  * Global logging hook (could be connected to Sentry, Bugsnag, etc.)
  */
+const AUTH_ERROR_MESSAGES = [
+  'No refresh token available',
+  'Refresh response contained no token',
+  'Session expired',
+];
+
 export const logError = (error: any, context?: string) => {
   const parsed = parseError(error);
-  console.error(`[AppError][${context || 'Global'}]`, {
-    message: parsed.message,
-    type: parsed.type,
-    status: parsed.status,
-    code: parsed.code,
-    original: parsed.originalError,
-  });
-  
+
+  // 401/403 and token-refresh failures are handled by the auth layer — not application errors
+  if (parsed.type === ErrorType.UNAUTHORIZED || parsed.type === ErrorType.FORBIDDEN) return;
+  const rawMsg: string = error?.message ?? '';
+  if (AUTH_ERROR_MESSAGES.some(m => rawMsg.includes(m))) return;
+
+  if (__DEV__) {
+    console.error(`[AppError][${context || 'Global'}]`, {
+      message: parsed.message,
+      type: parsed.type,
+      status: parsed.status,
+      code: parsed.code,
+    });
+  }
+
   // Potential Sentry.captureException(error) here
 };
 
@@ -24,8 +37,15 @@ export const logError = (error: any, context?: string) => {
  */
 export const showError = (error: any, title?: string) => {
   const parsed = parseError(error);
+
+  // 401/403 and token-refresh failures are handled silently by the auth interceptor.
+  // Never show a raw auth alert — the user will be redirected automatically.
+  if (parsed.type === ErrorType.UNAUTHORIZED || parsed.type === ErrorType.FORBIDDEN) return;
+  const rawMsg: string = error?.message ?? '';
+  if (AUTH_ERROR_MESSAGES.some(m => rawMsg.includes(m))) return;
+
   const message = getFriendlyMessage(parsed);
-  
+
   logError(error, 'UI_Alert');
 
   Alert.alert(

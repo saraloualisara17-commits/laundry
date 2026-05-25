@@ -3,11 +3,15 @@ export enum RealtimeEventType {
   ORDER_PAYMENT_ADDED = 'ORDER_PAYMENT_ADDED',
   ORDER_CREATED = 'ORDER_CREATED',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
+  ORDER_UPDATED = 'ORDER_UPDATED',
+  ORDER_DELETED = 'ORDER_DELETED',
+  ORDER_DRIVER_ASSIGNED = 'ORDER_DRIVER_ASSIGNED',
+  ORDER_PICKUP_DRIVER_ASSIGNED = 'ORDER_PICKUP_DRIVER_ASSIGNED',
   STATS_UPDATED = 'STATS_UPDATED',
 }
 
 export interface RealtimeEvent {
-  type: RealtimeEventType;
+  type: RealtimeEventType | string;
   data: any;
   timestamp: number;
 }

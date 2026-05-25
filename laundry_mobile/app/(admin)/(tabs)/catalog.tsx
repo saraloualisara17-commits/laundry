@@ -22,14 +22,16 @@ import { adminApi } from '../../../src/services/adminApi';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 
-import { useTranslation } from 'react-i18next';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
 import AppInput from '../../../components/ui/AppInput';
+import { useRTL, row, font, textAlign, textProps } from '../../../src/utils/rtl';
+import { logger } from '../../../src/lib/logger';
+
+const log = logger.ns('catalog');
 
 export default function CatalogScreen() {
-  const { t } = useTranslation();
+  const { t, isRTL: isArabic } = useRTL();
   const f = useFormStyles();
-  const isArabic = f.isArabic;
 
   const PRICING_METHODS: Record<string, { label: string, color: string, icon: any }> = {
     PER_M2: { label: t('admin.catalog.pricing.per_m2'), color: AdminColors.primary, icon: 'square-outline' },
@@ -71,7 +73,7 @@ export default function CatalogScreen() {
         setSelectedCategoryId(fetchedCategories[0].id);
       }
     } catch (error) {
-      console.error('Fetch catalog error:', error);
+      log.error('Fetch catalog error', { err: String(error) });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -181,7 +183,7 @@ export default function CatalogScreen() {
   const renderProduct = (product: any) => {
     const method = PRICING_METHODS[product.pricingMethod] || PRICING_METHODS.PER_UNIT;
     return (
-      <View key={product.id} style={[styles.productRow, !product.isActive && { opacity: 0.6 }, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View key={product.id} style={[styles.productRow, !product.isActive && { opacity: 0.6 }, row(isArabic)]}>
         <View style={styles.productIconBox}>
           {product.imageUrl ? (
             <Image source={{ uri: `${adminApi.getOrderPdfUrl(1).split('/api/')[0]}${product.imageUrl}` }} style={styles.productImg} />
@@ -190,15 +192,15 @@ export default function CatalogScreen() {
           )}
         </View>
 
-        <View style={[styles.productInfo, isArabic && { alignItems: 'flex-end' }]}>
-          <Text style={[styles.productName, isArabic && { textAlign: 'right' }]}>{product.nom}</Text>
+        <View style={[styles.productInfo, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
+          <Text style={[styles.productName, textAlign(isArabic), font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{product.nom}</Text>
           <View style={[styles.pricingBadge, { backgroundColor: method.color + '15' }]}>
             <Text style={[styles.pricingBadgeText, { color: method.color }]}>{isArabic ? method.label : method.label.toUpperCase()}</Text>
           </View>
         </View>
-        
-        <View style={[styles.productRight, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={[styles.productPrice, isArabic && { textAlign: 'right' }]}>
+
+        <View style={[styles.productRight, row(isArabic)]}>
+          <Text style={[styles.productPrice, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {product.pricingMethod === 'CUSTOM' ? t('admin.catalog.pricing.custom') : `${product.prixUnitaire} ${t('common.dh')}`}
           </Text>
 
@@ -232,9 +234,9 @@ export default function CatalogScreen() {
   const renderCategoryTab = ({ item }: { item: any }) => {
     const isActive = selectedCategoryId === item.id;
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={item.id}
-        style={[styles.categoryTab, isActive && styles.activeCategoryTab, isArabic && { flexDirection: 'row-reverse' }]}
+        style={[styles.categoryTab, isActive && styles.activeCategoryTab, row(isArabic)]}
         onPress={() => setSelectedCategoryId(item.id)}
       >
         <Text style={[styles.categoryTabIcon, isActive && styles.activeCategoryTabText]}>{item.icon || '📦'}</Text>
@@ -251,10 +253,10 @@ export default function CatalogScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.headerTitle}>{t('admin.catalog.title')}</Text>
-          <TouchableOpacity 
-            style={[styles.editCatBtn, isArabic && { flexDirection: 'row-reverse' }]}
+        <View style={[styles.headerContent, row(isArabic)]}>
+          <Text style={[styles.headerTitle, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.catalog.title')}</Text>
+          <TouchableOpacity
+            style={[styles.editCatBtn, row(isArabic)]}
             onPress={() => {
               if (selectedCategory) {
                 setCatForm({ nom: selectedCategory.nom, nomAr: selectedCategory.nomAr || '', icon: selectedCategory.icon || '🧺', imageUrl: selectedCategory.imageUrl || '' });
@@ -270,11 +272,12 @@ export default function CatalogScreen() {
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={[styles.tabsScroll, isArabic && { flexDirection: 'row-reverse' }]}
+            contentContainerStyle={[styles.tabsScroll, row(isArabic)]}
+
           >
             {categories.map(cat => renderCategoryTab({ item: cat }))}
             <TouchableOpacity 
-              style={[styles.addTabBtn, isArabic && { flexDirection: 'row-reverse' }]}
+              style={[styles.addTabBtn, row(isArabic)]}
               onPress={() => {
                 setCatForm({ nom: '', nomAr: '', icon: '🧺', imageUrl: '' });
                 setCategoryModal({ open: true, data: null });
@@ -295,9 +298,9 @@ export default function CatalogScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={AdminColors.primary} />}
         ListHeaderComponent={
           selectedCategory && (
-            <View style={[styles.categoryOverview, isArabic && { alignItems: 'flex-end' }]}>
-              <View style={[styles.categoryStatus, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.categoryInfoTitle}>{isArabic && selectedCategory.nomAr ? selectedCategory.nomAr : selectedCategory.nom}</Text>
+            <View style={[styles.categoryOverview, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
+              <View style={[styles.categoryStatus, row(isArabic)]}>
+                <Text style={[styles.categoryInfoTitle, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{isArabic && selectedCategory.nomAr ? selectedCategory.nomAr : selectedCategory.nom}</Text>
                 <Switch 
                   value={selectedCategory.isActive}
                   onValueChange={() => handleToggleCategory(selectedCategory.id, selectedCategory.isActive)}
@@ -336,8 +339,8 @@ export default function CatalogScreen() {
       {/* Category Modal */}
       <Modal visible={categoryModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={styles.modalTitle}>{categoryModal.data ? t('admin.catalog.edit_category') : t('admin.catalog.new_category')}</Text>
+          <View style={[styles.modalHeader, row(isArabic)]}>
+            <Text style={[styles.modalTitle, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{categoryModal.data ? t('admin.catalog.edit_category') : t('admin.catalog.new_category')}</Text>
             <TouchableOpacity onPress={() => setCategoryModal({ open: false, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -390,7 +393,7 @@ export default function CatalogScreen() {
 
             <View style={styles.formField}>
               <Text style={[styles.label, f.label]}>{t('admin.catalog.category_icon')}</Text>
-              <View style={[styles.iconGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.iconGrid, row(isArabic)]}>
                 {ICONS.map(icon => (
                   <TouchableOpacity 
                     key={icon} 
@@ -413,8 +416,8 @@ export default function CatalogScreen() {
       {/* Product Modal */}
       <Modal visible={productModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={styles.modalTitle}>{productModal.data ? t('admin.catalog.edit_product') : t('admin.catalog.new_product')}</Text>
+          <View style={[styles.modalHeader, row(isArabic)]}>
+            <Text style={[styles.modalTitle, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{productModal.data ? t('admin.catalog.edit_product') : t('admin.catalog.new_product')}</Text>
             <TouchableOpacity onPress={() => setProductModal({ open: false, categoryId: null, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -466,7 +469,7 @@ export default function CatalogScreen() {
 
             <View style={styles.formField}>
               <Text style={[styles.label, f.label]}>{t('admin.catalog.pricing_method')}</Text>
-              <View style={[styles.methodGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.methodGrid, row(isArabic)]}>
                 {Object.entries(PRICING_METHODS).map(([key, m]) => (
                   <TouchableOpacity 
                     key={key} 
@@ -481,7 +484,7 @@ export default function CatalogScreen() {
             </View>
 
             {prodForm.pricingMethod !== 'CUSTOM' && (
-              <View style={[styles.formRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.formRow, row(isArabic)]}>
                 <View style={[styles.formField, { flex: 1 }]}>
                   <AppInput
                     label={t('admin.catalog.price_dh')}
@@ -492,7 +495,7 @@ export default function CatalogScreen() {
                   />
                 </View>
                 {prodForm.pricingMethod === 'PER_UNIT' && (
-                  <View style={[styles.formField, { flex: 1, marginLeft: 12 }]}>
+                  <View style={[styles.formField, { flex: 1, marginStart: 12 }]}>
                     <AppInput
                       label={t('admin.catalog.unit')}
                       value={prodForm.uniteLabel}
@@ -505,7 +508,7 @@ export default function CatalogScreen() {
 
             <View style={styles.formField}>
               <Text style={[styles.label, f.label]}>{t('admin.catalog.delay_days')}</Text>
-              <View style={[styles.stepper, f.row]}>
+              <View style={[styles.stepper, row(isArabic)]}>
                 <TouchableOpacity 
                   style={styles.stepBtn} 
                   onPress={() => setProdForm({...prodForm, processingDays: Math.max(1, prodForm.processingDays - 1)})}

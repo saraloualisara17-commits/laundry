@@ -1,6 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/adminApi';
 import { queryKeys } from '../../services/query/queryKeys';
+import { useAppMutation } from '../../lib/query/mutationFactory';
+import { invalidateAfterClientSave } from '../../lib/query/invalidationHelpers';
 
 /**
  * Hook for list of clients with optional filtering.
@@ -55,16 +57,12 @@ export const useClientOrders = (id: string | number) => {
   });
 };
 
-/**
- * Mutation for creating/updating a client.
- */
 export const useSaveClient = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id?: string | number; data: any }) => 
+  const qc = useQueryClient();
+  return useAppMutation<any, { id?: string | number; data: any }>({
+    name: 'saveClient',
+    mutationFn: ({ id, data }) =>
       id ? adminApi.updateClient(String(id), data) : adminApi.createClient(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
-    },
+    onSettled: (_data, _err, vars) => invalidateAfterClientSave(qc, vars.id),
   });
 };

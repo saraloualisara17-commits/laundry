@@ -4,15 +4,21 @@ import com.wash.laundry_app.users.Role;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationService {
+
+    /** Suppress duplicate notifications for the same (recipient, type, referenceId) within this window. */
+    private static final int DEDUP_WINDOW_MINUTES = 5;
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
@@ -21,6 +27,14 @@ public class NotificationService {
 
     @Transactional
     public Notification createNotification(User recipient, String title, String message, String type, String referenceId) {
+        // Suppress duplicate notifications created within the dedup window
+        if (referenceId != null && notificationRepository.existsRecentNotification(
+                recipient.getId(), type, referenceId,
+                LocalDateTime.now().minusMinutes(DEDUP_WINDOW_MINUTES))) {
+            log.debug("Suppressed duplicate notification type={} referenceId={} for user {}", type, referenceId, recipient.getEmail());
+            return null;
+        }
+
         Notification notification = Notification.builder()
                 .recipient(recipient)
                 .title(title)
@@ -30,16 +44,16 @@ public class NotificationService {
                 .read(false)
                 .build();
         Notification saved = notificationRepository.save(notification);
-        
+
         // WebSocket broadcast
         pushWebSocketNotification(saved);
-        
-        // Push notification (Expo)
+
+        // Push notification (Expo) — runs asynchronously; never blocks this thread
         java.util.Map<String, Object> data = new java.util.HashMap<>();
         data.put("type", type);
         data.put("referenceId", referenceId);
         pushNotificationService.sendPushNotification(recipient, title, message, data);
-        
+
         return saved;
     }
 

@@ -23,7 +23,9 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logError(error, 'React_ErrorBoundary');
-    console.error('Uncaught error:', error, errorInfo);
+    if (__DEV__) {
+      console.error('Uncaught error:', error, errorInfo);
+    }
   }
 
   private handleRetry = () => {

@@ -3,19 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
-  ScrollView
 } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { adminApi } from '../../src/services/adminApi';
-import { useTranslation } from 'react-i18next';
+import { useRTL, row, font, textProps } from '../../src/utils/rtl';
 import * as Haptics from 'expo-haptics';
-import AppInput from '../ui/AppInput';
+import { RTLBottomSheet } from '../ui/RTLBottomSheet';
+import { RTLFormRow } from '../ui/RTLFormRow';
+import RTLNumericInput from '../ui/RTLNumericInput';
+import RTLTextarea from '../ui/RTLTextarea';
 
 interface AddPaymentModalProps {
   visible: boolean;
@@ -26,32 +25,26 @@ interface AddPaymentModalProps {
   onSuccess: () => void;
 }
 
-export default function AddPaymentModal({ visible, onClose, orderId, totalAmount, remainingAmount, onSuccess }: AddPaymentModalProps) {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
-  
+export default function AddPaymentModal({
+  visible,
+  onClose,
+  orderId,
+  totalAmount,
+  remainingAmount,
+  onSuccess,
+}: AddPaymentModalProps) {
+  const { t, isRTL } = useRTL();
+
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const amount = parseFloat(paymentAmount);
+  const isInvalidAmount = !!paymentAmount && (isNaN(amount) || amount <= 0 || amount > remainingAmount + 0.05);
+  const canSubmit = !!paymentAmount && !isNaN(amount) && amount > 0 && !isInvalidAmount && !submitting;
+
   const handleAddPayment = async () => {
-    const amount = parseFloat(paymentAmount);
-    if (!paymentAmount || isNaN(amount) || amount <= 0) {
-      Alert.alert(t('common.error'), t('admin.unpaid.enter_valid_amount'));
-      return;
-    }
-
-    if (amount > remainingAmount + 0.05) { // Small buffer for rounding
-      Alert.alert(
-        t('common.error'), 
-        t('admin.unpaid.payment_exceeds_remaining', { 
-          max: remainingAmount.toFixed(2),
-          defaultValue: `Le montant ne peut pas dépasser le reste à payer (${remainingAmount.toFixed(2)} DH)`
-        })
-      );
-      return;
-    }
-
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
       await adminApi.addOrderPayment(orderId.toString(), amount, paymentNote);
@@ -59,236 +52,145 @@ export default function AddPaymentModal({ visible, onClose, orderId, totalAmount
       setPaymentAmount('');
       setPaymentNote('');
       onSuccess();
-    } catch (error) {
+    } catch {
       Alert.alert(t('common.error'), t('common.error_msg'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const isInvalid = !paymentAmount || isNaN(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0 || parseFloat(paymentAmount) > remainingAmount + 0.05;
+  const footer = (
+    <View style={[styles.actions, row(isRTL)]}>
+      <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+        <Text style={[styles.cancelBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+          {t('common.cancel')}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.confirmBtn, !canSubmit && styles.confirmBtnDisabled]}
+        onPress={handleAddPayment}
+        disabled={!canSubmit}
+      >
+        {submitting ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={[styles.confirmBtnText, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+            {t('admin.unpaid.pay')}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <Modal
+    <RTLBottomSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={t('admin.unpaid.add_payment')}
+      footer={footer}
     >
-      <KeyboardAvoidingView 
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <TouchableOpacity style={styles.modalDismiss} activeOpacity={1} onPress={onClose} />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
-          
-          <ScrollView 
-            bounces={false} 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
+      <View style={styles.body}>
+        {/* Remaining pill */}
+        <View style={[styles.remainingPill, row(isRTL)]}>
+          <Text style={[styles.remainingLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+            {t('financial.remaining')}:
+          </Text>
+          <Text
+            style={[
+              styles.remainingValue,
+              font.bold(isRTL),
+              isInvalidAmount && parseFloat(paymentAmount) > remainingAmount && { color: Colors.danger },
+            ]}
+            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
           >
-            <Text style={[styles.modalTitle, isArabic && { textAlign: 'right' }]}>{t('admin.unpaid.add_payment')}</Text>
-
-            <View style={styles.modalBody}>
-              <View style={[styles.remainingInfo, isArabic && { flexDirection: 'row-reverse' }]}>
-                 <Text style={styles.remainingLabel}>{t('financial.remaining')}:</Text>
-                 <Text style={[styles.remainingValue, isInvalid && parseFloat(paymentAmount) > remainingAmount && { color: Colors.danger }]}>
-                   {remainingAmount.toFixed(2)} {t('common.dh')}
-                 </Text>
-              </View>
-
-              <View>
-                <View style={styles.amountInputContainer}>
-                  <AppInput
-                    label={t('admin.catalog.price_dh')}
-                    value={paymentAmount}
-                    onChangeText={setPaymentAmount}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    autoFocus
-                    error={
-                      isInvalid && parseFloat(paymentAmount) > remainingAmount
-                        ? `⚠️ ${t('admin.unpaid.max_allowed')}: ${remainingAmount.toFixed(2)} DH`
-                        : undefined
-                    }
-                    inputStyle={[
-                      styles.amountInput,
-                      isInvalid && parseFloat(paymentAmount) > remainingAmount
-                        ? { color: Colors.danger }
-                        : undefined,
-                    ]}
-                    forceDir="ltr"
-                  />
-                  <TouchableOpacity
-                    style={styles.fullAmountBtn}
-                    onPress={() => {
-                      setPaymentAmount(remainingAmount.toFixed(2));
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    }}
-                  >
-                    <Text style={styles.fullAmountBtnText}>{t('common.all')}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <AppInput
-                label={t('common.notes')}
-                value={paymentNote}
-                onChangeText={setPaymentNote}
-                placeholder={t('delivery.notes_placeholder')}
-                multiline
-                inputStyle={styles.noteInput}
-              />
-
-              <View style={[styles.modalActions, isArabic && { flexDirection: 'row-reverse' }]}>
-                <TouchableOpacity 
-                  style={styles.cancelBtn} 
-                  onPress={onClose}
-                >
-                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.confirmBtn, 
-                    (submitting || isInvalid) && { opacity: 0.5 }
-                  ]}
-                  onPress={handleAddPayment}
-                  disabled={submitting || isInvalid}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={styles.confirmBtnText}>{t('admin.unpaid.pay')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
+            {remainingAmount.toFixed(2)} {t('common.dh')}
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        {/* Amount */}
+        <RTLFormRow
+          label={t('admin.catalog.price_dh')}
+          error={
+            isInvalidAmount
+              ? `⚠️ ${t('admin.unpaid.max_allowed')}: ${remainingAmount.toFixed(2)} ${t('common.dh')}`
+              : undefined
+          }
+        >
+          <RTLNumericInput
+            value={paymentAmount}
+            onChangeText={setPaymentAmount}
+            unit={t('common.dh')}
+            quickFillLabel={t('common.all')}
+            quickFillValue={remainingAmount.toFixed(2)}
+            hasError={isInvalidAmount}
+            placeholder="0.00"
+          />
+        </RTLFormRow>
+
+        {/* Notes */}
+        <RTLFormRow label={t('common.notes')}>
+          <RTLTextarea
+            value={paymentNote}
+            onChangeText={setPaymentNote}
+            placeholder={t('delivery.notes_placeholder')}
+            minLines={3}
+          />
+        </RTLFormRow>
+      </View>
+    </RTLBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.4)', 
-    justifyContent: 'flex-end' 
+  body: {
+    gap: 4,
   },
-  modalDismiss: { 
-    flex: 1 
-  },
-  modalSheet: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    maxHeight: '90%', // Increased to allow more room for keyboard
-  },
-  scrollContent: {
-    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
-  },
-  modalHandle: { 
-    width: 40, 
-    height: 4, 
-    backgroundColor: 'rgba(0,0,0,0.1)', 
-    borderRadius: 2, 
-    alignSelf: 'center', 
-    marginBottom: 20 
-  },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: '700', 
-    color: Colors.textPrimary, 
-    marginBottom: 10, 
-    textAlign: 'center' 
-  },
-  modalBody: { 
-    gap: 16 
-  },
-  remainingInfo: {
-    flexDirection: 'row',
+  remainingPill: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 8,
+    backgroundColor: Colors.surface2,
+    paddingVertical: 10,
     borderRadius: 12,
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   remainingLabel: {
     fontSize: 13,
     color: Colors.textSecondary,
-    fontWeight: '500',
   },
   remainingValue: {
     fontSize: 14,
     color: Colors.primary,
-    fontWeight: '700',
   },
-  amountInputContainer: {
-    position: 'relative',
+  actions: {
+    gap: 12,
+  },
+  confirmBtn: {
+    flex: 2,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.teal,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.45,
+  },
+  confirmBtnText: {
+    color: 'white',
+    fontSize: 15,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  amountInput: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.primary,
-    textAlign: 'center',
-  },
-  fullAmountBtn: {
-    position: 'absolute',
-    right: 8,
-    top: 32,
-    backgroundColor: Colors.primary50,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    zIndex: 1,
-  },
-  fullAmountBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  noteInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  modalActions: { 
-    flexDirection: 'row', 
-    gap: 12, 
-    marginTop: 12 
-  },
-  confirmBtn: { 
-    flex: 2, 
-    backgroundColor: Colors.primary, 
-    height: 52, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    ...Shadows.teal 
-  },
-  confirmBtnText: { 
-    color: 'white', 
-    fontSize: 15, 
-    fontWeight: '700' 
-  },
-  cancelBtn: { 
-    flex: 1, 
-    backgroundColor: '#F1F5F9', 
-    height: 52, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  cancelBtnText: { 
-    color: Colors.textSecondary, 
-    fontSize: 15, 
-    fontWeight: '600' 
+  cancelBtnText: {
+    color: Colors.textSecondary,
+    fontSize: 15,
   },
 });

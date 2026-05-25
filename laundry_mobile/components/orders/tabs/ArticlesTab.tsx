@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { Feather } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../../constants/theme';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { row, textAlign } from '../../../src/utils/rtl';
 
 interface ArticlesTabProps {
   order: any;
@@ -29,15 +30,16 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
 
         return (
           <View key={item.id} style={styles.itemCard}>
-            <View style={[styles.itemHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-              <View style={[styles.itemTitleRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.itemHeader, row(isArabic)]}>
+              <View style={[styles.itemTitleRow, row(isArabic)]}>
                 <View style={styles.tagBadge}>
                   <Text style={styles.tagText}>TAG-{String(index + 1).padStart(3, '0')}</Text>
                 </View>
                 <Text
                   style={[
                     styles.itemName,
-                    isArabic && { textAlign: 'right', marginRight: 10, marginLeft: 0 },
+                    textAlign(isArabic),
+                    { marginEnd: isArabic ? 10 : 0 },
                   ]}
                 >
                   {isArabic && item.productNomAr ? item.productNomAr : item.productNom || t('admin.items.default_item_name')}
@@ -53,10 +55,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={{ marginTop: 12 }}
-                contentContainerStyle={[
-                  isArabic && { flexDirection: 'row-reverse' },
-                  { gap: 8 },
-                ]}
+                contentContainerStyle={[row(isArabic), { gap: 8 }]}
               >
                 {item.images.map((img: any, i: number) => (
                   <TouchableOpacity
@@ -73,7 +72,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
             )}
 
             {item.modeTarification === 'PER_M2' && (
-              <View style={[styles.chipsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.chipsRow, row(isArabic)]}>
                 <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
                   <Text style={[styles.chipLabel, f.chipLabel]}>
                     {t('admin.orders.create.items.dimensions')}
@@ -107,7 +106,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
             )}
 
             {item.notes && (
-              <View style={[styles.noteContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.noteContainer, row(isArabic)]}>
                 <Feather
                   name="info"
                   size={14}
@@ -115,11 +114,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                   style={{ marginTop: 2 }}
                 />
                 <Text
-                  style={[
-                    styles.itemNotes,
-                    isArabic && { textAlign: 'right', marginRight: 0, marginLeft: 8 },
-                    !isArabic && { marginLeft: 8 },
-                  ]}
+                  style={[styles.itemNotes, textAlign(isArabic), { marginStart: 8 }]}
                 >
                   {item.notes}
                 </Text>

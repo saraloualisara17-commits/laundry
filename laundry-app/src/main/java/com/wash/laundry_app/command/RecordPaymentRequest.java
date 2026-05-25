@@ -29,6 +29,14 @@ public class RecordPaymentRequest {
     /** Optional note (e.g. "Versement partiel à la livraison"). */
     private String note;
 
+    /**
+     * Client-generated UUID. When present, the server stores it in
+     * paiements.idempotency_key. A duplicate submission with the same key
+     * returns 409 Conflict instead of creating a second payment record.
+     * Callers should generate a UUID per payment attempt (not per session).
+     */
+    private String idempotencyKey;
+
     public ModePaiement getModePaiement() { return modePaiement; }
     public void setModePaiement(ModePaiement modePaiement) { this.modePaiement = modePaiement; }
     public BigDecimal getMontant() { return montant; }

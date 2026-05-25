@@ -2,8 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import * as SecureStore from 'expo-secure-store';
-import { I18nManager, DevSettings } from 'react-native';
-import { reloadAsync } from 'expo-updates';
+import { I18nManager } from 'react-native';
 
 import fr from './locales/fr.json';
 import ar from './locales/ar.json';
@@ -22,31 +21,25 @@ const getDeviceLanguage = (): string => {
       return locales[0].languageCode === 'ar' ? 'ar' : 'fr';
     }
   } catch (e) {
-    console.warn('Localization failed', e);
+    if (__DEV__) console.warn('Localization failed', e);
   }
   return 'fr';
 };
 
-// Called once at app startup from _layout.tsx before rendering
+// Called once at app startup from _layout.tsx before rendering.
+// We manage all directionality ourselves via JS (row(), textAlign(), etc.)
+// so the native RTL layout engine must stay off permanently.
 export const initI18n = async (): Promise<void> => {
-  // Prefer persisted user choice, fall back to device locale
+  // Ensure native RTL engine is always disabled — we handle direction in JS
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
+
   let lng = 'fr';
   try {
     const stored = await SecureStore.getItemAsync(LANGUAGE_KEY);
     lng = stored ?? getDeviceLanguage();
   } catch (e) {
     lng = getDeviceLanguage();
-  }
-
-  // Sync RTL state with the stored language so layout is correct from frame 1
-  try {
-    const shouldBeRTL = lng === 'ar';
-    if (I18nManager.isRTL !== shouldBeRTL) {
-      I18nManager.allowRTL(shouldBeRTL);
-      I18nManager.forceRTL(shouldBeRTL);
-    }
-  } catch (e) {
-    console.warn('I18nManager RTL sync failed', e);
   }
 
   if (!i18n.isInitialized) {
@@ -64,37 +57,15 @@ export const initI18n = async (): Promise<void> => {
   }
 };
 
+// Instant language switch — no reload needed.
+// All layout direction is driven by i18n.language via useRTL() hooks.
 export const changeLanguage = async (lng: string): Promise<void> => {
-  // Persist the choice before reloading so initI18n picks it up next time
   try {
     await SecureStore.setItemAsync(LANGUAGE_KEY, lng);
   } catch (e) {
-    console.warn('Failed to persist language', e);
+    if (__DEV__) console.warn('Failed to persist language', e);
   }
-
   await i18n.changeLanguage(lng);
-
-  const isRTL = lng === 'ar';
-  if (I18nManager.isRTL !== isRTL) {
-    try {
-      I18nManager.allowRTL(isRTL);
-      I18nManager.forceRTL(isRTL);
-    } catch (e) {
-      console.warn('I18nManager RTL toggle failed', e);
-    }
-
-    setTimeout(async () => {
-      try {
-        if (__DEV__) {
-          DevSettings.reload();
-        } else {
-          await reloadAsync();
-        }
-      } catch (e) {
-        console.error('Reload failed', e);
-      }
-    }, 100);
-  }
 };
 
 export default i18n;

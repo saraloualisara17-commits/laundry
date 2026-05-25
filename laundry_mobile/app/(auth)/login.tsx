@@ -4,7 +4,6 @@ import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../src/store/authSlice';
 import { useSettings } from '../../src/hooks/query/useSettings';
 import { authApi } from '../../src/services/api';
-import { showError } from '../../src/services/errors/errorHandler';
 import * as SecureStore from 'expo-secure-store';
 import { Image } from 'react-native';
 
@@ -20,7 +19,7 @@ export default function LoginScreen() {
   const isArabic = i18n.language === 'ar';
   
   const { data: settingsData } = useSettings();
-  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const settings = settingsData ?? { appName: 'Astra Propre', logoUrl: null, businessPhone: null };
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,7 +58,31 @@ export default function LoginScreen() {
       dispatch(setCredentials({ user, token }));
       
     } catch (error: any) {
-      showError(error, t('auth.login.error'));
+      // Clear any stale tokens so a previously expired session can't block the
+      // next successful login or cause a redirect loop in _layout.tsx.
+      await SecureStore.deleteItemAsync('accessToken');
+      await SecureStore.deleteItemAsync('refreshToken');
+      await SecureStore.deleteItemAsync('user');
+
+      // Map errors to user-friendly login messages — never show raw HTTP errors
+      const status = error?.status ?? error?.response?.status;
+      if (status === 401 || status === 403) {
+        const isDisabled =
+          error?.code === 'ACCOUNT_DISABLED' ||
+          error?.details?.error === 'ACCOUNT_DISABLED' ||
+          error?.message?.includes('désactivé');
+        Alert.alert(
+          t('common.error'),
+          isDisabled
+            ? t('auth.login.account_disabled', { defaultValue: 'Compte désactivé. Contactez l\'administrateur.' })
+            : t('auth.login.invalid_credentials', { defaultValue: 'Email ou mot de passe incorrect.' })
+        );
+      } else if (!status) {
+        // No response — network issue
+        Alert.alert(t('common.error'), t('errors.network', { defaultValue: 'Erreur réseau. Vérifiez votre connexion.' }));
+      } else {
+        Alert.alert(t('common.error'), t('errors.unknown', { defaultValue: 'Une erreur inattendue est survenue.' }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +113,7 @@ export default function LoginScreen() {
             <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('auth.login.email').toUpperCase()}</Text>
             <TextInput
               style={[styles.input, isArabic && { textAlign: 'right' }]}
-              placeholder="votre@email.com"
+              placeholder={t('auth.login.email_placeholder', { defaultValue: 'votre@email.com' })}
               placeholderTextColor={Colors.textMuted}
               value={email}
               onChangeText={setEmail}

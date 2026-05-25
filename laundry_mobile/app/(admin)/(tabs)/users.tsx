@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
+import { row, textAlign } from '../../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
@@ -24,6 +25,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
 import AppInput from '../../../components/ui/AppInput';
+import { logger } from '../../../src/lib/logger';
+
+const log = logger.ns('users');
 
 export default function UsersScreen() {
   const { t } = useTranslation();
@@ -81,7 +85,7 @@ export default function UsersScreen() {
       
       setUsers(allUsers);
     } catch (error) {
-      console.error('Fetch users error:', error);
+      log.error('Fetch users error', { err: String(error) });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -201,20 +205,20 @@ export default function UsersScreen() {
 
     return (
       <View style={styles.userCard}>
-        <View style={[styles.cardHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardHeader, row(isArabic)]}>
           <View style={[styles.avatar, { backgroundColor: role.color }]}>
             <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
           </View>
           
           <View style={{ flex: 1 }}>
-            <View style={[styles.rowSpaced, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.rowSpaced, row(isArabic)]}>
               <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 12 }]}>
                 <Text style={[styles.userName, isArabic && { textAlign: 'right' }]}>{item.name}</Text>
                 <Text style={[styles.userEmail, isArabic && { textAlign: 'right' }]}>{item.email}</Text>
                 <Text style={[styles.userEmail, { marginTop: 1 }, isArabic && { textAlign: 'right' }]}>{item.phone || item.phoneNumber || t('admin.users.no_phone')}</Text>
               </View>
               
-              <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.statusBadge, isUserActive ? styles.activeBadge : styles.inactiveBadge, row(isArabic)]}>
                 <View style={[styles.statusDot, { backgroundColor: isUserActive ? AdminColors.success : AdminColors.danger }]} />
                 <Text style={[styles.statusBadgeText, { color: isUserActive ? '#065F46' : AdminColors.danger }]}>
                   {isUserActive ? t('admin.users.status.active') : t('admin.users.status.suspended')}
@@ -232,9 +236,9 @@ export default function UsersScreen() {
 
         <View style={styles.divider} />
 
-        <View style={[styles.actionsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.actionsRow, row(isArabic)]}>
           <TouchableOpacity 
-            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, row(isArabic)]}
             onPress={() => {
               setForm({ 
                 name: item.name, 
@@ -251,7 +255,7 @@ export default function UsersScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.actionBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.actionBtn, row(isArabic)]}
             onPress={() => setPassModal({ open: true, userId: item.id })}
           >
             <Ionicons name="key-outline" size={16} color={AdminColors.primary} />
@@ -261,7 +265,7 @@ export default function UsersScreen() {
           {item.role?.toLowerCase() !== 'admin' && (
             <>
               <TouchableOpacity 
-                style={[styles.actionBtn, isUserActive ? styles.suspendBtn : styles.reactivateBtn, isArabic && { flexDirection: 'row-reverse' }]}
+                style={[styles.actionBtn, isUserActive ? styles.suspendBtn : styles.reactivateBtn, row(isArabic)]}
                 onPress={() => handleToggleActive(item)}
               >
                 <Text style={[styles.actionBtnText, { color: isUserActive ? AdminColors.warning : AdminColors.success }]}>
@@ -287,7 +291,7 @@ export default function UsersScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <View style={isArabic && { alignItems: 'flex-end' }}>
             <Text style={styles.headerTitle}>{t('admin.users.title')}</Text>
             <Text style={styles.headerSubtitle}>{users.length} {t('admin.users.total_count')}</Text>
@@ -304,7 +308,7 @@ export default function UsersScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.searchContainer, row(isArabic)]}>
           <Ionicons name="search" size={18} color={AdminColors.textMuted} />
           <TextInput
             style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
@@ -353,7 +357,7 @@ export default function UsersScreen() {
       {/* User Modal */}
       <Modal visible={userModal.open} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
-          <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.modalHeader, row(isArabic)]}>
             <Text style={styles.modalTitle}>{userModal.data ? t('common.modifier') : t('admin.users.new_user')}</Text>
             <TouchableOpacity onPress={() => setUserModal({ open: false, data: null })}>
               <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
@@ -439,7 +443,7 @@ export default function UsersScreen() {
               onChangeText={setNewPass}
               forceDir="ltr"
             />
-            <View style={[styles.dialogActions, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.dialogActions, row(isArabic)]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => { setPassModal({ open: false, userId: null }); setNewPass(''); }}>
                 <Text style={styles.dialogBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>

@@ -41,4 +41,20 @@ public interface HistoriqueStatutRepository extends JpaRepository<HistoriqueStat
             @Param("status") String status,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    /**
+     * Returns pairs of (fromEntry.createdAt, toEntry.createdAt) for orders
+     * that passed through both statuses within the given window.
+     * Used to compute average processing/delivery time in AnalyticsService.
+     */
+    @Query("SELECT h1.createdAt, h2.createdAt " +
+           "FROM HistoriqueStatut h1 JOIN HistoriqueStatut h2 " +
+           "ON h1.commande.id = h2.commande.id " +
+           "WHERE h1.nouveauStatut = :fromStatus AND h2.nouveauStatut = :toStatus " +
+           "AND h1.createdAt < h2.createdAt " +
+           "AND h1.createdAt >= :since")
+    List<Object[]> findStatusTransitionTimes(
+            @Param("fromStatus") String fromStatus,
+            @Param("toStatus") String toStatus,
+            @Param("since") LocalDateTime since);
 }

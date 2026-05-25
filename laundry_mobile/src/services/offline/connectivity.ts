@@ -1,4 +1,25 @@
+/**
+ * ConnectivityService — wraps React Native's AppState + a lightweight fetch
+ * probe to determine real internet reachability.
+ *
+ * We do NOT depend on @react-native-community/netinfo (not installed).
+ * Instead we listen to AppState changes and run a HEAD probe against the
+ * backend's /actuator/health endpoint.  The probe fires:
+ *   - Once on startup
+ *   - On every foreground transition (app returns from background)
+ *   - On an interval while the app is in the foreground (30 s default)
+ *
+ * This covers the common case: driver loses signal, kills background, comes
+ * back online and opens the app → probe fires, queue drains.
+ */
+
+import { AppState, AppStateStatus } from 'react-native';
 import { ConnectivityState } from './types';
+import { logger } from '../../lib/logger';
+
+const PROBE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app'}/actuator/health`;
+const PROBE_INTERVAL_MS = 30_000;
+const PROBE_TIMEOUT_MS = 5_000;
 
 type Listener = (state: ConnectivityState) => void;
 
@@ -8,10 +29,51 @@ class ConnectivityService {
     isConnected: true,
     isInternetReachable: true,
   };
+  private intervalHandle: ReturnType<typeof setInterval> | null = null;
+  private appStateSubscription: any = null;
 
-  constructor() {
-    // In a real implementation with NetInfo:
-    // NetInfo.addEventListener(state => this.updateState(state));
+  public start() {
+    // Initial probe
+    this.probe();
+
+    // Probe on foreground
+    this.appStateSubscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') this.probe();
+    });
+
+    // Interval probe while foregrounded
+    this.intervalHandle = setInterval(() => {
+      if (AppState.currentState === 'active') this.probe();
+    }, PROBE_INTERVAL_MS);
+  }
+
+  public stop() {
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+    if (this.intervalHandle !== null) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
+    }
+  }
+
+  private async probe() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+
+      const res = await fetch(PROBE_URL, {
+        method: 'HEAD',
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      clearTimeout(timeoutId);
+
+      this.updateState({ isConnected: true, isInternetReachable: res.ok || res.status < 500 });
+    } catch {
+      this.updateState({ isConnected: false, isInternetReachable: false });
+    }
   }
 
   public subscribe(listener: Listener) {
@@ -20,8 +82,15 @@ class ConnectivityService {
   }
 
   public updateState(state: Partial<ConnectivityState>) {
+    const wasConnected = this.currentState.isConnected;
     this.currentState = { ...this.currentState, ...state };
-    this.listeners.forEach((listener) => listener(this.currentState));
+    this.listeners.forEach((l) => l(this.currentState));
+
+    if (!wasConnected && this.currentState.isConnected) {
+      logger.network.info('Connection restored');
+    } else if (wasConnected && !this.currentState.isConnected) {
+      logger.network.warn('Connection lost');
+    }
   }
 
   public get isConnected() {

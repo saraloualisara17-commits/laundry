@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { 
   View, 
   Text, 
@@ -6,6 +6,7 @@ import {
   TouchableOpacity, 
   ScrollView 
 } from 'react-native';
+import { row, textAlign } from '../../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
@@ -17,6 +18,9 @@ import { RootState } from '../../../src/store/store';
 import { logOut } from '../../../src/store/authSlice';
 import * as SecureStore from 'expo-secure-store';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { queryClient } from '../../../src/services/query/queryClient';
+import { socketClient } from '../../../src/services/realtime';
+import Constants from 'expo-constants';
 
 export default function MoreScreen() {
   const { t } = useTranslation();
@@ -26,11 +30,12 @@ export default function MoreScreen() {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const handleLogout = async () => {
-    dispatch(logOut());
     await SecureStore.deleteItemAsync('refreshToken');
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('user');
-    router.replace('/(auth)/login');
+    socketClient.disconnect();
+    queryClient.clear();
+    dispatch(logOut());
   };
 
   const renderMenuItem = (icon: any, title: string, subtitle: string, onPress: () => void, danger?: boolean) => (
@@ -53,7 +58,7 @@ export default function MoreScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <View style={styles.profileInfo}>
             <Text style={[styles.headerTitle, isArabic && { textAlign: 'right' }]}>{t('common.more')}</Text>
             <Text style={[styles.headerSubtitle, isArabic && { textAlign: 'right' }]}>{user?.name || 'Admin'}</Text>
@@ -87,6 +92,12 @@ export default function MoreScreen() {
             t('admin.more.map_title'),
             t('admin.more.map_sub'),
             () => router.push('/(admin)/all-orders-map')
+          )}
+          {renderMenuItem(
+            'shield-checkmark-outline',
+            t('audit.title', { defaultValue: 'Journal d\'audit' }),
+            t('audit.subtitle', { defaultValue: 'Historique des opérations' }),
+            () => router.push('/(admin)/(tabs)/audit')
           )}
         </View>
 <View style={styles.section}>
@@ -122,7 +133,7 @@ export default function MoreScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Laundry Admin v2.1.0</Text>
+          <Text style={styles.footerText}>v{Constants.expoConfig?.version ?? '—'}</Text>
         </View>
       </ScrollView>
     </View>
@@ -188,7 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: AdminColors.primary100,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginEnd: 14,
   },
   menuInfo: {
     flex: 1,

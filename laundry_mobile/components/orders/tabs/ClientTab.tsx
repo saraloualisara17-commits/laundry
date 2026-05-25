@@ -4,6 +4,7 @@ import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Colors, Shadows } from '../../../constants/theme';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { row, textAlign } from '../../../src/utils/rtl';
 
 interface ClientTabProps {
   order: any;
@@ -34,12 +35,12 @@ const ClientTab: React.FC<ClientTabProps> = ({
           {t('admin.orders.create.client_info')}
         </Text>
 
-        <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.infoRow, row(isArabic)]}>
           <View style={[styles.infoIconCircle, { backgroundColor: Colors.primary100 }]}>
             <Ionicons name="person" size={20} color={Colors.primary} />
           </View>
           <TouchableOpacity
-            style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}
+            style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}
             onPress={() => onClientPress(order.client?.id)}
           >
             <Text style={[styles.infoLabel, f.label]}>{t('tabs.clients')}</Text>
@@ -55,13 +56,13 @@ const ClientTab: React.FC<ClientTabProps> = ({
         </View>
 
         <TouchableOpacity
-          style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}
+          style={[styles.infoRow, row(isArabic)]}
           onPress={() => Linking.openURL(`tel:${getClientPhone(order.client)}`)}
         >
           <View style={[styles.infoIconCircle, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
             <Ionicons name="call" size={20} color={Colors.success} />
           </View>
-          <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+          <View style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
             <Text style={[styles.infoLabel, f.label]}>{t('admin.clients.phone')}</Text>
             <Text style={styles.infoValue}>{getClientPhone(order.client)}</Text>
           </View>
@@ -69,14 +70,14 @@ const ClientTab: React.FC<ClientTabProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}
+          style={[styles.infoRow, row(isArabic)]}
           onPress={handleShareReceipt}
           disabled={sharing}
         >
           <View style={[styles.infoIconCircle, { backgroundColor: 'rgba(37,211,102,0.1)' }]}>
             <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
           </View>
-          <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+          <View style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
             <Text style={styles.infoLabel}>{t('admin.items.whatsapp_label')}</Text>
             <Text style={styles.infoValue}>
               {sharing ? t('common.loading') : t('admin.orders.create.confirmation.send_receipt')}
@@ -86,7 +87,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
             <ActivityIndicator size="small" color="#25D366" />
           ) : (
             <Feather
-              name={isArabic ? 'chevron-left' : 'chevron-right'}
+              name={isArabic ? 'chevron-back' : 'chevron-forward'}
               size={14}
               color={Colors.textMuted}
             />
@@ -94,11 +95,11 @@ const ClientTab: React.FC<ClientTabProps> = ({
         </TouchableOpacity>
 
         {order.livreur && (
-          <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoRow, row(isArabic)]}>
             <View style={[styles.infoIconCircle, { backgroundColor: 'rgba(201,168,76,0.1)' }]}>
               <MaterialIcons name="local-shipping" size={20} color={Colors.accent} />
             </View>
-            <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+            <View style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
               <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_pickup')}</Text>
               <Text style={styles.infoValue}>{order.livreur.name}</Text>
             </View>
@@ -106,11 +107,11 @@ const ClientTab: React.FC<ClientTabProps> = ({
         )}
 
         {order.deliveryDriver && (
-          <View style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.infoRow, row(isArabic)]}>
             <View style={[styles.infoIconCircle, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
               <MaterialIcons name="local-shipping" size={20} color={Colors.success} />
             </View>
-            <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+            <View style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
               <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_delivery')}</Text>
               <Text style={styles.infoValue}>{order.deliveryDriver.name}</Text>
             </View>
@@ -119,20 +120,20 @@ const ClientTab: React.FC<ClientTabProps> = ({
 
         {order.status !== 'DELIVERED' && !order.deliveryDriver && (
           <TouchableOpacity
-            style={[styles.infoRow, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.infoRow, row(isArabic)]}
             onPress={() => setShowDriverModal(true)}
           >
             <View style={[styles.infoIconCircle, { backgroundColor: Colors.primary100 }]}>
               <Feather name="plus" size={20} color={Colors.primary} />
             </View>
-            <View style={[styles.infoCol, isArabic && { alignItems: 'flex-end' }]}>
+            <View style={[styles.infoCol, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
               <Text style={[styles.infoLabel, f.label]}>{t('admin.orders.driver_delivery')}</Text>
               <Text style={[styles.infoValue, { color: Colors.primary }]}>
                 {t('admin.orders.filter_driver')}
               </Text>
             </View>
             <Feather
-              name={isArabic ? 'chevron-left' : 'chevron-right'}
+              name={isArabic ? 'chevron-back' : 'chevron-forward'}
               size={16}
               color={Colors.textMuted}
             />
@@ -142,11 +143,11 @@ const ClientTab: React.FC<ClientTabProps> = ({
 
       {order.client?.addresses?.[0]?.latitude && (
         <View style={styles.mapSection}>
-          <View style={[styles.mapHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.mapHeaderRow, row(isArabic)]}>
             <Ionicons name="location" size={16} color={Colors.primary} />
             <Text style={styles.mapTitle}>{t('admin.clients.address')}</Text>
           </View>
-          <Text style={[styles.addressText, isArabic && { textAlign: 'right' }]}>
+          <Text style={[styles.addressText, textAlign(isArabic)]}>
             {order.client.addresses[0].address}
           </Text>
 

@@ -1,5 +1,7 @@
 package com.wash.laundry_app.command.events;
 
+import com.wash.laundry_app.command.CommandeRepository;
+import com.wash.laundry_app.command.CommandeStatus;
 import com.wash.laundry_app.notifications.NotificationService;
 import com.wash.laundry_app.realtime.RealtimeService;
 import com.wash.laundry_app.users.Role;
@@ -47,14 +49,17 @@ public class OrderSideEffectListener {
     private final RealtimeService realtimeService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final CommandeRepository commandeRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOrderEvent(OrderSideEffectEvent event) {
         try {
             switch (event.eventType()) {
-                case "ORDER_STATUS_CHANGED" ->
-                        realtimeService.broadcastOrderEvent(
-                                "ORDER_STATUS_CHANGED", event.orderId(), event.newStatus());
+                case "ORDER_STATUS_CHANGED" -> {
+                    realtimeService.broadcastOrderEvent(
+                            "ORDER_STATUS_CHANGED", event.orderId(), event.newStatus());
+                    onStatusChanged(event);
+                }
 
                 case "ORDER_UPDATED" ->
                         realtimeService.broadcastOrderEvent(
@@ -119,5 +124,90 @@ public class OrderSideEffectListener {
             log.error("OrderSideEffectListener failed for event {} orderId={}: {}",
                     event.eventType(), event.orderId(), ex.getMessage(), ex);
         }
+    }
+
+    /** Status-specific notifications triggered after ORDER_STATUS_CHANGED. */
+    private void onStatusChanged(OrderSideEffectEvent event) {
+        if (event.newStatus() == null) return;
+
+        commandeRepository.findById(event.orderId()).ifPresent(commande -> {
+            String orderNum = commande.getNumeroCommande();
+
+            switch (event.newStatus()) {
+
+                case PICKED_UP -> {
+                    // Notify admins that pickup was completed
+                    notificationService.notifyRole(
+                            Role.ADMIN,
+                            "Collecte Effectuée",
+                            "Commande #" + orderNum + " a été collectée.",
+                            "ORDER_PICKED_UP",
+                            event.orderId().toString()
+                    );
+                }
+
+                case READY_FOR_DELIVERY -> {
+                    // Notify assigned delivery driver that the order is ready
+                    if (commande.getDeliveryDriver() != null) {
+                        notificationService.createNotification(
+                                commande.getDeliveryDriver(),
+                                "Commande Prête",
+                                "La commande #" + orderNum + " est prête pour la livraison.",
+                                "ORDER_READY",
+                                event.orderId().toString()
+                        );
+                    }
+                    notificationService.notifyRole(
+                            Role.ADMIN,
+                            "Commande Prête",
+                            "Commande #" + orderNum + " est prête pour la livraison.",
+                            "ORDER_READY",
+                            event.orderId().toString()
+                    );
+                }
+
+                case DELIVERED -> {
+                    notificationService.notifyRole(
+                            Role.ADMIN,
+                            "Livraison Confirmée",
+                            "Commande #" + orderNum + " a été livrée avec succès.",
+                            "ORDER_DELIVERED",
+                            event.orderId().toString()
+                    );
+                }
+
+                case CANCELLED -> {
+                    // Notify admins; also notify pickup/delivery driver if assigned
+                    notificationService.notifyRole(
+                            Role.ADMIN,
+                            "Commande Annulée",
+                            "Commande #" + orderNum + " a été annulée.",
+                            "ORDER_CANCELLED",
+                            event.orderId().toString()
+                    );
+                    if (commande.getPickupDriver() != null) {
+                        notificationService.createNotification(
+                                commande.getPickupDriver(),
+                                "Mission Annulée",
+                                "La commande #" + orderNum + " a été annulée.",
+                                "ORDER_CANCELLED",
+                                event.orderId().toString()
+                        );
+                    }
+                    if (commande.getDeliveryDriver() != null
+                            && !commande.getDeliveryDriver().equals(commande.getPickupDriver())) {
+                        notificationService.createNotification(
+                                commande.getDeliveryDriver(),
+                                "Mission Annulée",
+                                "La commande #" + orderNum + " a été annulée.",
+                                "ORDER_CANCELLED",
+                                event.orderId().toString()
+                        );
+                    }
+                }
+
+                default -> { /* no extra notification for IN_PROCESS, PENDING_PICKUP */ }
+            }
+        });
     }
 }

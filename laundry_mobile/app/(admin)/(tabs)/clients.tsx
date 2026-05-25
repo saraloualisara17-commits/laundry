@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import { row, textAlign } from '../../../src/utils/rtl';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,9 @@ import { EmptyState } from '../../../components/admin/EmptyState';
 import { router, useFocusEffect } from 'expo-router';
 
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../../src/lib/logger';
+
+const log = logger.ns('clients');
 
 export default function ClientsScreen() {
   const { t, i18n } = useTranslation();
@@ -70,7 +74,7 @@ export default function ClientsScreen() {
       setHasMore(clientsArray.length === 20);
       setTotalCount(res.data.totalElements || (isRefresh || pageNum === 0 ? clientsArray.length : totalCount));
     } catch (error) {
-      console.error('Fetch clients error:', error);
+      log.error('Fetch clients error', { err: String(error) });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,7 +152,7 @@ export default function ClientsScreen() {
           {getClientAddress(item)}
         </Text>
         
-        <View style={[styles.statsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.statsRow, row(isArabic)]}>
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeText}>{item.totalCommandes || 0} {t('dashboard.orders_count')}</Text>
           </View>
@@ -165,13 +169,13 @@ export default function ClientsScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           <View style={[{ flex: 1 }, isArabic && { alignItems: 'flex-end' }]}>
             <Text style={styles.headerTitle}>{t('admin.clients.title')}</Text>
             <Text style={styles.headerSubtitle}>{totalCount} {t('admin.clients.total_count')}</Text>
           </View>
           <TouchableOpacity 
-            style={[styles.addBtn, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.addBtn, row(isArabic)]}
             onPress={() => router.push('/(admin)/order-client?mode=immediate')}
           >
             <Ionicons name="person-add" size={16} color="white" />
@@ -179,7 +183,7 @@ export default function ClientsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.searchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.searchContainer, row(isArabic)]}>
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
             style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
@@ -190,9 +194,9 @@ export default function ClientsScreen() {
           />
         </View>
 
-        <View style={[styles.filterRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.filterRow, row(isArabic)]}>
           <TouchableOpacity
-            style={[styles.filterBtn, selectedDate && styles.filterBtnActive, isArabic && { flexDirection: 'row-reverse' }]}
+            style={[styles.filterBtn, selectedDate && styles.filterBtnActive, row(isArabic)]}
             onPress={() => setShowDatePicker(true)}
           >
             <Ionicons name="calendar-outline" size={14} color={selectedDate ? AdminColors.primary : AdminColors.textMuted} />
@@ -230,6 +234,10 @@ export default function ClientsScreen() {
           )
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={AdminColors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 40 }} />}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={15}
       />
 
       {/* Date Picker Modal */}
@@ -238,7 +246,7 @@ export default function ClientsScreen() {
           <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowDatePicker(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ ...row(isArabic), justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={styles.modalTitle}>{t('admin.orders.filter_date')}</Text>
               <TouchableOpacity onPress={() => { setSelectedDate(null); setShowDatePicker(false); }}>
                 <Text style={{ color: AdminColors.primary, fontWeight: '700' }}>{t('admin.orders.reset_btn')}</Text>

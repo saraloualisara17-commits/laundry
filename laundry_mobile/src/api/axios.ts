@@ -46,6 +46,7 @@ api.interceptors.response.use(
         const { store } = require('../store/store');
         const { logOut } = require('../store/authSlice');
         store.dispatch(logOut());
+        await SecureStore.deleteItemAsync('accessToken');
         await SecureStore.deleteItemAsync('refreshToken');
         await SecureStore.deleteItemAsync('user');
       }
@@ -66,9 +67,10 @@ api.interceptors.response.use(
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
 
         if (!refreshToken) {
-          // If no refresh token, just log out and reject
           const { store } = require('../store/store');
           const { logOut } = require('../store/authSlice');
+          await SecureStore.deleteItemAsync('accessToken');
+          await SecureStore.deleteItemAsync('user');
           store.dispatch(logOut());
           return Promise.reject(new Error('Session expired'));
         }
@@ -95,6 +97,7 @@ api.interceptors.response.use(
         const { store } = require('../store/store');
         const { logOut } = require('../store/authSlice');
         store.dispatch(logOut());
+        await SecureStore.deleteItemAsync('accessToken');
         await SecureStore.deleteItemAsync('refreshToken');
         await SecureStore.deleteItemAsync('user');
         return Promise.reject(err);

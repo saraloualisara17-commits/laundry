@@ -34,6 +34,14 @@ public class CreateCommandeRequest {
     @Valid
     private List<TapisItem> tapis;
 
+    /**
+     * Client-generated UUID sent with every order creation attempt.
+     * The server stores it in commandes.creation_idempotency_key (UNIQUE).
+     * A duplicate submission with the same key returns the existing order
+     * instead of creating a second one — safe under network retries.
+     */
+    private String creationIdempotencyKey;
+
     // Explicit Getters/Setters to bypass potential Lombok issues
     public Long getClientId() { return clientId; }
     public void setClientId(Long clientId) { this.clientId = clientId; }
@@ -61,6 +69,8 @@ public class CreateCommandeRequest {
     public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
     public List<TapisItem> getTapis() { return tapis; }
     public void setTapis(List<TapisItem> tapis) { this.tapis = tapis; }
+    public String getCreationIdempotencyKey() { return creationIdempotencyKey; }
+    public void setCreationIdempotencyKey(String k) { this.creationIdempotencyKey = k; }
 
     @Data
     @NoArgsConstructor

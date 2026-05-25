@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -14,6 +14,7 @@ import {
   Animated,
   Dimensions
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -24,6 +25,9 @@ import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('order-client');
 
 export default function OrderClientScreen() {
   const { t, i18n } = useTranslation();
@@ -128,7 +132,7 @@ export default function OrderClientScreen() {
       );
       setDrivers(livreurs);
     } catch (error) {
-      console.warn('Could not load drivers:', error);
+      log.warn('Could not load drivers', { err: String(error) });
     }
   };
 
@@ -263,7 +267,7 @@ export default function OrderClientScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.header, row(isArabic)]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
         </TouchableOpacity>
@@ -286,10 +290,10 @@ export default function OrderClientScreen() {
           {/* Search Section */}
           <View style={styles.searchSection}>
             <Text style={[styles.fieldLabel, isArabic && { textAlign: 'right' }]}>{t('admin.users.phone')}</Text>
-            <View style={[styles.searchRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.searchRow, row(isArabic)]}>
               <TextInput
                 style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
-                placeholder="0600000000"
+                placeholder={t('admin.clients.phone_placeholder', { defaultValue: '0600000000' })}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -304,7 +308,7 @@ export default function OrderClientScreen() {
           {showForm && (
             <Animated.View style={{ opacity: formOpacity }}>
               {/* Client Info Section */}
-              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.sectionHeader, row(isArabic)]}>
                 <View style={styles.headerIconBox}>
                   <Ionicons name="person" size={18} color={AdminColors.primary} />
                 </View>
@@ -333,7 +337,7 @@ export default function OrderClientScreen() {
               </View>
 
               {/* Location Section */}
-              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.sectionHeader, row(isArabic)]}>
                 <View style={styles.headerIconBox}>
                   <Ionicons name="pin" size={18} color={AdminColors.primary} />
                 </View>
@@ -360,9 +364,9 @@ export default function OrderClientScreen() {
                 />
               </View>
 
-              <View style={[styles.locationButtonsRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.locationButtonsRow, row(isArabic)]}>
                 <TouchableOpacity 
-                  style={[styles.locBtnPrimary, isArabic && { flexDirection: 'row-reverse' }]} 
+                  style={[styles.locBtnPrimary, row(isArabic)]} 
                   onPress={() => router.push({
                     pathname: '/(admin)/map-picker',
                     params: { returnTo: 'order-client' }
@@ -371,13 +375,13 @@ export default function OrderClientScreen() {
                   <Ionicons name="map" size={18} color="white" />
                   <Text style={styles.locBtnText}>{t('admin.orders.create.location_map')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.locBtnSecondary, isArabic && { flexDirection: 'row-reverse' }]} onPress={captureLocation}>
+                <TouchableOpacity style={[styles.locBtnSecondary, row(isArabic)]} onPress={captureLocation}>
                   <Ionicons name="locate" size={18} color="white" />
                   <Text style={styles.locBtnText}>{t('admin.orders.create.location_gps')}</Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.sectionHeader, row(isArabic)]}>
                 <View style={styles.headerIconBox}>
                   {isImmediate ? (
                     <MaterialCommunityIcons name="truck-delivery" size={18} color={AdminColors.primary} />
@@ -393,10 +397,10 @@ export default function OrderClientScreen() {
                 <View style={styles.formField}>
                   <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.delivery_type')}</Text>
                   <TouchableOpacity 
-                    style={[styles.dropdown, isArabic && { flexDirection: 'row-reverse' }]} 
+                    style={[styles.dropdown, row(isArabic)]} 
                     onPress={() => setShowDeliveryModal(true)}
                   >
-                    <View style={[styles.dropdownLeft, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.dropdownLeft, row(isArabic)]}>
                       {deliveryType ? (
                         <>
                           <Text style={{ fontSize: 20, [isArabic ? 'marginLeft' : 'marginRight']: 10 }}>
@@ -415,18 +419,18 @@ export default function OrderClientScreen() {
                 </View>
               ) : (
                 <>
-                  <View style={[styles.dateTimeRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.dateTimeRow, row(isArabic)]}>
                     <View style={[styles.formField, { flex: 1 }]}>
                       <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.pickup_date')}</Text>
                       <TouchableOpacity 
                         style={[
                           styles.input, 
                           pickupDate && { borderColor: AdminColors.primary, backgroundColor: AdminColors.primary50 },
-                          isArabic && { flexDirection: 'row-reverse' }
+                          row(isArabic)
                         ]} 
                         onPress={() => setShowDatePicker(true)}
                       >
-                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, row(isArabic)]}>
                           <Ionicons name="calendar-outline" size={20} color={AdminColors.primary} />
                           <Text style={{ 
                             color: pickupDate ? AdminColors.primary : AdminColors.textMuted,
@@ -445,11 +449,11 @@ export default function OrderClientScreen() {
                         style={[
                           styles.input, 
                           pickupTime && { borderColor: AdminColors.primary, backgroundColor: AdminColors.primary50 },
-                          isArabic && { flexDirection: 'row-reverse' }
+                          row(isArabic)
                         ]} 
                         onPress={() => setShowTimePicker(true)}
                       >
-                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', height: '100%', gap: 8 }, row(isArabic)]}>
                           <Ionicons name="time-outline" size={20} color={AdminColors.primary} />
                           <Text style={{ 
                             color: pickupTime ? AdminColors.primary : AdminColors.textMuted,
@@ -494,7 +498,7 @@ export default function OrderClientScreen() {
                     drivers.map(driver => (
                       <TouchableOpacity 
                         key={driver.id} 
-                        style={[styles.driverCard, selectedDriver?.id === driver.id && styles.driverCardSelected, isArabic && { flexDirection: 'row-reverse' }]}
+                        style={[styles.driverCard, selectedDriver?.id === driver.id && styles.driverCardSelected, row(isArabic)]}
                         onPress={() => setSelectedDriver(driver)}
                       >
                         <View style={styles.driverAvatar}>
@@ -539,7 +543,7 @@ export default function OrderClientScreen() {
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowDeliveryModal(false)} />
           <View style={styles.modalSheet}>
-             <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+             <View style={[styles.modalHeader, row(isArabic)]}>
                <Text style={styles.modalTitle}>{t('admin.orders.create.delivery_type')}</Text>
                <TouchableOpacity onPress={() => setShowDeliveryModal(false)}>
                  <Ionicons name="close" size={24} color={AdminColors.textPrimary} />
@@ -549,7 +553,7 @@ export default function OrderClientScreen() {
                {DELIVERY_TYPES.map(type => (
                  <TouchableOpacity 
                    key={type.id} 
-                   style={[styles.modalRow, isArabic && { flexDirection: 'row-reverse' }]}
+                   style={[styles.modalRow, row(isArabic)]}
                    onPress={() => { setDeliveryType(type.id); setShowDeliveryModal(false); }}
                  >
                    <View style={styles.emojiCircle}>

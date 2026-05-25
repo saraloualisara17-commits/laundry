@@ -16,8 +16,8 @@ import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { useSettings } from '../../../src/hooks/query/useSettings';
 import { router } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 import { useOrderCreation } from '../../../src/context/OrderCreationContext';
+import { useRTL, row, font, arabicSafe, pos, textAlign, alignStart, alignEnd, chevronForward, borderStart, textProps } from '../../../src/utils/rtl';
 import { ScannerModal } from '../../../components/admin/ScannerModal';
 import { useDashboardStats, useStatusOverview, useUnpaidOverview } from '../../../src/hooks/query/useDashboard';
 import { useReadyDeliveries, usePendingPickups } from '../../../src/hooks/queries/useLivreur';
@@ -44,8 +44,7 @@ interface OverviewData {
 
 
 export default function AdminDashboard() {
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
+  const { t, isRTL: isArabic } = useRTL();
 
   const { data: settingsData } = useSettings();
   const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
@@ -123,13 +122,13 @@ export default function AdminDashboard() {
           onPress={onPress}
           activeOpacity={0.8}
         >
-          <View style={[styles.subCardTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.subCardTopRow, row(isArabic)]}>
             <View style={[styles.subCardIconCircle, { backgroundColor: color + '20' }]}>
               <Ionicons name={icon as any} size={24} color={color} />
             </View>
-            <Text style={[styles.subCardCount, { color }]}>{data.count}</Text>
+            <Text style={[styles.subCardCount, { color }, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{data.count}</Text>
           </View>
-          <Text style={[styles.subCardLabel, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{label}</Text>
+          <Text style={[styles.subCardLabel, textAlign(isArabic), font.bold(isArabic)]} numberOfLines={2} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{label}</Text>
         </TouchableOpacity>
       );
     }
@@ -140,20 +139,20 @@ export default function AdminDashboard() {
         onPress={onPress}
         activeOpacity={0.85}
       >
-        <View style={[styles.cardTopRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.cardTopRow, row(isArabic)]}>
           <Ionicons name={icon as any} size={28} color="rgba(255,255,255,0.85)" />
-          <Text style={styles.cardCount}>{data.count}</Text>
+          <Text style={[styles.cardCount, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{data.count}</Text>
         </View>
-        <Text style={[styles.cardLabel, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{label}</Text>
+        <Text style={[styles.cardLabel, textAlign(isArabic), font.bold(isArabic)]} numberOfLines={2} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{label}</Text>
         {showPrice && (
-          <View style={[styles.cardAmountRow, isArabic && { alignItems: 'flex-start' }]}>
-            <Text style={styles.cardAmount} numberOfLines={1} adjustsFontSizeToFit>
+          <View style={[styles.cardAmountRow, isArabic ? { alignItems: 'flex-start' } : { alignItems: 'flex-end' }]}>
+            <Text style={[styles.cardAmount, font.bold(isArabic)]} numberOfLines={1} adjustsFontSizeToFit>
               {data.total.toLocaleString()} {t('common.dh')}
             </Text>
           </View>
         )}
         {status === 'READY_FOR_DELIVERY' && data.count > 0 && (
-          <Animated.View style={[styles.attentionDot, isArabic ? { left: 10, right: undefined } : { right: 10 }, { opacity: readyPulsingAnim }]} />
+          <Animated.View style={[styles.attentionDot, pos.end(10, isArabic), { top: 8, opacity: readyPulsingAnim }]} />
         )}
       </TouchableOpacity>
     );
@@ -162,7 +161,7 @@ export default function AdminDashboard() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={styles.headerContent}>
+        <View style={[styles.headerContent, row(isArabic)]}>
           {/* Logo */}
           <View style={styles.logoCircle}>
             {settings.logoUrl ? (
@@ -171,10 +170,10 @@ export default function AdminDashboard() {
               <Ionicons name="water-outline" size={28} color={AdminColors.primary} />
             )}
           </View>
-          {/* Title + app name — always right-aligned */}
-          <View style={styles.headerTitleCol}>
-            <Text style={styles.headerScreenTitle}>{t('tabs.home')}</Text>
-            <Text style={styles.headerAppName}>{settings.appName}</Text>
+          {/* Title + app name — aligns to reading-end */}
+          <View style={[styles.headerTitleCol, { alignItems: isArabic ? 'flex-start' : 'flex-end' }]}>
+            <Text style={[styles.headerScreenTitle, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('tabs.home')}</Text>
+            <Text style={[styles.headerAppName, arabicSafe(isArabic), font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{settings.appName}</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -225,42 +224,42 @@ export default function AdminDashboard() {
 
         {/* 2. Create Order Section */}
         <View style={styles.actionsGrid}>
-          <TouchableOpacity 
-            style={[styles.mainCreateBtn, isArabic && { flexDirection: 'row-reverse' }, showCreateOptions && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}
+          <TouchableOpacity
+            style={[styles.mainCreateBtn, row(isArabic), borderStart(isArabic, 4, AdminColors.primary), showCreateOptions && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}
             onPress={() => setShowCreateOptions(!showCreateOptions)}
             activeOpacity={0.9}
           >
             <View style={styles.mainCreateIcon}><Text style={styles.plusSign}>{showCreateOptions ? '−' : '+'}</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.mainCreateTitle, isArabic && { textAlign: 'right' }]}>{t('dashboard.create_order')}</Text>
-              <Text style={[styles.mainCreateSub, isArabic && { textAlign: 'right' }]}>{t('dashboard.create_order_sub')}</Text>
+              <Text style={[styles.mainCreateTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('dashboard.create_order')}</Text>
+              <Text style={[styles.mainCreateSub, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('dashboard.create_order_sub')}</Text>
             </View>
             <Ionicons name={showCreateOptions ? "chevron-up" : "chevron-down"} size={20} color={AdminColors.primary} />
           </TouchableOpacity>
 
           {showCreateOptions && (
             <View style={styles.createOptionsColumn}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.createOptionRow, { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}
                 onPress={() => handleSelectMode('immediate')}
               >
-                <Text style={[styles.createOptionRowText, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.btn_now')}</Text>
+                <Text style={[styles.createOptionRowText, textAlign(isArabic), font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.create.btn_now')}</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.createOptionRow}
                 onPress={() => handleSelectMode('scheduled')}
               >
-                <Text style={[styles.createOptionRowText, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.btn_later')}</Text>
+                <Text style={[styles.createOptionRowText, textAlign(isArabic), font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.create.btn_later')}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         {/* 3. Status Section - Phase 1: Operational Flow */}
-        <View style={[styles.sectionOverviewHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.sectionOverviewTitle}>{t('dashboard.overview')}</Text>
-          <Text style={styles.lastUpdatedText}>{lastUpdated}</Text>
+        <View style={[styles.sectionOverviewHeader, row(isArabic)]}>
+          <Text style={[styles.sectionOverviewTitle, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('dashboard.overview')}</Text>
+          <Text style={[styles.lastUpdatedText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{lastUpdated}</Text>
         </View>
 
         {isLoadingOverview ? (
@@ -277,7 +276,7 @@ export default function AdminDashboard() {
           </TouchableOpacity>
         ) : (
           <>
-            <View style={[styles.statusCardsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.statusCardsContainer, row(isArabic)]}>
               {renderStatusCard('PENDING_PICKUP',     t('status.PENDING_PICKUP'),     'time-outline',    '#C2185B')}
               {renderStatusCard('PICKED_UP',          t('status.PICKED_UP'),          'swap-horizontal', '#D32F2F')}
               {renderStatusCard('READY_FOR_DELIVERY', t('status.READY_FOR_DELIVERY'), 'car-outline',     '#00897B')}
@@ -292,25 +291,25 @@ export default function AdminDashboard() {
                   onPress={() => router.push('/(admin)/unpaid-orders')}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.unpaidMain, row(isArabic)]}>
                     <View style={[styles.unpaidIcon, unpaidOverview.totalRemaining === 0 && { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
                       <Text style={{ fontSize: 24 }}>{unpaidOverview.totalRemaining > 0 ? '💰' : '✅'}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                      <Text style={[styles.unpaidTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                         {unpaidOverview.totalRemaining > 0 ? t('dashboard.unpaid_balance') : t('dashboard.all_settled')}
                       </Text>
                       {unpaidOverview.totalRemaining > 0 && (
-                        <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                        <Text style={[styles.unpaidSubtitle, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                           {unpaidOverview.clientsWithDebt} {t('dashboard.clients')} • {unpaidOverview.totalOrders} {t('dashboard.orders_count')}
                         </Text>
                       )}
                     </View>
-                    <View style={[styles.unpaidAmountCol, isArabic && { alignItems: 'flex-start' }]}>
-                      <Text style={[styles.unpaidAmount, { color: unpaidOverview.totalRemaining > 0 ? '#EF4444' : '#10B981' }]}>
+                    <View style={[styles.unpaidAmountCol, isArabic ? { alignItems: 'flex-start' } : { alignItems: 'flex-end' }]}>
+                      <Text style={[styles.unpaidAmount, { color: unpaidOverview.totalRemaining > 0 ? '#EF4444' : '#10B981' }, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                         {unpaidOverview.totalRemaining.toLocaleString()} {t('common.dh')}
                       </Text>
-                      <Text style={styles.unpaidAmountLabel}>{t('dashboard.to_collect')}</Text>
+                      <Text style={[styles.unpaidAmountLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('dashboard.to_collect')}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -318,7 +317,7 @@ export default function AdminDashboard() {
             )}
 
             {/* 5. Status Section - Phase 2: Exceptions & Location (Sub Cases) */}
-            <View style={[styles.statusCardsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.statusCardsContainer, row(isArabic)]}>
               {renderStatusCard('DELIVERY_FAILED', t('status.DELIVERY_FAILED'), 'alert-circle-outline', '#F43F5E', 'sub')}
               {renderStatusCard('PICKUP_FAILED',   t('status.PICKUP_FAILED'),   'warning-outline',      '#EF4444', 'sub')}
               {renderStatusCard('CANCELLED',       t('status.CANCELLED'),       'trash-outline',        '#94A3B8', 'sub')}
@@ -327,34 +326,34 @@ export default function AdminDashboard() {
 
             {/* 6. Accounts / General Statistics (Account style) */}
             <View style={styles.accountCardsWrapper}>
-              <TouchableOpacity 
-                style={[styles.accountCard, isArabic && { flexDirection: 'row-reverse' }]}
+              <TouchableOpacity
+                style={[styles.accountCard, row(isArabic)]}
                 onPress={() => router.push('/(admin)/(tabs)/clients')}
                 activeOpacity={0.8}
               >
                 <View style={styles.accountAvatar}>
                   <Ionicons name="people" size={24} color={AdminColors.primary} />
                 </View>
-                <View style={[styles.accountInfo, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.accountLabel}>{t('tabs.clients')}</Text>
-                  <Text style={styles.accountValue}>{stats?.totalClients || 0}</Text>
+                <View style={[styles.accountInfo, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+                  <Text style={[styles.accountLabel, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('tabs.clients')}</Text>
+                  <Text style={[styles.accountValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{stats?.totalClients || 0}</Text>
                 </View>
-                <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
+                <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.accountCard, isArabic && { flexDirection: 'row-reverse' }]}
+              <TouchableOpacity
+                style={[styles.accountCard, row(isArabic)]}
                 onPress={() => router.push('/(admin)/(tabs)/orders')}
                 activeOpacity={0.8}
               >
                 <View style={styles.accountAvatar}>
                   <Ionicons name="receipt" size={24} color={AdminColors.primary} />
                 </View>
-                <View style={[styles.accountInfo, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={styles.accountLabel}>{t('tabs.orders')}</Text>
-                  <Text style={styles.accountValue}>{stats?.totalCommandes || 0}</Text>
+                <View style={[styles.accountInfo, isArabic ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+                  <Text style={[styles.accountLabel, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('tabs.orders')}</Text>
+                  <Text style={[styles.accountValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{stats?.totalCommandes || 0}</Text>
                 </View>
-                <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
+                <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -365,19 +364,19 @@ export default function AdminDashboard() {
                 onPress={() => router.push('/(admin)/self-submitted-orders')}
                 activeOpacity={0.8}
               >
-                <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.unpaidMain, row(isArabic)]}>
                   <View style={[styles.unpaidIcon, { backgroundColor: '#EEF2FF' }]}>
                     <Text style={{ fontSize: 24 }}>🌐</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                    <Text style={[styles.unpaidTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                       {t('dashboard.self_submitted_orders')}
                     </Text>
-                    <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                    <Text style={[styles.unpaidSubtitle, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                       {t('dashboard.self_submitted_sub')}
                     </Text>
                   </View>
-                  <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={20} color={AdminColors.textMuted} />
+                  <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -390,23 +389,23 @@ export default function AdminDashboard() {
                   onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { specialFilter: 'PAID_DEBTS' } })}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.unpaidMain, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.unpaidMain, row(isArabic)]}>
                     <View style={[styles.unpaidIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
                       <Text style={{ fontSize: 24 }}>💰</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                      <Text style={[styles.unpaidTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                         {t('dashboard.paid_debts')}
                       </Text>
-                      <Text style={[styles.unpaidSubtitle, isArabic && { textAlign: 'right' }]}>
+                      <Text style={[styles.unpaidSubtitle, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                         {t('dashboard.orders_count_completed')}
                       </Text>
                     </View>
-                    <View style={[styles.unpaidAmountCol, isArabic && { alignItems: 'flex-start' }]}>
-                      <Text style={[styles.unpaidAmount, { color: '#10B981' }]}>
+                    <View style={[styles.unpaidAmountCol, isArabic ? { alignItems: 'flex-start' } : { alignItems: 'flex-end' }]}>
+                      <Text style={[styles.unpaidAmount, { color: '#10B981' }, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                         {overview.PAID_DEBTS.count}
                       </Text>
-                      <Text style={styles.unpaidAmountLabel}>{t('dashboard.orders')}</Text>
+                      <Text style={[styles.unpaidAmountLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('dashboard.orders')}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -428,7 +427,7 @@ const styles = StyleSheet.create({
   headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 30 },
   logoCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...AdminShadows.shadowSmall },
   logoImage: { width: 52, height: 52, borderRadius: 26 },
-  headerTitleCol: { flex: 1, alignItems: 'flex-end' },
+  headerTitleCol: { flex: 1 },
   headerScreenTitle: { color: 'white', fontSize: 22, fontWeight: '900' },
   headerAppName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   content: { flex: 1, marginTop: -20 },
@@ -479,14 +478,14 @@ const styles = StyleSheet.create({
   gridLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600', marginBottom: 4 },
   gridValue: { fontSize: 16, fontWeight: '800' },
   gridDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 15 },
-  statusCardsContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', marginTop: 12 },
+  statusCardsContainer: { flexWrap: 'wrap', paddingHorizontal: 20, justifyContent: 'space-between', marginTop: 12 },
   statusCard: { width: '48%', borderRadius: 18, padding: 16, marginBottom: 14, ...AdminShadows.shadowSmall, position: 'relative', overflow: 'hidden' },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cardCount: { fontSize: 26, fontWeight: '800', color: 'white' },
   cardLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
   cardAmountRow: { marginTop: 6 },
   cardAmount: { fontSize: 13, fontWeight: '800', color: 'white' },
-  attentionDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
+  attentionDot: { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
   unpaidWrapper: { paddingHorizontal: 20, marginBottom: 16, marginTop: 4 },
   unpaidCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#FEE2E2', ...AdminShadows.shadowSmall },
   unpaidMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -497,7 +496,7 @@ const styles = StyleSheet.create({
   unpaidAmount: { fontSize: 16, fontWeight: '800' },
   unpaidAmountLabel: { fontSize: 9, fontWeight: '600', color: AdminColors.textMuted, textTransform: 'uppercase' },
   actionsGrid: { paddingHorizontal: 20, gap: 12, marginTop: 12 },
-  mainCreateBtn: { backgroundColor: 'white', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, ...AdminShadows.shadowSmall, borderLeftWidth: 4, borderLeftColor: AdminColors.primary },
+  mainCreateBtn: { backgroundColor: 'white', borderRadius: 18, padding: 16, alignItems: 'center', gap: 14, ...AdminShadows.shadowSmall },
   mainCreateIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: AdminColors.primary, alignItems: 'center', justifyContent: 'center' },
   plusSign: { fontSize: 24, color: 'white', fontWeight: '300' },
   mainCreateTitle: { fontSize: 15, fontWeight: '700', color: AdminColors.textPrimary },
@@ -522,7 +521,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: { flexDirection: 'row', gap: 12 },
   actionCard: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center', ...AdminShadows.shadowSmall },
-  actionIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  actionIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginEnd: 10 },
   actionTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: AdminColors.textPrimary },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, marginTop: 24, marginBottom: 14 },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: AdminColors.textPrimary },

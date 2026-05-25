@@ -36,6 +36,17 @@ public class CommandeCreationService {
     public CommandeDTO createCommande(CreateCommandeRequest request) {
         User creator = authService.currentUser();
 
+        // ── Idempotency check ────────────────────────────────────────────────
+        // If the client retries after a network drop (server committed but
+        // response was lost), return the existing order instead of creating
+        // a duplicate. Key is a UUID generated once per creation attempt.
+        if (request.getCreationIdempotencyKey() != null && !request.getCreationIdempotencyKey().isBlank()) {
+            var existing = commandeRepository.findByCreationIdempotencyKey(request.getCreationIdempotencyKey());
+            if (existing.isPresent()) {
+                return commandeMapper.toDto(existing.get());
+            }
+        }
+
         Client client = clientRepository.findById(request.getClientId())
                 .orElseThrow(() -> new ClientNotFoundException("Client non trouvé"));
 
@@ -101,6 +112,7 @@ public class CommandeCreationService {
             commande.setDeliveryLongitude(client.getAddresses().get(0).getLongitude());
         }
 
+        commande.setCreationIdempotencyKey(request.getCreationIdempotencyKey());
         commande = commandeRepository.save(commande);
 
         BigDecimal total = BigDecimal.ZERO;
@@ -120,6 +132,12 @@ public class CommandeCreationService {
             }
             // Validate before creating the record — same rules as addPayment
             PaymentGuard.validatePayment(request.getMontantPaye(), total, BigDecimal.ZERO);
+            // Derive an idempotency key for this payment from the order key so that
+            // if the creation is replayed (network retry after commit) the payment is
+            // not inserted twice. The "-init" suffix scopes it to this specific event.
+            String paymentKey = request.getCreationIdempotencyKey() != null
+                    ? request.getCreationIdempotencyKey() + "-init"
+                    : null;
             Paiement initialPayment = Paiement.builder()
                     .commande(commande)
                     .montant(request.getMontantPaye())
@@ -127,6 +145,7 @@ public class CommandeCreationService {
                     .note("Paiement à la création")
                     .recordedBy(creator)
                     .modePaiement(paymentMode)
+                    .idempotencyKey(paymentKey)
                     .build();
             paiementRepository.save(initialPayment);
             // Derive montantPaye from the DB sum — not from the request directly.

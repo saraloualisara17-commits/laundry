@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
+import { randomUUID } from '../../src/utils/uuid';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, Alert, Linking, Platform,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -84,7 +86,13 @@ export default function AdminMissionsScreen() {
 
   const handleStatusUpdate = (orderId: number, status: 'PICKED_UP' | 'DELIVERED', extraData?: any) => {
     updateStatusMutation.mutate(
-      { orderId, status, amount: extraData?.amount, notesPaiement: extraData?.notesPaiement },
+      {
+        orderId,
+        status,
+        amount: extraData?.amount,
+        notesPaiement: extraData?.notesPaiement,
+        paymentIdempotencyKey: status === 'DELIVERED' ? randomUUID() : undefined,
+      },
       {
         onSuccess: async (res: any) => {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -116,9 +124,9 @@ export default function AdminMissionsScreen() {
             onPress={() => router.push(`/order/${item.id}`)}
             activeOpacity={0.7}
           >
-            <View style={[styles.cardHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.cardHeaderRow, row(isArabic)]}>
               <Text style={styles.cardRef}>#{item.numeroCommande}</Text>
-              <View style={[styles.cardHeaderRight, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.cardHeaderRight, row(isArabic)]}>
                 {item.montantTotal > 0 && (
                   <Text style={styles.cardPrice}>{item.montantTotal} {t('common.dh')}</Text>
                 )}
@@ -132,13 +140,13 @@ export default function AdminMissionsScreen() {
             
             <Text style={[styles.cardClient, isArabic && { textAlign: 'right' }]}>{item.clientName || item.client?.name}</Text>
             
-            <View style={[styles.infoRowSmall, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.infoRowSmall, row(isArabic)]}>
               <Ionicons name="cube-outline" size={14} color={AdminColors.textSecondary} />
               <Text style={styles.infoTextSmall}>{itemsSummary}</Text>
             </View>
 
             {addr && (
-              <View style={[styles.addressRow, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.addressRow, row(isArabic)]}>
                 <Ionicons name="location-outline" size={14} color={AdminColors.textMuted} />
                 <Text style={[styles.cardAddress, isArabic && { textAlign: 'right' }]} numberOfLines={1}>{addr}</Text>
               </View>
@@ -148,7 +156,7 @@ export default function AdminMissionsScreen() {
           <View style={styles.divider} />
 
           <View style={styles.actionsBox}>
-            <View style={[styles.utilRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.utilRow, row(isArabic)]}>
               <TouchableOpacity
                 style={[styles.utilBtn, { backgroundColor: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.1)' }]}
                 onPress={() => phone && Linking.openURL(`tel:${phone}`)}
@@ -197,7 +205,7 @@ export default function AdminMissionsScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
-        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.header, row(isArabic)]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color="white" />
           </TouchableOpacity>
@@ -210,7 +218,7 @@ export default function AdminMissionsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.tabsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.tabsContainer, row(isArabic)]}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'pickup' && styles.tabActive]}
             onPress={() => setActiveTab('pickup')}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   Linking,
   KeyboardAvoidingView,
 } from 'react-native';
+import { row, textAlign } from '../../src/utils/rtl';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
@@ -26,6 +27,7 @@ import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { SkeletonCard } from '../../components/admin/SkeletonCard';
 import * as ImagePicker from 'expo-image-picker';
+import { compressImage, compressImages } from '../../src/services/uploads/imageCompression';
 import * as WebBrowser from 'expo-web-browser';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -33,6 +35,9 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { BASE_URL } from '../../src/services/api/client';
+import { logger } from '../../src/lib/logger';
+
+const log = logger.ns('order-items');
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -104,7 +109,7 @@ export default function OrderItemsScreen() {
 
       setProducts(allProducts);
     } catch (e: any) {
-      console.error('Catalog load error:', e.response?.data || e.message);
+      log.error('Catalog load error', { msg: String(e?.message) });
       Alert.alert(t('common.error'), t('admin.catalog.empty_title'));
     } finally {
       setLoading(false);
@@ -190,72 +195,70 @@ export default function OrderItemsScreen() {
     setConfigModal({ open: false, product: null, editCartId: null });
   };
 
+  // Shared picker helper — request permission, launch source, return raw assets
+  const launchPicker = async (source: 'camera' | 'gallery', multi = false) => {
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
+        return null;
+      }
+      return ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
+        return null;
+      }
+      return ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsMultipleSelection: multi,
+        selectionLimit: multi ? 5 : 1,
+      });
+    }
+  };
+
+  // Item-level photo picker: compress picked images immediately so the
+  // in-memory URI is already the final compressed version. Compression
+  // happens here once — not again at submit time.
   const pickItemImage = async (source: 'camera' | 'gallery') => {
     try {
-      let result;
-      if (source === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          quality: 0.7,
-        });
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          quality: 0.7,
-          allowsMultipleSelection: true,
-          selectionLimit: 5,
-        });
-      }
+      const result = await launchPicker(source, source === 'gallery');
+      if (!result || result.canceled || result.assets.length === 0) return;
 
-      if (!result.canceled && result.assets.length > 0) {
-        const newUris = result.assets.map(a => a.uri);
-        setConfigForm(prev => ({
-          ...prev,
-          images: [...prev.images, ...newUris].slice(0, 5) // max 5 images
-        }));
-      }
+      const rawUris = result.assets.map(a => a.uri);
+      // Compress all picked images in parallel
+      const compressed = await compressImages(rawUris, 'standard');
+
+      setConfigForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...compressed].slice(0, 5),
+      }));
     } catch (e) {
-      console.error('Image picker error:', e);
+      log.error('Item image picker error', { err: String(e) });
     }
   };
 
   const removeItemImage = (uri: string) => {
     setConfigForm(prev => ({
       ...prev,
-      images: prev.images.filter(i => i !== uri)
+      images: prev.images.filter(i => i !== uri),
     }));
   };
 
-  const pickImage = async () => {
+  // Order-level photo picker: camera only (these are reception/handoff shots).
+  // Also compresses immediately on pick.
+  const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('common.error'), t('admin.orders.location_permission_denied'));
-        return;
-      }
+      const result = await launchPicker(source, false);
+      if (!result || result.canceled || result.assets.length === 0) return;
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets.length > 0) {
-        const newUri = result.assets[0].uri;
-        setOrderImages([...orderImages, newUri]);
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      const compressed = await compressImage(result.assets[0].uri, 'standard');
+      setOrderImages([...orderImages, compressed]);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.error('Order photo error:', e);
+      log.error('Order photo error', { err: String(e) });
     }
   };
 
@@ -270,7 +273,7 @@ export default function OrderItemsScreen() {
           message: `${t('admin.orders.create.items.summary_for')} ${client?.name}\nTotal: ${totalAmount.toFixed(2)} ${t('common.dh')}\n${t('dashboard.orders_count')}: ${itemCount}`,
         });
       } catch (error) {
-        console.log(error);
+        log.error('Failed to share order summary', { err: String(error) });
       }
       return;
     }
@@ -324,7 +327,7 @@ export default function OrderItemsScreen() {
   };
 
   const renderActionBar = () => (
-    <View style={[styles.actionBar, isArabic && { flexDirection: 'row-reverse' }]}>
+    <View style={[styles.actionBar, row(isArabic)]}>
       <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
         <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
           <Ionicons name="share-social" size={20} color="#1976D2" />
@@ -350,7 +353,7 @@ export default function OrderItemsScreen() {
 
   const renderSummaryCard = () => (
     <View style={styles.summaryCard}>
-      <View style={[styles.summaryGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.summaryGrid, row(isArabic)]}>
         <View style={styles.gridItem}>
           <Text style={styles.summaryLabel}>{t('common.total')}</Text>
           <Text style={[styles.summaryValue, { color: AdminColors.textPrimary }]}>{totalAmount.toFixed(2)} {t('common.dh')}</Text>
@@ -365,7 +368,7 @@ export default function OrderItemsScreen() {
         </View>
       </View>
       
-      <View style={[styles.paymentRow, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.paymentRow, row(isArabic)]}>
         <TouchableOpacity style={styles.paymentSection} onPress={() => { setTempPaid(paidAmount.toString()); setShowPaymentModal(true); }}>
           <Text style={styles.summaryLabel}>{t('financial.paid')}</Text>
           <Text style={[styles.summaryValue, { color: AdminColors.success }]}>{paidAmount.toFixed(2)} {t('common.dh')}</Text>
@@ -382,7 +385,7 @@ export default function OrderItemsScreen() {
       </View>
 
       <TouchableOpacity 
-        style={[styles.addNoteBtn, isArabic && { flexDirection: 'row-reverse' }]} 
+        style={[styles.addNoteBtn, row(isArabic)]} 
         onPress={() => { setTempNotes(orderNotes); setShowNotesModal(true); }}
       >
         <Ionicons name="document-text-outline" size={16} color={AdminColors.primary} />
@@ -392,7 +395,7 @@ export default function OrderItemsScreen() {
   );
 
   const renderCartItem = (item: OrderItem) => (
-    <View key={item.cartId} style={[styles.cartItemCard, isArabic && { flexDirection: 'row-reverse' }]}>
+    <View key={item.cartId} style={[styles.cartItemCard, row(isArabic)]}>
       <View style={styles.cartActions}>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => removeItem(item.cartId)}>
           <Ionicons name="trash-outline" size={16} color={AdminColors.danger} />
@@ -407,7 +410,7 @@ export default function OrderItemsScreen() {
           <Text style={[styles.cartItemDetails, isArabic && { textAlign: 'right' }]}>{item.largeur}×{item.hauteur}={(item.largeur! * item.hauteur!).toFixed(2)}m²</Text>
         )}
         {item.imageUrls && item.imageUrls.length > 0 && (
-          <View style={[{ flexDirection: 'row', gap: 4, marginTop: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[{ flexDirection: 'row', gap: 4, marginTop: 4 }, row(isArabic)]}>
              {item.imageUrls.slice(0, 3).map((uri, idx) => (
                 <Image key={idx} source={{ uri }} style={{ width: 30, height: 30, borderRadius: 6 }} />
              ))}
@@ -426,13 +429,13 @@ export default function OrderItemsScreen() {
   );
 
   const renderProductRow = ({ item }: { item: any }) => (
-    <View style={[styles.productRow, isArabic && { flexDirection: 'row-reverse' }]}>
+    <View style={[styles.productRow, row(isArabic)]}>
       <TouchableOpacity style={styles.addIconBtn} onPress={() => openAdd(item)}>
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>
       <View style={[styles.productInfoCol, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 14 }]}>
         <Text style={[styles.productName, isArabic && { textAlign: 'right' }]}>{item.nom}</Text>
-        <View style={[styles.priceRowSmall, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.priceRowSmall, row(isArabic)]}>
           <Text style={styles.productPriceText}>{item.prixUnitaire} {t('common.dh')}</Text>
           <Text style={styles.unitSmall}> / {item.uniteLabel || t('common.unit')}</Text>
         </View>
@@ -481,7 +484,7 @@ export default function OrderItemsScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <SafeAreaView edges={['top']}>
-          <View style={[styles.headerContent, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={[styles.headerContent, row(isArabic)]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -526,7 +529,7 @@ export default function OrderItemsScreen() {
             )}
 
             <View style={styles.bagSection}>
-               <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+               <View style={[styles.sectionHeader, row(isArabic)]}>
                   <View style={styles.bagIconBox}>
                     <MaterialCommunityIcons name="shopping" size={16} color="white" />
                   </View>
@@ -545,7 +548,7 @@ export default function OrderItemsScreen() {
             </View>
 
             <View style={[styles.section, { marginTop: 24, marginBottom: 8 }]}>
-              <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.sectionHeader, row(isArabic)]}>
                 <Ionicons name="list" size={20} color={AdminColors.primary} />
                 <Text style={styles.sectionTitle}>{t('admin.orders.create.items.available_products')}</Text>
               </View>
@@ -583,7 +586,7 @@ export default function OrderItemsScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.dragHandle} />
             
-            <View style={[styles.modalHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.modalHeaderRow, row(isArabic)]}>
               <View style={styles.modalHeaderImgBox}>
                 {configModal.product?.imageUrl ? (
                    <Image source={{ uri: `${BASE_URL}${configModal.product.imageUrl}` }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
@@ -599,7 +602,7 @@ export default function OrderItemsScreen() {
 
             <ScrollView ref={modalScrollRef} style={styles.modalBody} keyboardShouldPersistTaps="handled">
               {configModal.product?.pricingMethod === 'PER_M2' && (
-                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.dimRow, row(isArabic)]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.width')}</Text>
                     <TextInput
@@ -625,7 +628,7 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_UNIT' && (
-                <View style={[styles.unitStepper, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.unitStepper, row(isArabic)]}>
                   <TouchableOpacity 
                     style={[styles.stepBtn, configForm.qty === 1 && styles.stepBtnDisabled]} 
                     disabled={configForm.qty === 1}
@@ -644,7 +647,7 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_KG' && (
-                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.dimRow, row(isArabic)]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_kg')} (kg)</Text>
                     <TextInput
@@ -659,7 +662,7 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'PER_LINEAR_M' && (
-                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.dimRow, row(isArabic)]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_linear_m')} (m)</Text>
                     <TextInput
@@ -674,7 +677,7 @@ export default function OrderItemsScreen() {
               )}
 
               {configModal.product?.pricingMethod === 'CUSTOM' && (
-                <View style={[styles.dimRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.dimRow, row(isArabic)]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('financial.amount')} ({t('common.dh')})</Text>
                     <TextInput
@@ -717,8 +720,8 @@ export default function OrderItemsScreen() {
 
               {/* PHOTOS SECTION */}
               <View style={styles.remiseSection}>
-                <View style={[styles.remiseHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.remiseHeader, row(isArabic)]}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
                     <Ionicons name="camera-outline" size={18} color={AdminColors.primary} />
                     <Text style={styles.remiseTitle}>{t('admin.orders.create.items.item_photos')}</Text>
                     {configForm.images.length > 0 && (
@@ -744,7 +747,7 @@ export default function OrderItemsScreen() {
                 </View>
 
                 {configForm.images.length > 0 && (
-                  <View style={[styles.photoPreviewRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.photoPreviewRow, row(isArabic)]}>
                     {configForm.images.map((uri, idx) => (
                       <View key={idx} style={styles.photoThumbWrap}>
                         <Image source={{ uri }} style={styles.photoThumb} />
@@ -762,8 +765,8 @@ export default function OrderItemsScreen() {
 
               {/* REMISE SECTION */}
               <View style={styles.remiseSection}>
-                <View style={[styles.remiseHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.remiseHeader, row(isArabic)]}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
                     <Ionicons name="pricetag-outline" size={18} color={AdminColors.primary} />
                     <Text style={styles.remiseTitle}>{t('admin.orders.create.items.apply_remise')}</Text>
                   </View>
@@ -822,7 +825,7 @@ export default function OrderItemsScreen() {
               onChangeText={setTempPaid}
               autoFocus
             />
-            <View style={[styles.dialogButtons, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.dialogButtons, row(isArabic)]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => setShowPaymentModal(false)}>
                 <Text style={styles.dialogBtnCancel}>{t('common.cancel')}</Text>
               </TouchableOpacity>
@@ -846,7 +849,7 @@ export default function OrderItemsScreen() {
               onChangeText={setTempNotes}
               placeholder={t('admin.orders.create.items.order_note_placeholder')}
             />
-            <View style={[styles.dialogButtons, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[styles.dialogButtons, row(isArabic)]}>
               <TouchableOpacity style={styles.dialogBtn} onPress={() => setShowNotesModal(false)}>
                 <Text style={styles.dialogBtnCancel}>{t('common.cancel')}</Text>
               </TouchableOpacity>

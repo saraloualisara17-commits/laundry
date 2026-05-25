@@ -13,7 +13,7 @@ export interface RouteResult {
   durationMin: number;
 }
 
-const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjVhMGIxN2M1MzVhZjQ4MzNhMjNmYmI3MWFlMzQ2ZjJhIiwiaCI6Im11cm11cjY0In0=';
+const ORS_API_KEY = process.env.EXPO_PUBLIC_ORS_API_KEY ?? '';
 
 // Decode Google-style polyline encoding
 function decodePolyline(encoded: string): RoutePoint[] {

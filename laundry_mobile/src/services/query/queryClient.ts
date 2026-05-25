@@ -1,4 +1,5 @@
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
+import { logger } from '../../lib/logger';
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -28,19 +29,39 @@ const GC_TIME = 1000 * 60 * 10; // 10 minutes
 // MutationCache — not on defaultOptions. The defaultOptions.queries.meta.onError
 // pattern from v4 is silently ignored in v5.
 
+// Auth-layer errors that should never surface as application errors.
+// These strings come from client.ts / axios.ts when the token refresh path
+// determines the session is gone — the auth guard handles the redirect.
+const AUTH_ERROR_MESSAGES = [
+  'No refresh token available',
+  'Refresh response contained no token',
+  'Session expired',
+];
+
+function isAuthError(error: any): boolean {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 401 || status === 403) return true;
+  const msg: string = error?.message ?? '';
+  return AUTH_ERROR_MESSAGES.some(m => msg.includes(m));
+}
+
 const queryCache = new QueryCache({
   onError: (error: any, query) => {
-    // Structured log: includes the query key so errors are traceable in prod
-    console.error('[QueryCache] Query failed:', query.queryKey, error?.message ?? error);
-    // TODO: replace with Sentry.captureException(error, { extra: { queryKey: query.queryKey } })
+    if (isAuthError(error)) return;
+    logger.query.error('Query failed', {
+      key: JSON.stringify(query.queryKey),
+      msg: error?.message ?? String(error),
+    });
   },
 });
 
 const mutationCache = new MutationCache({
   onError: (error: any, _variables, _context, mutation) => {
-    console.error('[MutationCache] Mutation failed:', mutation.options.mutationKey ?? '(no key)', error?.message ?? error);
-    // TODO: replace with Sentry.captureException(error)
-    // Individual hooks show user-facing alerts; this is the engineering log only.
+    if (isAuthError(error)) return;
+    logger.mutation.error('Mutation failed (global)', {
+      key: JSON.stringify(mutation.options.mutationKey ?? '(no key)'),
+      msg: error?.message ?? String(error),
+    });
   },
 });
 

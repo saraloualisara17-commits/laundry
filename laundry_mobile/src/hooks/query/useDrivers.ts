@@ -1,11 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/adminApi';
 import { ordersApi } from '../../services/api/ordersApi';
 import { queryKeys } from '../../services/query/queryKeys';
+import { useAppMutation } from '../../lib/query/mutationFactory';
+import { invalidateAfterDriverAssign } from '../../lib/query/invalidationHelpers';
 
-/**
- * Hook for list of drivers (users with role 'livreur' or 'admin').
- */
 export const useDriversList = () => {
   return useQuery({
     queryKey: queryKeys.users.drivers(),
@@ -16,11 +15,6 @@ export const useDriversList = () => {
   });
 };
 
-/**
- * Hook for pickup drivers (livreur + admin).
- * Uses queryKeys.users.pickup() — a child of queryKeys.users.drivers() so that
- * invalidating all drivers also clears this subset.
- */
 export const usePickupDriversList = () => {
   return useQuery({
     queryKey: queryKeys.users.pickup(),
@@ -32,29 +26,26 @@ export const usePickupDriversList = () => {
 };
 
 /**
- * Mutation for assigning a delivery driver.
+ * Driver assignment mutations are idempotent (assigning the same driver twice
+ * is safe), so a simple dedup by orderId is sufficient.
  */
 export const useAssignDeliveryDriver = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, driverId, scheduledDeliveryDate }: { id: string | number; driverId: string | number; scheduledDeliveryDate?: string }) =>
+  const qc = useQueryClient();
+  return useAppMutation<any, { id: string | number; driverId: string | number; scheduledDeliveryDate?: string }>({
+    name: 'assignDeliveryDriver',
+    mutationFn: ({ id, driverId, scheduledDeliveryDate }) =>
       adminApi.assignDeliveryDriver(String(id), String(driverId), scheduledDeliveryDate),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
-    },
+    dedupKey: (vars) => `assignDelivery:${vars.id}`,
+    onSettled: (_data, _err, vars) => invalidateAfterDriverAssign(qc, vars.id),
   });
 };
 
-/**
- * Mutation for assigning a pickup driver.
- */
 export const useAssignPickupDriver = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, livreurId }: { id: string | number; livreurId: string | number }) =>
-      ordersApi.assignPickupDriver(id, livreurId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
-    },
+  const qc = useQueryClient();
+  return useAppMutation<any, { id: string | number; livreurId: string | number }>({
+    name: 'assignPickupDriver',
+    mutationFn: ({ id, livreurId }) => ordersApi.assignPickupDriver(id, livreurId),
+    dedupKey: (vars) => `assignPickup:${vars.id}`,
+    onSettled: (_data, _err, vars) => invalidateAfterDriverAssign(qc, vars.id),
   });
 };

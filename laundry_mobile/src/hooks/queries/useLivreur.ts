@@ -1,9 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { ordersApi } from '../../services/api/ordersApi';
 import { statisticsApi } from '../../services/api/statisticsApi';
 import { queryKeys } from '../../services/query/queryKeys';
 import { RootState } from '../../store/store';
+import { useAppMutation } from '../../lib/query/mutationFactory';
+import { invalidateAfterLivreurAction } from '../../lib/query/invalidationHelpers';
 
 const useIsLivreur = () => {
   const role = useSelector((state: RootState) => state.auth.user?.role);
@@ -62,32 +64,28 @@ export const useCancelledDeliveries = () => {
 /**
  * Cancels a delivery. Optimistically removes the order from the deliveries
  * list so the driver sees instant feedback; rolls back on failure.
+ * Dedup guard: only one cancel per order can be in-flight at a time.
  */
 export const useCancelDelivery = () => {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: (orderId: number | string) => ordersApi.cancelDelivery(orderId),
-
-    onMutate: async (orderId) => {
-      await qc.cancelQueries({ queryKey: queryKeys.livreur.deliveries() });
-      const previous = qc.getQueryData<any[]>(queryKeys.livreur.deliveries());
-      qc.setQueryData<any[]>(queryKeys.livreur.deliveries(), (old = []) =>
-        old.filter(o => String(o.id) !== String(orderId))
-      );
-      return { previous };
+  return useAppMutation<any, number | string>({
+    name: 'cancelDelivery',
+    mutationFn: (orderId) => ordersApi.cancelDelivery(orderId),
+    dedupKey: (orderId) => `cancelDelivery:${orderId}`,
+    optimistic: {
+      cancelKeys: () => [queryKeys.livreur.deliveries()],
+      snapshot: () => qc.getQueryData<any[]>(queryKeys.livreur.deliveries()) ?? [],
+      apply: (orderId) => {
+        qc.setQueryData<any[]>(queryKeys.livreur.deliveries(), (old = []) =>
+          old.filter((o) => String(o.id) !== String(orderId))
+        );
+      },
+      restore: (snap) => {
+        qc.setQueryData(queryKeys.livreur.deliveries(), snap);
+      },
     },
-
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.previous !== undefined) {
-        qc.setQueryData(queryKeys.livreur.deliveries(), ctx.previous);
-      }
-    },
-
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.livreur.deliveries() });
-      qc.invalidateQueries({ queryKey: queryKeys.livreur.stats() });
-    },
+    onSettled: () => invalidateAfterLivreurAction(qc),
   });
 };
 
@@ -98,81 +96,67 @@ export const useCancelDelivery = () => {
 export const useReturnToWorkplace = () => {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: (orderId: number | string) => ordersApi.returnToWorkplace(orderId),
-
-    onMutate: async (orderId) => {
-      await qc.cancelQueries({ queryKey: queryKeys.livreur.deliveries() });
-      const previous = qc.getQueryData<any[]>(queryKeys.livreur.deliveries());
-      qc.setQueryData<any[]>(queryKeys.livreur.deliveries(), (old = []) =>
-        old.filter(o => String(o.id) !== String(orderId))
-      );
-      return { previous };
+  return useAppMutation<any, number | string>({
+    name: 'returnToWorkplace',
+    mutationFn: (orderId) => ordersApi.returnToWorkplace(orderId),
+    dedupKey: (orderId) => `returnToWorkplace:${orderId}`,
+    optimistic: {
+      cancelKeys: () => [queryKeys.livreur.deliveries()],
+      snapshot: () => qc.getQueryData<any[]>(queryKeys.livreur.deliveries()) ?? [],
+      apply: (orderId) => {
+        qc.setQueryData<any[]>(queryKeys.livreur.deliveries(), (old = []) =>
+          old.filter((o) => String(o.id) !== String(orderId))
+        );
+      },
+      restore: (snap) => {
+        qc.setQueryData(queryKeys.livreur.deliveries(), snap);
+      },
     },
-
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.previous !== undefined) {
-        qc.setQueryData(queryKeys.livreur.deliveries(), ctx.previous);
-      }
-    },
-
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.livreur.deliveries() });
-      qc.invalidateQueries({ queryKey: queryKeys.livreur.stats() });
-    },
+    onSettled: () => invalidateAfterLivreurAction(qc),
   });
 };
 
 /**
  * Updates order status during a mission (PICKED_UP or DELIVERED).
- * Invalidates the specific order detail plus whichever mission list it
- * belonged to — pickups for PICKED_UP, deliveries for DELIVERED.
- * Also refreshes stats so dashboard counters update immediately.
+ * Dedup: one status change per order in-flight at a time — prevents double-tap
+ * in the confirm modal from firing two concurrent PATCH requests.
  */
 export const useUpdateOrderStatusMission = () => {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({
-      orderId,
-      status,
-      amount,
-      notesPaiement,
-    }: {
+  return useAppMutation<
+    any,
+    {
       orderId: number | string;
       status: 'PICKED_UP' | 'DELIVERED';
       amount?: number;
       notesPaiement?: string;
-    }) => ordersApi.updateStatus(orderId, { status, amount, notesPaiement }),
-
-    onSuccess: (_data, variables) => {
-      // Invalidate the individual order so the order detail screen refreshes
-      qc.invalidateQueries({
-        queryKey: queryKeys.orders.details(variables.orderId),
-      });
-
-      if (variables.status === 'PICKED_UP') {
-        qc.invalidateQueries({ queryKey: queryKeys.livreur.pickups() });
-      } else {
-        qc.invalidateQueries({ queryKey: queryKeys.livreur.deliveries() });
-      }
-
-      qc.invalidateQueries({ queryKey: queryKeys.livreur.stats() });
+      // Per-attempt UUID for the payment embedded in a DELIVERED transition.
+      // The server uses it to prevent a duplicate payment if the network drops
+      // after commit and the client retries. Must be generated once per tap,
+      // not per session (a new delivery attempt = a new UUID).
+      paymentIdempotencyKey?: string;
+    }
+  >({
+    name: 'updateOrderStatusMission',
+    mutationFn: ({ orderId, status, amount, notesPaiement, paymentIdempotencyKey }) =>
+      ordersApi.updateStatus(orderId, { status, amount, notesPaiement, paymentIdempotencyKey }),
+    dedupKey: (vars) => `missionStatus:${vars.orderId}`,
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.orders.details(vars.orderId) });
+      invalidateAfterLivreurAction(qc);
     },
   });
 };
 
-/**
- * Creates a new order from the livreur flow.
- * On success invalidates the global orders namespace so any admin list also
- * reflects the new entry.
- */
 export const useLivreurCreateOrder = () => {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: (orderData: any) => ordersApi.createOrder(orderData),
-    onSuccess: () => {
+  return useAppMutation<any, any>({
+    name: 'livreurCreateOrder',
+    mutationFn: (orderData) => ordersApi.createOrder(orderData),
+    dedupKey: (data) => `createOrder:${data?.creationIdempotencyKey ?? 'unknown'}`,
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.orders.all });
       qc.invalidateQueries({ queryKey: queryKeys.livreur.stats() });
     },

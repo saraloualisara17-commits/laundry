@@ -10,7 +10,7 @@ export function useFormStyles() {
 
     /** Form field label */
     label: {
-      textAlign: (isArabic ? 'right' : 'center') as 'right' | 'center',
+      textAlign: (isArabic ? 'right' : 'left') as 'right' | 'left',
       ...(isArabic
         ? {
             fontSize: 13,

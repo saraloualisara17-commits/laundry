@@ -99,6 +99,20 @@ public class Commande {
     @Column(name = "self_submitted", nullable = false)
     private boolean selfSubmitted = false;
 
+    /** NULL = single-branch mode; set when multi-branch is activated. */
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    /**
+     * Client-generated UUID sent at order creation time.
+     * The DB UNIQUE index on this column prevents a double-submitted order
+     * from being created twice — the second INSERT throws a constraint
+     * violation which the service layer maps to an idempotent 200 response.
+     * NULL for orders created before this field was introduced.
+     */
+    @Column(name = "creation_idempotency_key", length = 64, unique = true)
+    private String creationIdempotencyKey;
+
     /**
      * Optimistic locking — prevents concurrent status overwrites.
      * If two users update the same order simultaneously, the second
@@ -298,6 +312,9 @@ public class Commande {
     public void setDeliveryLatitude(java.math.BigDecimal deliveryLatitude) { this.deliveryLatitude = deliveryLatitude; }
     public java.math.BigDecimal getDeliveryLongitude() { return deliveryLongitude; }
     public void setDeliveryLongitude(java.math.BigDecimal deliveryLongitude) { this.deliveryLongitude = deliveryLongitude; }
+
+    public String getCreationIdempotencyKey() { return creationIdempotencyKey; }
+    public void setCreationIdempotencyKey(String k) { this.creationIdempotencyKey = k; }
 
     // Helper method to generate order number
     private String generateOrderNumber() {

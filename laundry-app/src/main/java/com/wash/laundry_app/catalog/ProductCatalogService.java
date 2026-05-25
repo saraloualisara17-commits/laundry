@@ -1,5 +1,6 @@
 package com.wash.laundry_app.catalog;
 
+import com.wash.laundry_app.audit.AuditService;
 import com.wash.laundry_app.catalog.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ public class ProductCatalogService {
 
     private final ProductCategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public List<CategoryDto> getAllCategories() {
@@ -40,34 +42,47 @@ public class ProductCatalogService {
             category.setSortOrder(maxSort + 1);
         }
         updateCategoryFields(category, request);
-        return mapToCategoryDto(categoryRepository.save(category));
+        CategoryDto result = mapToCategoryDto(categoryRepository.save(category));
+        auditService.log("CATALOG_CATEGORY_CREATED", "PRODUCT_CATEGORY", category.getId(),
+                null, "Name: " + category.getNom(), null);
+        return result;
     }
 
     @Transactional
     public CategoryDto updateCategory(Long id, CategoryRequest request) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+        String previous = "Name: " + category.getNom() + " | Active: " + category.getIsActive();
         updateCategoryFields(category, request);
-        return mapToCategoryDto(categoryRepository.save(category));
+        CategoryDto result = mapToCategoryDto(categoryRepository.save(category));
+        auditService.log("CATALOG_CATEGORY_UPDATED", "PRODUCT_CATEGORY", id,
+                previous, "Name: " + category.getNom(), null);
+        return result;
     }
 
     @Transactional
     public CategoryDto toggleCategory(Long id) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-        category.setIsActive(!category.getIsActive());
-        return mapToCategoryDto(categoryRepository.save(category));
+        boolean wasActive = Boolean.TRUE.equals(category.getIsActive());
+        category.setIsActive(!wasActive);
+        CategoryDto result = mapToCategoryDto(categoryRepository.save(category));
+        auditService.log("CATALOG_CATEGORY_TOGGLED", "PRODUCT_CATEGORY", id,
+                String.valueOf(wasActive), String.valueOf(!wasActive), "Name: " + category.getNom());
+        return result;
     }
 
     @Transactional
     public void deleteCategory(Long id) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-        
+
         if (!category.getProducts().isEmpty()) {
             throw new RuntimeException("Impossible de supprimer: cette catégorie contient des produits");
         }
-        
+
+        auditService.log("CATALOG_CATEGORY_DELETED", "PRODUCT_CATEGORY", id,
+                "Name: " + category.getNom(), null, null);
         categoryRepository.delete(category);
     }
 
@@ -89,7 +104,7 @@ public class ProductCatalogService {
     public ProductDto createProduct(Long categoryId, ProductRequest request) {
         ProductCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-        
+
         Product product = new Product();
         product.setCategory(category);
         if (request.getSortOrder() == null) {
@@ -100,34 +115,42 @@ public class ProductCatalogService {
             product.setSortOrder(maxSort + 1);
         }
         updateProductFields(product, request);
-        return mapToProductDto(productRepository.save(product));
+        ProductDto result = mapToProductDto(productRepository.save(product));
+        auditService.log("CATALOG_PRODUCT_CREATED", "PRODUCT", product.getId(),
+                null, "Name: " + product.getNom() + " | Category: " + category.getNom(), null);
+        return result;
     }
 
     @Transactional
     public ProductDto updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+        String previous = "Name: " + product.getNom() + " | Price: " + product.getPrixUnitaire();
         updateProductFields(product, request);
-        return mapToProductDto(productRepository.save(product));
+        ProductDto result = mapToProductDto(productRepository.save(product));
+        auditService.log("CATALOG_PRODUCT_UPDATED", "PRODUCT", id,
+                previous, "Name: " + product.getNom() + " | Price: " + product.getPrixUnitaire(), null);
+        return result;
     }
 
     @Transactional
     public ProductDto toggleProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-        product.setIsActive(!product.getIsActive());
-        return mapToProductDto(productRepository.save(product));
+        boolean wasActive = Boolean.TRUE.equals(product.getIsActive());
+        product.setIsActive(!wasActive);
+        ProductDto result = mapToProductDto(productRepository.save(product));
+        auditService.log("CATALOG_PRODUCT_TOGGLED", "PRODUCT", id,
+                String.valueOf(wasActive), String.valueOf(!wasActive), "Name: " + product.getNom());
+        return result;
     }
 
     @Transactional
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-        
-        // TODO: Check if product is used in any order item
-        // Currently there is no direct link between products and order items in the schema provided.
-        // For now, we allow deletion if no link exists, or implement name-based check if required.
-        
+        auditService.log("CATALOG_PRODUCT_DELETED", "PRODUCT", id,
+                "Name: " + product.getNom() + " | Category: " + product.getCategory().getNom(), null, null);
         productRepository.delete(product);
     }
 

@@ -47,16 +47,29 @@ public class CommandeWorkflowService {
             commande.setDateLivraison(LocalDateTime.now());
             BigDecimal montantCollecte = request.getMontantCollecte();
             if (montantCollecte != null && montantCollecte.compareTo(BigDecimal.ZERO) > 0) {
-                PaymentGuard.validatePayment(montantCollecte, commande.getMontantTotal(), commande.getMontantPaye());
-                
-                Paiement paiement = Paiement.builder()
-                        .commande(commande)
-                        .montant(montantCollecte)
-                        .datePaiement(LocalDateTime.now())
-                        .note(request.getNotesPaiement() != null ? request.getNotesPaiement() : "Paiement à la livraison")
-                        .recordedBy(currentUser)
-                        .build();
-                paiementRepository.save(paiement);
+
+                // ── Idempotency guard for delivery payment ────────────────────
+                // If the client retries the DELIVERED transition after a network
+                // timeout (the server committed but the response was lost), the
+                // status transition itself will be rejected by the workflow
+                // validator (DELIVERED → DELIVERED is invalid). But if somehow
+                // the retry reaches here, a duplicate payment must not be created.
+                // The paymentIdempotencyKey catches this at the DB level.
+                boolean paymentAlreadyRecorded = request.getPaymentIdempotencyKey() != null
+                        && paiementRepository.findByIdempotencyKey(request.getPaymentIdempotencyKey()).isPresent();
+
+                if (!paymentAlreadyRecorded) {
+                    PaymentGuard.validatePayment(montantCollecte, commande.getMontantTotal(), commande.getMontantPaye());
+                    Paiement paiement = Paiement.builder()
+                            .commande(commande)
+                            .montant(montantCollecte)
+                            .datePaiement(LocalDateTime.now())
+                            .note(request.getNotesPaiement() != null ? request.getNotesPaiement() : "Paiement à la livraison")
+                            .recordedBy(currentUser)
+                            .idempotencyKey(request.getPaymentIdempotencyKey())
+                            .build();
+                    paiementRepository.save(paiement);
+                }
                 BigDecimal totalPaid = paiementRepository.sumByCommandeId(commande.getId());
                 commande.setMontantPaye(totalPaid != null ? totalPaid : BigDecimal.ZERO);
             } else if (commande.getMontantPaye() == null) {
@@ -144,7 +157,10 @@ public class CommandeWorkflowService {
 
     @Transactional
     public void deleteCommande(Long id) {
-        if (!commandeRepository.existsById(id)) throw new CommandeNotFoundException();
+        Commande commande = commandeRepository.findById(id).orElseThrow(CommandeNotFoundException::new);
+        String snapshot = "Num: " + commande.getNumeroCommande() + " | Status: " + commande.getStatus().name()
+                + " | Total: " + commande.getMontantTotal();
+        auditService.log("ORDER_DELETED", "COMMANDE", id, snapshot, null, null);
         commandeRepository.deleteById(id);
         eventPublisher.publishEvent(OrderSideEffectEvent.deleted(id));
     }

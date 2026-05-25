@@ -49,6 +49,14 @@ public class Paiement {
     @Column(name = "mode_paiement", length = 20)
     private ModePaiement modePaiement;
 
+    /**
+     * Client-generated UUID preventing duplicate payment submissions.
+     * The DB unique index (uidx_paiement_idempotency) enforces this at the
+     * storage layer. NULL is allowed for back-office and legacy payments.
+     */
+    @Column(name = "idempotency_key", length = 64, unique = true)
+    private String idempotencyKey;
+
     @PrePersist
     protected void onCreate() {
         if (datePaiement == null) {

@@ -1,13 +1,20 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { randomUUID } from '../../utils/uuid';
 import { adminApi } from '../../services/adminApi';
 import { queryKeys } from '../../services/query/queryKeys';
+import { useAppMutation } from '../../lib/query/mutationFactory';
+import {
+  orderStatusOptimistic,
+  paymentOptimistic,
+  orderImagesOptimistic,
+} from '../../lib/query/optimisticHelpers';
+import {
+  invalidateAfterStatusChange,
+  invalidateOrderPayments,
+  invalidateOrderDetail,
+} from '../../lib/query/invalidationHelpers';
 
-/**
- * Hook for single order details with its sub-data (payments, history).
- */
 export const useOrder = (id: string | number) => {
-  const queryClient = useQueryClient();
-
   const orderQuery = useQuery({
     queryKey: queryKeys.orders.details(id),
     queryFn: () => adminApi.getOrder(String(id)).then(res => res.data),
@@ -39,123 +46,104 @@ export const useOrder = (id: string | number) => {
 };
 
 /**
- * Mutation for status updates with optimistic UI support.
+ * Status update with optimistic UI and dedup guard.
+ * Only one status change per order can be in-flight at a time — prevents
+ * double-tap from firing two concurrent PATCH requests.
  */
 export const useUpdateOrderStatus = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ id, status, data }: { id: string | number; status: string; data?: any }) => 
-      adminApi.updateOrderStatus(String(id), status, data),
-    onMutate: async (newStatusData) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.orders.details(newStatusData.id) });
-      const previousOrder = queryClient.getQueryData(queryKeys.orders.details(newStatusData.id));
-      if (previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(newStatusData.id), (old: any) => ({
-          ...old,
-          status: newStatusData.status,
-          ...(newStatusData.data || {}),
-        }));
-      }
-      return { previousOrder };
+  const qc = useQueryClient();
+
+  return useAppMutation<any, { id: string | number; status: string; data?: any }>({
+    name: 'updateOrderStatus',
+    mutationFn: ({ id, status, data }) => adminApi.updateOrderStatus(String(id), status, data),
+    dedupKey: (vars) => `status:${vars.id}`,
+    optimistic: {
+      cancelKeys: (v) => [queryKeys.orders.details(v.id)],
+      snapshot: (v) => qc.getQueryData(queryKeys.orders.details(v.id)),
+      apply: (v) => {
+        qc.setQueryData(queryKeys.orders.details(v.id), (old: any) =>
+          old ? { ...old, status: v.status, ...(v.data ?? {}) } : old
+        );
+      },
+      restore: (snap, v) => {
+        if (snap !== undefined) qc.setQueryData(queryKeys.orders.details(v.id), snap);
+      },
     },
-    onError: (err, variables, context) => {
-      if (context?.previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(variables.id), context.previousOrder);
-      }
-    },
-    onSettled: (data, error, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.history(variables.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all }); // Refresh lists
+    onSettled: (_data, _err, vars) => {
+      invalidateAfterStatusChange(qc, vars.id);
     },
   });
 };
 
 /**
- * Mutation for recording payments with optimistic UI.
+ * Payment with optimistic UI and per-order dedup guard.
+ * Each call generates a fresh UUID idempotency key so a network retry
+ * (or offline queue replay) never creates a duplicate payment record.
  */
 export const useAddPayment = () => {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ id, amount, note }: { id: string | number; amount: number; note?: string }) =>
-      adminApi.addOrderPayment(String(id), amount, note),
-    onMutate: async (newPayment) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.orders.details(newPayment.id) });
-      await queryClient.cancelQueries({ queryKey: queryKeys.orders.payments(newPayment.id) });
-
-      const previousOrder = queryClient.getQueryData(queryKeys.orders.details(newPayment.id));
-      const previousPayments = queryClient.getQueryData(queryKeys.orders.payments(newPayment.id));
-
-      if (previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(newPayment.id), (old: any) => ({
-          ...old,
-          montantPaye: (Number(old.montantPaye) || 0) + Number(newPayment.amount),
-        }));
-      }
-
-      if (previousPayments) {
-        queryClient.setQueryData(queryKeys.orders.payments(newPayment.id), (old: any[]) => [
-          {
-            id: 'temp-' + Date.now(),
-            montant: newPayment.amount,
-            note: newPayment.note,
-            datePaiement: new Date().toISOString(),
-          },
+  return useAppMutation<any, { id: string | number; amount: number; note?: string; modePaiement?: string }>({
+    name: 'addPayment',
+    mutationFn: ({ id, amount, note, modePaiement }) => {
+      const idempotencyKey = randomUUID();
+      return adminApi.addOrderPayment(String(id), amount, note, modePaiement, idempotencyKey);
+    },
+    dedupKey: (vars) => `payment:${vars.id}`,
+    optimistic: {
+      cancelKeys: (v) => [queryKeys.orders.details(v.id), queryKeys.orders.payments(v.id)],
+      snapshot: (v) => ({
+        order: qc.getQueryData(queryKeys.orders.details(v.id)),
+        payments: qc.getQueryData(queryKeys.orders.payments(v.id)),
+      }),
+      apply: (v) => {
+        qc.setQueryData(queryKeys.orders.details(v.id), (old: any) =>
+          old ? { ...old, montantPaye: (Number(old.montantPaye) || 0) + Number(v.amount) } : old
+        );
+        qc.setQueryData(queryKeys.orders.payments(v.id), (old: any[] = []) => [
+          { id: `temp-${Date.now()}`, montant: v.amount, note: v.note, datePaiement: new Date().toISOString() },
           ...old,
         ]);
-      }
-
-      return { previousOrder, previousPayments };
+      },
+      restore: (snap, v) => {
+        if (snap.order !== undefined) qc.setQueryData(queryKeys.orders.details(v.id), snap.order);
+        if (snap.payments !== undefined) qc.setQueryData(queryKeys.orders.payments(v.id), snap.payments);
+      },
     },
-    onError: (err, variables, context) => {
-      if (context?.previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(variables.id), context.previousOrder);
-      }
-      if (context?.previousPayments) {
-        queryClient.setQueryData(queryKeys.orders.payments(variables.id), context.previousPayments);
-      }
-    },
-    onSettled: (data, error, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.payments(variables.id) });
+    onSettled: (_data, _err, vars) => {
+      invalidateOrderPayments(qc, vars.id);
     },
   });
 };
 
-/**
- * Mutation for adding order images.
- */
 export const useAddOrderImages = () => {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ id, imageUrls, type }: { id: string | number; imageUrls: string[]; type: string }) =>
-      adminApi.addOrderImages(String(id), imageUrls, type),
-    onMutate: async ({ id, imageUrls, type }) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.orders.details(id) });
-      const previousOrder = queryClient.getQueryData(queryKeys.orders.details(id));
-
-      if (previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(id), (old: any) => ({
-          ...old,
-          images: [
-            ...(old.images || []),
-            ...imageUrls.map(url => ({ imageUrl: url, photoType: type })),
-          ],
-        }));
-      }
-
-      return { previousOrder };
+  return useAppMutation<any, { id: string | number; imageUrls: string[]; type: string }>({
+    name: 'addOrderImages',
+    mutationFn: ({ id, imageUrls, type }) => adminApi.addOrderImages(String(id), imageUrls, type),
+    optimistic: {
+      cancelKeys: (v) => [queryKeys.orders.details(v.id)],
+      snapshot: (v) => qc.getQueryData(queryKeys.orders.details(v.id)),
+      apply: (v) => {
+        qc.setQueryData(queryKeys.orders.details(v.id), (old: any) =>
+          old
+            ? {
+                ...old,
+                images: [
+                  ...(old.images ?? []),
+                  ...v.imageUrls.map((url) => ({ imageUrl: url, photoType: v.type })),
+                ],
+              }
+            : old
+        );
+      },
+      restore: (snap, v) => {
+        if (snap !== undefined) qc.setQueryData(queryKeys.orders.details(v.id), snap);
+      },
     },
-    onError: (err, variables, context) => {
-      if (context?.previousOrder) {
-        queryClient.setQueryData(queryKeys.orders.details(variables.id), context.previousOrder);
-      }
-    },
-    onSettled: (data, error, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.details(variables.id) });
+    onSettled: (_data, _err, vars) => {
+      invalidateOrderDetail(qc, vars.id);
     },
   });
 };

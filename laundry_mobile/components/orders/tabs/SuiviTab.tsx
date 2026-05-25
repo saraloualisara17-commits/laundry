@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { Colors, Shadows } from '../../../constants/theme';
 import Timeline from '../timeline/Timeline';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { row, textAlign } from '../../../src/utils/rtl';
 
 interface SuiviTabProps {
   order: any;
@@ -35,14 +36,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
   return (
     <View>
       <View
-        style={[
-          styles.sectionHeader,
-          {
-            flexDirection: isArabic ? 'row-reverse' : 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          },
-        ]}
+        style={[styles.sectionHeader, row(isArabic), { justifyContent: 'space-between', alignItems: 'center' }]}
       >
         <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('financial.details')}</Text>
         {canAddPayment ? (
@@ -57,13 +51,13 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
       </View>
 
       <View style={styles.paymentSummaryCard}>
-        <View style={[styles.paymentRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.paymentRow, row(isArabic)]}>
           <Text style={styles.paymentLabel}>{t('financial.total')}</Text>
           <Text style={[styles.paymentValue, { color: Colors.primary }]}>
             {totalAmount.toFixed(2)} {t('common.dh')}
           </Text>
         </View>
-        <View style={[styles.paymentRow, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[styles.paymentRow, row(isArabic)]}>
           <Text style={styles.paymentLabel}>{t('financial.paid')}</Text>
           <Text style={[styles.paymentValue, { color: Colors.success }]}>
             {paidAmount.toFixed(2)} {t('common.dh')}
@@ -73,7 +67,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
           style={[
             styles.paymentRow,
             { borderBottomWidth: 0, paddingBottom: 0 },
-            isArabic && { flexDirection: 'row-reverse' },
+            row(isArabic),
           ]}
         >
           <Text style={styles.paymentLabel}>{t('financial.remaining')}</Text>
@@ -92,7 +86,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
             <View style={styles.listDivider} />
             {payments.map((p) => (
               <View key={p.id} style={styles.paymentHistoryItem}>
-                <View style={[styles.historyTop, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.historyTop, row(isArabic)]}>
                   <Text style={styles.historyAmount}>
                     {parseFloat(p.montant).toFixed(2)} {t('common.dh')}
                   </Text>
@@ -101,13 +95,13 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
                   </Text>
                 </View>
                 {p.note && (
-                  <View style={[styles.historyNoteBox, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.historyNoteBox, row(isArabic)]}>
                     <Feather name="info" size={10} color={Colors.textMuted} />
                     <Text
                       style={[
                         styles.historyNote,
-                        isArabic && { textAlign: 'right', marginLeft: 0, marginRight: 6 },
-                        !isArabic && { marginLeft: 6 },
+                        textAlign(isArabic),
+                        { marginStart: 6 },
                       ]}
                     >
                       {p.note}
@@ -120,7 +114,7 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
         )}
       </View>
 
-      <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+      <View style={[styles.sectionHeader, row(isArabic)]}>
         <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('admin.orders.history')}</Text>
       </View>
       <Timeline items={history} isArabic={isArabic} t={t} />

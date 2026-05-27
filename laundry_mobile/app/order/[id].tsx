@@ -121,6 +121,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
   } = permissions;
 
   const [deliveryDate, setDeliveryDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
 
   // Pickup driver assignment state
@@ -557,6 +558,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                     onPress={canAssignDriver ? () => {
                       setSelectedDriverId(order.deliveryDriver?.id || null);
                       setDeliveryDate(order.dateLivraisonPrevue ? new Date(order.dateLivraisonPrevue) : new Date());
+                      setShowDatePicker(false);
                       setShowDriverModal(true);
                     } : undefined}
                     activeOpacity={canAssignDriver ? 0.75 : 1}
@@ -613,6 +615,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               onPress={() => {
                 setSelectedDriverId(null);
                 setDeliveryDate(new Date());
+                setShowDatePicker(false);
                 setShowDriverModal(true);
               }}
             >
@@ -794,28 +797,34 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
               <View style={styles.modalBody}>
 
-                {/* Date picker — inline calendar (same style as orders filter) */}
-                <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }, row(isArabic)]}>
+                {/* Date picker */}
+                <TouchableOpacity
+                  style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.primary100, borderWidth: 1, borderColor: Colors.primary }, row(isArabic)]}
+                  onPress={() => setShowDatePicker(true)}
+                >
                   <Text style={[styles.inputLabel, { marginBottom: 0 }, isArabic && { textAlign: 'right' }]}>
                     {t('admin.orders.create.delivery_date')}
                   </Text>
                   <Text style={{ color: Colors.primary, fontWeight: '700', fontSize: 13 }}>
                     {format(deliveryDate, 'dd MMM yyyy', { locale: isArabic ? ar : fr })}
                   </Text>
-                </View>
-                <DateTimePicker
-                  value={deliveryDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  themeVariant="light"
-                  onChange={(event, date) => {
-                    if (Platform.OS === 'android') {
-                      if (event.type === 'set' && date) setDeliveryDate(date);
-                    } else {
-                      if (date) setDeliveryDate(date);
-                    }
-                  }}
-                />
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={deliveryDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                    themeVariant="light"
+                    onChange={(event, date) => {
+                      if (Platform.OS === 'android') {
+                        setShowDatePicker(false);
+                        if (event.type === 'set' && date) setDeliveryDate(date);
+                      } else {
+                        if (date) setDeliveryDate(date);
+                      }
+                    }}
+                  />
+                )}
 
                 {/* Driver list */}
                 <Text style={[styles.inputLabel, { marginTop: 24 }, isArabic && { textAlign: 'right' }]}>

@@ -20,6 +20,7 @@ yarn-debug.log*
 # Java/Spring Boot
 target/
 *.jar
+!laundry_mobile/android/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.ear
 *.class

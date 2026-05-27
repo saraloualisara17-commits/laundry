@@ -42,4 +42,7 @@ app-example
 
 # generated native folders
 /ios
-/android
+# android/ is committed (bare workflow) so EAS has gradle-wrapper.jar
+/android/build
+/android/.gradle
+/android/app/build

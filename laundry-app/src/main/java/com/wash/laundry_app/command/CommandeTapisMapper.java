@@ -25,9 +25,15 @@ public interface CommandeTapisMapper {
 
     default java.util.List<CommandeImageDTO> mapImages(java.util.List<CommandeImage> images) {
         if (images == null) return null;
-        return images.stream().map(img -> CommandeImageDTO.builder()
-                .imageUrl(img.getImageUrl())
-                .photoType(img.getPhotoType() != null ? img.getPhotoType().name() : null)
-                .build()).toList();
+        return images.stream().map(img -> {
+            String url = img.getImageUrl();
+            if (url != null && !url.startsWith("/uploads/") && !url.startsWith("http")) {
+                url = "/uploads/" + url;
+            }
+            return CommandeImageDTO.builder()
+                    .imageUrl(url)
+                    .photoType(img.getPhotoType() != null ? img.getPhotoType().name() : null)
+                    .build();
+        }).toList();
     }
 }

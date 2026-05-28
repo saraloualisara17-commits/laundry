@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -18,17 +18,22 @@ interface ReceiptActionsModalProps {
   onClose: () => void;
   confirmedStatus: string | undefined;
   sharingAction: 'whatsapp' | 'print' | null;
-  onWhatsApp: () => void;
-  onPrint: () => void;
+  onWhatsApp: (lang: 'fr' | 'ar') => void;
+  onPrint: (lang: 'fr' | 'ar') => void;
   t: (key: string, options?: any) => string;
 }
 
 const C = {
   success: '#10B981',
+  primary: '#0D7377',
   whatsappBg: '#E8F5E9',
   whatsappColor: '#2E7D32',
   printBg: '#F3E5F5',
   printColor: '#7B1FA2',
+  frBg: '#EFF6FF',
+  frColor: '#1D4ED8',
+  arBg: '#FFF7ED',
+  arColor: '#C2410C',
 };
 
 const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
@@ -42,77 +47,93 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
 }) => {
   const { isRTL } = useRTL();
   const insets = useSafeAreaInsets();
+  const [selectedLang, setSelectedLang] = useState<'fr' | 'ar' | null>(null);
 
   const isPickup = confirmedStatus === 'PICKED_UP';
-  // Bottom padding: safe area on devices with home indicator
   const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 12);
 
+  const handleClose = () => {
+    setSelectedLang(null);
+    onClose();
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
 
         <View style={[styles.sheet, { paddingBottom: bottomPad + 12 }]}>
           <View style={styles.handle} />
 
-          {/* Success icon */}
           <View style={styles.iconBox}>
             <Ionicons name="checkmark-circle" size={60} color={C.success} />
           </View>
 
-          {/* Title — centered on confirmation screens is intentional */}
-          <Text
-            style={[styles.title, font.bold(isRTL)]}
-            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-          >
+          <Text style={[styles.title, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {isPickup
               ? t('livreur.confirm_pickup_title', { defaultValue: 'Collecte confirmée !' })
               : t('livreur.confirm_delivery_title', { defaultValue: 'Livraison confirmée !' })}
           </Text>
 
-          <Text
-            style={[styles.subtitle, font.regular(isRTL)]}
-            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-          >
+          <Text style={[styles.subtitle, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {t('livreur.send_receipt_prompt', { defaultValue: 'Voulez-vous envoyer le reçu au client ?' })}
           </Text>
 
-          {/* Action buttons — row direction flips in RTL */}
+          {/* Step 1 — language picker */}
+          <Text style={styles.stepLabel}>
+            {t('receipt.choose_language')}
+          </Text>
+          <View style={[styles.langRow, row(isRTL)]}>
+            <TouchableOpacity
+              style={[styles.langBtn, selectedLang === 'fr' && styles.langBtnActiveFr]}
+              onPress={() => setSelectedLang('fr')}
+            >
+              <Text style={[styles.langBtnText, selectedLang === 'fr' && { color: C.frColor, fontWeight: '800' }]}>
+                🇫🇷 Français
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, selectedLang === 'ar' && styles.langBtnActiveAr]}
+              onPress={() => setSelectedLang('ar')}
+            >
+              <Text style={[styles.langBtnText, selectedLang === 'ar' && { color: C.arColor, fontWeight: '800' }]}>
+                🇲🇦 العربية
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Step 2 — action buttons (enabled only after language chosen) */}
           <View style={[styles.actions, row(isRTL)]}>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: C.whatsappBg }]}
-              onPress={onWhatsApp}
-              disabled={!!sharingAction}
+              style={[styles.actionBtn, { backgroundColor: C.whatsappBg }, !selectedLang && styles.actionBtnDisabled]}
+              onPress={() => selectedLang && onWhatsApp(selectedLang)}
+              disabled={!!sharingAction || !selectedLang}
             >
               {sharingAction === 'whatsapp' ? (
                 <ActivityIndicator color={C.whatsappColor} />
               ) : (
                 <>
-                  <Ionicons name="logo-whatsapp" size={24} color={C.whatsappColor} />
-                  <Text
-                    style={[styles.actionText, { color: C.whatsappColor }, font.bold(isRTL)]}
-                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-                  >
-                    WhatsApp
+                  <Ionicons name="logo-whatsapp" size={24} color={selectedLang ? C.whatsappColor : '#ccc'} />
+                  <Text style={[styles.actionText, { color: selectedLang ? C.whatsappColor : '#ccc' }, font.bold(isRTL)]}
+                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                    {t('common.share', { defaultValue: 'Partager' })}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: C.printBg }]}
-              onPress={onPrint}
-              disabled={!!sharingAction}
+              style={[styles.actionBtn, { backgroundColor: C.printBg }, !selectedLang && styles.actionBtnDisabled]}
+              onPress={() => selectedLang && onPrint(selectedLang)}
+              disabled={!!sharingAction || !selectedLang}
             >
               {sharingAction === 'print' ? (
                 <ActivityIndicator color={C.printColor} />
               ) : (
                 <>
-                  <Ionicons name="print" size={24} color={C.printColor} />
-                  <Text
-                    style={[styles.actionText, { color: C.printColor }, font.bold(isRTL)]}
-                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-                  >
+                  <Ionicons name="print" size={24} color={selectedLang ? C.printColor : '#ccc'} />
+                  <Text style={[styles.actionText, { color: selectedLang ? C.printColor : '#ccc' }, font.bold(isRTL)]}
+                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                     {t('common.print')}
                   </Text>
                 </>
@@ -120,12 +141,8 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Done / dismiss */}
-          <TouchableOpacity style={styles.doneBtn} onPress={onClose}>
-            <Text
-              style={[styles.doneBtnText, font.semibold(isRTL)]}
-              maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-            >
+          <TouchableOpacity style={styles.doneBtn} onPress={handleClose}>
+            <Text style={[styles.doneBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
               {t('common.done', { defaultValue: 'Terminé' })}
             </Text>
           </TouchableOpacity>
@@ -170,9 +187,46 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: Colors.textSecondary,
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  langRow: {
+    gap: 10,
+    width: '100%',
+    marginBottom: 20,
+  },
+  langBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langBtnActiveFr: {
+    borderColor: C.frColor,
+    backgroundColor: C.frBg,
+  },
+  langBtnActiveAr: {
+    borderColor: C.arColor,
+    backgroundColor: C.arBg,
+  },
+  langBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
   actions: {
     gap: 12,
@@ -186,6 +240,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  actionBtnDisabled: {
+    opacity: 0.45,
   },
   actionText: { fontSize: 13, fontWeight: '700' },
   doneBtn: {

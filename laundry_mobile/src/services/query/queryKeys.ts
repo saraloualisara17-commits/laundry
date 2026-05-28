@@ -80,6 +80,13 @@ export const queryKeys = {
     cancelled: () => [...queryKeys.livreur.all, 'cancelled'] as const,
   },
 
+  // ─── NOTIFICATIONS ─────────────────────────────────────────────────────────
+  notifications: {
+    all: ['notifications'] as const,
+    list: () => [...['notifications'], 'list'] as const,
+    unreadCount: () => [...['notifications'], 'unread-count'] as const,
+  },
+
   // ─── AUDIT ─────────────────────────────────────────────────────────────────
   audit: {
     all: ['audit'] as const,

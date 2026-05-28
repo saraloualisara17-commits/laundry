@@ -128,11 +128,16 @@ public class PdfService {
     }
 
     public byte[] generatePdf(Commande commande, String receiptType) {
-        log.info("[pdf] Generating {} PDF — orderId={} orderNum={}",
-                receiptType, commande.getId(), commande.getNumeroCommande());
+        return generatePdf(commande, receiptType, "fr");
+    }
+
+    public byte[] generatePdf(Commande commande, String receiptType, String lang) {
+        String resolvedLang = (lang != null && lang.equalsIgnoreCase("ar")) ? "ar" : "fr";
+        log.info("[pdf] Generating {} PDF — orderId={} orderNum={} lang={}",
+                receiptType, commande.getId(), commande.getNumeroCommande(), resolvedLang);
         long t0 = System.currentTimeMillis();
         try {
-            String html = buildReceiptHtml(commande, receiptType);
+            String html = buildReceiptHtml(commande, receiptType, resolvedLang);
             log.debug("[pdf] HTML built — length={} chars", html.length());
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -155,103 +160,144 @@ public class PdfService {
     }
 
     private String buildReceiptHtml(Commande commande, String receiptType) {
+        return buildReceiptHtml(commande, receiptType, "fr");
+    }
+
+    private String buildReceiptHtml(Commande commande, String receiptType, String lang) {
+        boolean ar = "ar".equals(lang);
+
         SystemSettings settings = settingsService.getSettings();
-        String businessName = settings.getAppName() != null ? settings.getAppName() : "Laundry";
+        String businessName  = settings.getAppName()      != null ? settings.getAppName()      : "Laundry";
         String businessPhone = settings.getBusinessPhone() != null ? settings.getBusinessPhone() : "";
-        String logoUrl = settings.getLogoUrl() != null ? settings.getLogoUrl() : "";
+        String logoUrl       = settings.getLogoUrl()       != null ? settings.getLogoUrl()       : "";
 
-        Client client = commande.getClient();
-        List<CommandeTapis> items = commande.getCommandeTapis();
-        List<Paiement> payments = commande.getPaiements();
+        Client             client   = commande.getClient();
+        List<CommandeTapis> items   = commande.getCommandeTapis();
+        List<Paiement>      payments = commande.getPaiements();
 
-        BigDecimal montantTotal = commande.getMontantTotal();
-        BigDecimal montantPaye = commande.getMontantPaye() != null ? commande.getMontantPaye() : BigDecimal.ZERO;
+        BigDecimal montantTotal   = commande.getMontantTotal();
+        BigDecimal montantPaye    = commande.getMontantPaye() != null ? commande.getMontantPaye() : BigDecimal.ZERO;
         BigDecimal montantRestant = montantTotal.subtract(montantPaye);
 
-        String qrContent = frontendUrl + "/order/" + commande.getId();
-        String qrBase64 = generateQrCodeBase64(qrContent);
+        String qrBase64     = generateQrCodeBase64(frontendUrl + "/order/" + commande.getId());
+        String dateCreation = commande.getDateCreation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
-        String dateCreation = commande.getDateCreation()
-                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-        
+        // ── labels (single language) ────────────────────────────────────────────
+        String labelClient   = ar ? "معلومات العميل"    : "Informations Client";
+        String labelNom      = ar ? "الاسم"              : "Nom";
+        String labelTel      = ar ? "الهاتف"             : "Téléphone";
+        String labelAdresse  = ar ? "العنوان"            : "Adresse";
+        String labelArticles = ar ? "المنتجات"           : "Articles";
+        String labelArticle  = ar ? "المنتج"             : "Article";
+        String labelDetails  = ar ? "التفاصيل"           : "Détails";
+        String labelPrix     = ar ? "السعر"              : "Prix";
+        String labelDate     = ar ? "التاريخ"            : "Date";
+        String labelMode     = ar ? "النوع"              : "Mode";
+        String labelStatut   = ar ? "الحالة"             : "Statut";
+        String labelSousTotal = ar ? "المجموع الفرعي"   : "Sous-total";
+        String labelRemise   = ar ? "إجمالي الخصم"      : "Remise totale";
+        String labelTotal    = ar ? "الإجمالي"           : "TOTAL";
+        String labelPaye     = ar ? "المدفوع"            : "Payé";
+        String labelReste    = ar ? "المتبقي للدفع"      : "Reste à payer";
+        String labelPaiements = ar ? "سجل المدفوعات"    : "Historique des paiements";
+        String labelTentatives = ar ? "سجل المحاولات"   : "Historique des tentatives";
+        String labelPickupDate = ar ? "موعد الاستلام"   : "Date de collecte prévue";
+        String labelLivreur  = ar ? "السائق"             : "Livreur assigné";
+        String labelSigClient = ar ? "توقيع العميل"      : "Signature client";
+        String labelSigLivr  = ar ? "توقيع السائق"       : "Signature livreur";
+        String labelSignLine = ar ? "الاسم والتوقيع"     : "Nom et signature";
+        String labelPaiement  = ar ? "دفعة"              : "Paiement";
+        String labelEntPaye  = ar ? "تم الدفع بالكامل"  : "Entièrement payé";
+        String labelSolde    = ar ? "المبلغ المتبقي للدفع" : "Solde restant à payer";
+        String labelNoAddr   = ar ? "لا يوجد عنوان"     : "Pas d'adresse";
+        String labelCancelled = ar ? "تم إلغاء هذا الطلب" : "COMMANDE ANNULÉE";
+        String labelPickupFail = ar ? "فشل عملية الاستلام" : "ÉCHEC DE COLLECTE";
+        String labelDelivFail  = ar ? "فشل عملية التسليم"  : "ÉCHEC DE LIVRAISON";
+        String footerThanks  = ar ? "شكراً لثقتكم"       : "Merci pour votre confiance";
+        String footerContact = ar ? "للاستفسار يرجى التواصل معنا" : "Pour toute question: " + businessPhone;
+
+        String modeLabel;
+        if (commande.getMode() == null) {
+            modeLabel = "—";
+        } else if (commande.getMode().equals("immediate")) {
+            modeLabel = ar ? "في المحل" : "Au local";
+        } else {
+            modeLabel = ar ? "هاتفي" : "Téléphonique";
+        }
+
+        // ── HTML/CSS ────────────────────────────────────────────────────────────
+        String dir       = ar ? "rtl" : "ltr";
+        String borderSide = ar ? "border-right" : "border-left";
+        String thAlign   = ar ? "right" : "left";
+        String priceAlign = ar ? "left"  : "right";
+        String marginAuto = ar ? "margin-right: auto;" : "margin-left: auto;";
+
         StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html dir='ltr'><head><meta charset='UTF-8'/><style>");
-        html.append("* { margin: 0; padding: 0; box-sizing: border-box; }");
-        html.append("body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: white; padding: 20px; max-width: 600px; margin: 0 auto; }");
-        html.append(".logo-top { text-align: center; padding-bottom: 16px; margin-bottom: 4px; }");
-        html.append(".header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid #0D7377; margin-bottom: 20px; }");
-        html.append(".business-info { flex: 1; }");
-        html.append(".business-name { font-size: 22px; font-weight: 800; color: #0D7377; margin-bottom: 4px; }");
-        html.append(".business-detail { font-size: 12px; color: #666; margin-top: 2px; }");
-        html.append(".header-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }");
-        html.append(".qr-code { width: 80px; height: 80px; }");
-        html.append(".receipt-number { font-size: 11px; color: #999; margin-top: 4px; }");
-        html.append(".section-header { display: flex; justify-content: space-between; align-items: center; background: #f0fafa; border-left: 4px solid #0D7377; padding: 8px 12px; margin: 16px 0 10px; }");
-        html.append(".section-label-fr { font-size: 13px; font-weight: 700; color: #0D7377; }");
-        html.append(".section-label-ar { font-size: 13px; font-weight: 700; color: #0D7377; direction: rtl; }");
-        html.append(".client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }");
-        html.append(".info-row { display: flex; flex-direction: column; gap: 2px; }");
-        html.append(".info-label { font-size: 10px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }");
-        html.append(".info-value { font-size: 13px; font-weight: 600; color: #1a1a1a; }");
-        html.append(".order-meta { background: #f9f9f9; border-radius: 8px; padding: 12px; margin-bottom: 16px; }");
-        html.append(".order-ref { font-size: 16px; font-weight: 800; color: #0D7377; margin-bottom: 6px; }");
-        html.append(".meta-row { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 4px; }");
-        html.append(".items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }");
-        html.append(".items-table th { background: #0D7377; color: white; padding: 8px 10px; font-size: 11px; font-weight: 700; text-align: left; }");
-        html.append(".items-table td { padding: 8px 10px; font-size: 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }");
-        html.append(".items-table tr:nth-child(even) td { background: #fafafa; }");
-        html.append(".item-name { font-weight: 600; color: #1a1a1a; }");
-        html.append(".item-detail { font-size: 11px; color: #888; margin-top: 2px; }");
-        html.append(".item-tag { display: inline-block; background: #e6f4f4; color: #0D7377; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-bottom: 3px; }");
-        html.append(".discount-text { color: #EF4444; font-size: 11px; }");
-        html.append(".price-cell { font-weight: 700; color: #0D7377; text-align: right; white-space: nowrap; }");
-        html.append(".totals-section { margin-left: auto; width: 280px; margin-bottom: 16px; }");
-        html.append(".total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }");
-        html.append(".total-row.grand { border-bottom: 2px solid #0D7377; border-top: 2px solid #0D7377; padding: 10px 0; font-size: 16px; font-weight: 800; color: #0D7377; margin-top: 4px; }");
-        html.append(".total-row.paid { color: #10B981; font-weight: 700; }");
-        html.append(".total-row.remaining { color: #EF4444; font-weight: 700; font-size: 15px; }");
-        html.append(".total-label-ar { direction: rtl; font-size: 11px; color: #999; }");
-        html.append(".payment-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f0faf5; border-radius: 8px; margin-bottom: 6px; border-left: 3px solid #10B981; }");
-        html.append(".payment-amount { font-weight: 700; color: #10B981; }");
-        html.append(".payment-note { font-size: 11px; color: #666; }");
-        html.append(".payment-date { font-size: 11px; color: #999; }");
-        html.append(".unpaid-alert { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 14px; margin-bottom: 16px; text-align: center; }");
-        html.append(".unpaid-alert-title { font-size: 15px; font-weight: 800; color: #EF4444; margin-bottom: 4px; }");
-        html.append(".unpaid-alert-ar { font-size: 13px; color: #EF4444; direction: rtl; margin-top: 4px; }");
-        html.append(".unpaid-amount { font-size: 22px; font-weight: 800; color: #EF4444; margin-top: 6px; }");
-        html.append(".paid-badge { background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 14px; text-align: center; margin-bottom: 16px; }");
-        html.append(".paid-badge-text { font-size: 16px; font-weight: 800; color: #10B981; }");
-        html.append(".paid-badge-ar { font-size: 14px; color: #10B981; direction: rtl; margin-top: 4px; }");
-        html.append(".pickup-box { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; }");
-        html.append(".pickup-label { font-size: 12px; color: #3B82F6; font-weight: 700; }");
-        html.append(".pickup-label-ar { font-size: 12px; color: #3B82F6; font-weight: 700; direction: rtl; }");
-        html.append(".pickup-date { font-size: 14px; font-weight: 800; color: #1D4ED8; margin-top: 2px; }");
-        html.append(".footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0; text-align: center; }");
-        html.append(".footer-text { font-size: 12px; color: #999; margin-bottom: 4px; }");
-        html.append(".footer-text-ar { font-size: 12px; color: #999; direction: rtl; margin-bottom: 4px; }");
-        html.append(".footer-brand { font-size: 13px; font-weight: 700; color: #0D7377; margin-top: 8px; }");
-        html.append(".status-banner { padding: 14px 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; }");
-        html.append(".status-banner.cancelled { background: #FEF2F2; border: 2px solid #EF4444; }");
-        html.append(".status-banner.failed { background: #FFF7ED; border: 2px solid #F97316; }");
-        html.append(".status-banner-title { font-size: 16px; font-weight: 800; margin-bottom: 4px; }");
-        html.append(".status-banner.cancelled .status-banner-title { color: #EF4444; }");
-        html.append(".status-banner.failed .status-banner-title { color: #EA580C; }");
-        html.append(".status-banner-ar { font-size: 13px; direction: rtl; margin-top: 4px; }");
-        html.append(".status-banner.cancelled .status-banner-ar { color: #EF4444; }");
-        html.append(".status-banner.failed .status-banner-ar { color: #EA580C; }");
-        html.append(".attempt-row { background: #FFF7ED; border-left: 3px solid #F97316; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }");
-        html.append(".attempt-type-label { font-size: 11px; font-weight: 700; color: #EA580C; text-transform: uppercase; letter-spacing: 0.5px; }");
-        html.append(".attempt-reason { font-size: 13px; font-weight: 600; color: #1a1a1a; margin-top: 3px; }");
-        html.append(".attempt-meta { font-size: 11px; color: #888; margin-top: 4px; }");
-        html.append(".signature-section { display: flex; gap: 20px; margin-bottom: 16px; margin-top: 16px; }");
-        html.append(".signature-box { flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; }");
-        html.append(".signature-label { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 36px; }");
-        html.append(".signature-line { border-top: 1px solid #ccc; margin-top: 4px; padding-top: 4px; font-size: 10px; color: #bbb; text-align: center; }");
+        html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'/><style>");
+        html.append("* { margin:0; padding:0; box-sizing:border-box; }");
+        html.append("body { font-family: Arial, sans-serif; font-size:13px; color:#1a1a1a; background:white; padding:20px; max-width:600px; margin:0 auto; direction:").append(dir).append("; }");
+        html.append(".logo-top { text-align:center; padding-bottom:16px; margin-bottom:4px; }");
+        html.append(".header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:20px; border-bottom:2px solid #0D7377; margin-bottom:20px; }");
+        html.append(".business-info { flex:1; }");
+        html.append(".business-name { font-size:22px; font-weight:800; color:#0D7377; margin-bottom:4px; }");
+        html.append(".business-detail { font-size:12px; color:#666; margin-top:2px; }");
+        html.append(".header-side { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }");
+        html.append(".qr-code { width:80px; height:80px; }");
+        html.append(".receipt-number { font-size:11px; color:#999; margin-top:4px; }");
+        html.append(".section-header { background:#f0fafa; ").append(borderSide).append(":4px solid #0D7377; padding:8px 12px; margin:16px 0 10px; font-size:13px; font-weight:700; color:#0D7377; }");
+        html.append(".client-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px; }");
+        html.append(".info-row { display:flex; flex-direction:column; gap:2px; }");
+        html.append(".info-label { font-size:10px; font-weight:700; color:#999; text-transform:uppercase; letter-spacing:0.5px; }");
+        html.append(".info-value { font-size:13px; font-weight:600; color:#1a1a1a; }");
+        html.append(".order-meta { background:#f9f9f9; border-radius:8px; padding:12px; margin-bottom:16px; }");
+        html.append(".order-ref { font-size:16px; font-weight:800; color:#0D7377; margin-bottom:6px; }");
+        html.append(".meta-row { display:flex; justify-content:space-between; font-size:12px; color:#666; margin-top:4px; }");
+        html.append(".items-table { width:100%; border-collapse:collapse; margin-bottom:16px; }");
+        html.append(".items-table th { background:#0D7377; color:white; padding:8px 10px; font-size:11px; font-weight:700; text-align:").append(thAlign).append("; }");
+        html.append(".items-table td { padding:8px 10px; font-size:12px; border-bottom:1px solid #f0f0f0; vertical-align:top; }");
+        html.append(".items-table tr:nth-child(even) td { background:#fafafa; }");
+        html.append(".item-name { font-weight:600; color:#1a1a1a; }");
+        html.append(".item-detail { font-size:11px; color:#888; margin-top:2px; }");
+        html.append(".discount-text { color:#EF4444; font-size:11px; }");
+        html.append(".price-cell { font-weight:700; color:#0D7377; text-align:").append(priceAlign).append("; white-space:nowrap; }");
+        html.append(".totals-section { ").append(marginAuto).append(" width:280px; margin-bottom:16px; }");
+        html.append(".total-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; border-bottom:1px solid #f0f0f0; }");
+        html.append(".total-row.grand { border-bottom:2px solid #0D7377; border-top:2px solid #0D7377; padding:10px 0; font-size:16px; font-weight:800; color:#0D7377; margin-top:4px; }");
+        html.append(".total-row.paid { color:#10B981; font-weight:700; }");
+        html.append(".total-row.remaining { color:#EF4444; font-weight:700; font-size:15px; }");
+        html.append(".payment-row { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#f0faf5; border-radius:8px; margin-bottom:6px; ").append(borderSide).append(":3px solid #10B981; }");
+        html.append(".payment-amount { font-weight:700; color:#10B981; }");
+        html.append(".payment-note { font-size:11px; color:#666; }");
+        html.append(".payment-date { font-size:11px; color:#999; }");
+        html.append(".unpaid-alert { background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:14px; margin-bottom:16px; text-align:center; }");
+        html.append(".unpaid-title { font-size:15px; font-weight:800; color:#EF4444; margin-bottom:4px; }");
+        html.append(".unpaid-amount { font-size:22px; font-weight:800; color:#EF4444; margin-top:6px; }");
+        html.append(".paid-badge { background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:14px; text-align:center; margin-bottom:16px; }");
+        html.append(".paid-badge-text { font-size:16px; font-weight:800; color:#10B981; }");
+        html.append(".pickup-box { background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:12px; margin-bottom:16px; display:flex; justify-content:space-between; }");
+        html.append(".pickup-label { font-size:12px; color:#3B82F6; font-weight:700; }");
+        html.append(".pickup-date { font-size:14px; font-weight:800; color:#1D4ED8; margin-top:2px; }");
+        html.append(".footer { margin-top:24px; padding-top:16px; border-top:1px solid #e0e0e0; text-align:center; }");
+        html.append(".footer-text { font-size:12px; color:#999; margin-bottom:4px; }");
+        html.append(".footer-brand { font-size:13px; font-weight:700; color:#0D7377; margin-top:8px; }");
+        html.append(".status-banner { padding:14px 16px; border-radius:8px; margin-bottom:16px; text-align:center; }");
+        html.append(".status-banner.cancelled { background:#FEF2F2; border:2px solid #EF4444; color:#EF4444; }");
+        html.append(".status-banner.failed    { background:#FFF7ED; border:2px solid #F97316; color:#EA580C; }");
+        html.append(".status-title { font-size:16px; font-weight:800; }");
+        html.append(".attempt-row { background:#FFF7ED; ").append(borderSide).append(":3px solid #F97316; border-radius:6px; padding:10px 12px; margin-bottom:8px; }");
+        html.append(".attempt-type { font-size:11px; font-weight:700; color:#EA580C; text-transform:uppercase; letter-spacing:0.5px; }");
+        html.append(".attempt-reason { font-size:13px; font-weight:600; color:#1a1a1a; margin-top:3px; }");
+        html.append(".attempt-meta { font-size:11px; color:#888; margin-top:4px; }");
+        html.append(".signature-section { display:flex; gap:20px; margin:16px 0; }");
+        html.append(".signature-box { flex:1; border:1px solid #e0e0e0; border-radius:8px; padding:12px; }");
+        html.append(".signature-label { font-size:11px; font-weight:700; color:#999; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:36px; }");
+        html.append(".signature-line { border-top:1px solid #ccc; margin-top:4px; padding-top:4px; font-size:10px; color:#bbb; text-align:center; }");
         html.append("</style></head><body>");
 
+        // ── Logo + header ───────────────────────────────────────────────────────
         String logoImgTag = logoToBase64ImgTag(logoUrl);
         String phoneDetail = (businessPhone != null && !businessPhone.isEmpty())
-                ? "<div class='business-detail'>📞 " + businessPhone + "</div>" : "";
+                ? "<div class='business-detail'>&#128222; " + businessPhone + "</div>" : "";
         String qrTag = qrBase64.isEmpty() ? "" : "<img src='data:image/png;base64," + qrBase64 + "' class='qr-code'/>";
 
         html.append("<div class='logo-top'>").append(logoImgTag).append("</div>");
@@ -259,140 +305,181 @@ public class PdfService {
             .append("<div class='business-info'>")
             .append("<div class='business-name'>").append(businessName).append("</div>")
             .append(phoneDetail)
-            .append("<div class='business-detail'>📍 ").append(businessAddress).append("</div>")
+            .append("<div class='business-detail'>&#128205; ").append(businessAddress).append("</div>")
             .append("</div>")
-            .append("<div class='header-right'>").append(qrTag)
+            .append("<div class='header-side'>").append(qrTag)
             .append("<div class='receipt-number'>#").append(commande.getNumeroCommande()).append("</div>")
-            .append("</div>")
-            .append("</div>");
+            .append("</div></div>");
 
+        // ── Status banners ──────────────────────────────────────────────────────
         CommandeStatus currentStatus = commande.getStatus();
         if (currentStatus == CommandeStatus.CANCELLED) {
-            html.append("<div class='status-banner cancelled'><div class='status-banner-title'>❌ COMMANDE ANNULÉE</div><div class='status-banner-ar'>تم إلغاء هذا الطلب</div></div>");
+            html.append("<div class='status-banner cancelled'><div class='status-title'>").append(labelCancelled).append("</div></div>");
         } else if (currentStatus == CommandeStatus.PICKUP_FAILED) {
-            html.append("<div class='status-banner failed'><div class='status-banner-title'>⚠️ ÉCHEC DE COLLECTE</div><div class='status-banner-ar'>فشل عملية الاستلام</div></div>");
+            html.append("<div class='status-banner failed'><div class='status-title'>").append(labelPickupFail).append("</div></div>");
         } else if (currentStatus == CommandeStatus.DELIVERY_FAILED) {
-            html.append("<div class='status-banner failed'><div class='status-banner-title'>⚠️ ÉCHEC DE LIVRAISON</div><div class='status-banner-ar'>فشل عملية التسليم</div></div>");
+            html.append("<div class='status-banner failed'><div class='status-title'>").append(labelDelivFail).append("</div></div>");
         }
 
-        html.append(String.format(
-            "<div class='order-meta'><div class='order-ref'>%s</div><div class='meta-row'><span>Date / التاريخ: <strong>%s</strong></span>" +
-            "<span>Mode / النوع: <strong>%s</strong></span></div>" +
-            "<div class='meta-row'><span>Statut / الحالة: <strong>%s</strong></span></div></div>",
-            commande.getNumeroCommande(), dateCreation,
-            commande.getMode() != null ? (commande.getMode().equals("immediate") ? "Au local / في المحل" : "Téléphonique / هاتفي") : "—",
-            translateStatus(commande.getStatus().name())
-        ));
+        // ── Order meta ──────────────────────────────────────────────────────────
+        html.append("<div class='order-meta'>")
+            .append("<div class='order-ref'>").append(commande.getNumeroCommande()).append("</div>")
+            .append("<div class='meta-row'>")
+            .append("<span>").append(labelDate).append(": <strong>").append(dateCreation).append("</strong></span>")
+            .append("<span>").append(labelMode).append(": <strong>").append(modeLabel).append("</strong></span>")
+            .append("</div>")
+            .append("<div class='meta-row'>")
+            .append("<span>").append(labelStatut).append(": <strong>").append(translateStatus(commande.getStatus().name(), ar)).append("</strong></span>")
+            .append("</div></div>");
 
+        // ── Scheduled pickup box ────────────────────────────────────────────────
         if (commande.getScheduledPickupDate() != null) {
             String pickupDate = commande.getScheduledPickupDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-            html.append(String.format(
-                "<div class='pickup-box'><div><div class='pickup-label'>📅 Date de collecte prévue</div><div class='pickup-label-ar'>موعد الاستلام المحدد</div><div class='pickup-date'>%s</div></div>" +
-                "<div style='text-align:right'><div class='pickup-label'>Livreur assigné</div><div class='pickup-label-ar'>السائق المعين</div><div class='pickup-date'>%s</div></div></div>",
-                pickupDate, commande.getLivreur() != null ? commande.getLivreur().getName() : "—"
-            ));
+            String driverName = commande.getLivreur() != null ? commande.getLivreur().getName() : "—";
+            html.append("<div class='pickup-box'>")
+                .append("<div><div class='pickup-label'>").append(labelPickupDate).append("</div>")
+                .append("<div class='pickup-date'>").append(pickupDate).append("</div></div>")
+                .append("<div style='text-align:").append(ar ? "left" : "right").append("'>")
+                .append("<div class='pickup-label'>").append(labelLivreur).append("</div>")
+                .append("<div class='pickup-date'>").append(driverName).append("</div></div>")
+                .append("</div>");
         }
 
-        html.append("<div class='section-header'><span class='section-label-fr'>👤 Informations Client</span><span class='section-label-ar'>معلومات العميل</span></div>" +
-                "<div class='client-grid'><div class='info-row'><span class='info-label'>Nom / الاسم</span><span class='info-value'>").append(client.getName()).append("</span></div>")
-                .append("<div class='info-row'><span class='info-label'>Téléphone / الهاتف</span><span class='info-value'>")
-                .append(!client.getPhones().isEmpty() ? client.getPhones().get(0).getPhoneNumber() : "—").append("</span></div>")
-                .append("<div class='info-row' style='grid-column: span 2'><span class='info-label'>Adresse / العنوان</span><span class='info-value'>")
-                .append(!client.getAddresses().isEmpty() ? client.getAddresses().get(0).getAddress() : "Pas d'adresse / لا يوجد عنوان").append("</span></div></div>");
+        // ── Client info ─────────────────────────────────────────────────────────
+        String phone   = !client.getPhones().isEmpty()    ? client.getPhones().get(0).getPhoneNumber()    : "—";
+        String address = !client.getAddresses().isEmpty() ? client.getAddresses().get(0).getAddress()     : labelNoAddr;
 
-        html.append("<div class='section-header'><span class='section-label-fr'>📦 Articles</span><span class='section-label-ar'>المنتجات</span></div><table class='items-table'><thead><tr><th>Article / المنتج</th><th>Détails / التفاصيل</th><th style='text-align:right'>Prix / السعر</th></tr></thead><tbody>");
+        html.append("<div class='section-header'>&#128100; ").append(labelClient).append("</div>")
+            .append("<div class='client-grid'>")
+            .append("<div class='info-row'><span class='info-label'>").append(labelNom).append("</span><span class='info-value'>").append(client.getName()).append("</span></div>")
+            .append("<div class='info-row'><span class='info-label'>").append(labelTel).append("</span><span class='info-value'>").append(phone).append("</span></div>")
+            .append("<div class='info-row' style='grid-column:span 2'><span class='info-label'>").append(labelAdresse).append("</span><span class='info-value'>").append(address).append("</span></div>")
+            .append("</div>");
+
+        // ── Items table ─────────────────────────────────────────────────────────
+        html.append("<div class='section-header'>&#128230; ").append(labelArticles).append("</div>")
+            .append("<table class='items-table'><thead><tr>")
+            .append("<th>").append(labelArticle).append("</th>")
+            .append("<th>").append(labelDetails).append("</th>")
+            .append("<th style='text-align:").append(priceAlign).append("'>").append(labelPrix).append("</th>")
+            .append("</tr></thead><tbody>");
 
         for (int i = 0; i < items.size(); i++) {
             CommandeTapis item = items.get(i);
-            String tagNum = item.getTagNumero() != null ? item.getTagNumero() : "TAG-00" + (i + 1);
+            String productName = item.getProduct() != null ? item.getProduct().getNom() : "—";
             String details = "";
             if (item.getLargeur() != null && item.getHauteur() != null) {
-                details = item.getLargeur() + "m × " + item.getHauteur() + "m = " + item.getLargeur().multiply(item.getHauteur()).setScale(2, RoundingMode.HALF_UP) + "m²";
+                details = item.getLargeur() + "m × " + item.getHauteur() + "m = "
+                        + item.getLargeur().multiply(item.getHauteur()).setScale(2, RoundingMode.HALF_UP) + "m²";
             } else if (item.getQuantite() != null && item.getQuantite() > 1) {
-                details = item.getQuantite() + " pièces";
+                details = item.getQuantite() + (ar ? " قطع" : " pièces");
             }
             if (item.getCouleur() != null && !item.getCouleur().isEmpty()) {
                 details += (details.isEmpty() ? "" : " · ") + item.getCouleur();
             }
             String discountHtml = "";
             if (item.getRemiseMontant() != null && item.getRemiseMontant().compareTo(BigDecimal.ZERO) > 0) {
-                discountHtml = "<div class='discount-text'>Remise / خصم: -" + item.getRemiseMontant() + " DH" + (item.getRemiseRaison() != null ? " (" + item.getRemiseRaison() + ")" : "") + "</div>";
+                String remiseLabel = ar ? "خصم" : "Remise";
+                discountHtml = "<div class='discount-text'>" + remiseLabel + ": -"
+                        + item.getRemiseMontant() + " DH"
+                        + (item.getRemiseRaison() != null ? " (" + item.getRemiseRaison() + ")" : "")
+                        + "</div>";
             }
-            html.append(String.format("<tr><td><div class='item-name'>%s</div>%s</td><td class='item-detail'>%s</td><td class='price-cell'>%s DH</td></tr>",
-                    item.getProduct() != null ? item.getProduct().getNom() : "—", discountHtml, details, item.getSousTotal().setScale(2, RoundingMode.HALF_UP)));
+            html.append("<tr><td><div class='item-name'>").append(productName).append("</div>").append(discountHtml).append("</td>")
+                .append("<td class='item-detail'>").append(details).append("</td>")
+                .append("<td class='price-cell'>").append(item.getSousTotal().setScale(2, RoundingMode.HALF_UP)).append(" DH</td></tr>");
         }
         html.append("</tbody></table>");
 
-        BigDecimal totalDiscount = items.stream().map(i -> i.getRemiseMontant() != null ? i.getRemiseMontant() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // ── Totals ──────────────────────────────────────────────────────────────
+        BigDecimal totalDiscount = items.stream()
+                .map(i -> i.getRemiseMontant() != null ? i.getRemiseMontant() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         html.append("<div class='totals-section'>");
         if (totalDiscount.compareTo(BigDecimal.ZERO) > 0) {
-            html.append(String.format("<div class='total-row'><span>Sous-total / المجموع الفرعي</span><span>%s DH</span></div><div class='total-row discount-text'><span>Remise totale / إجمالي الخصم</span><span>-%s DH</span></div>",
-                    montantTotal.add(totalDiscount).setScale(2, RoundingMode.HALF_UP), totalDiscount.setScale(2, RoundingMode.HALF_UP)));
+            html.append("<div class='total-row'><span>").append(labelSousTotal).append("</span><span>")
+                .append(montantTotal.add(totalDiscount).setScale(2, RoundingMode.HALF_UP)).append(" DH</span></div>")
+                .append("<div class='total-row discount-text'><span>").append(labelRemise).append("</span><span>-")
+                .append(totalDiscount.setScale(2, RoundingMode.HALF_UP)).append(" DH</span></div>");
         }
-        html.append(String.format("<div class='total-row grand'><span>TOTAL / الإجمالي</span><span>%s DH</span></div>", montantTotal.setScale(2, RoundingMode.HALF_UP)));
+        html.append("<div class='total-row grand'><span>").append(labelTotal).append("</span><span>")
+            .append(montantTotal.setScale(2, RoundingMode.HALF_UP)).append(" DH</span></div>");
 
         if (montantPaye.compareTo(BigDecimal.ZERO) > 0) {
-            if (montantRestant.compareTo(BigDecimal.ZERO) <= 0) {
-                html.append(String.format(
-                    "<div class='total-row paid'><span>Payé / المدفوع</span><span>%s DH</span></div>",
-                    montantPaye.setScale(2, RoundingMode.HALF_UP)));
-            } else {
-                html.append(String.format(
-                    "<div class='total-row paid'><span>Payé / المدفوع</span><span>%s DH</span></div>" +
-                    "<div class='total-row remaining'><span>Reste à payer / المتبقي</span><span>%s DH</span></div>",
-                    montantPaye.setScale(2, RoundingMode.HALF_UP), montantRestant.setScale(2, RoundingMode.HALF_UP)));
+            html.append("<div class='total-row paid'><span>").append(labelPaye).append("</span><span>")
+                .append(montantPaye.setScale(2, RoundingMode.HALF_UP)).append(" DH</span></div>");
+            if (montantRestant.compareTo(BigDecimal.ZERO) > 0) {
+                html.append("<div class='total-row remaining'><span>").append(labelReste).append("</span><span>")
+                    .append(montantRestant.setScale(2, RoundingMode.HALF_UP)).append(" DH</span></div>");
             }
         }
         html.append("</div>");
 
+        // ── Payment history ─────────────────────────────────────────────────────
         if (payments != null && !payments.isEmpty()) {
-            html.append("<div class='section-header'><span class='section-label-fr'>💰 Historique des paiements</span><span class='section-label-ar'>سجل المدفوعات</span></div><div class='payment-history'>");
+            html.append("<div class='section-header'>&#128176; ").append(labelPaiements).append("</div><div>");
             for (Paiement p : payments) {
                 String payDate = p.getDatePaiement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-                html.append(String.format("<div class='payment-row'><div><div class='payment-amount'>+%s DH</div><div class='payment-note'>%s</div></div><div class='payment-date'>%s</div></div>",
-                        p.getMontant().setScale(2, RoundingMode.HALF_UP), p.getNote() != null && !p.getNote().isEmpty() ? p.getNote() : "Paiement", payDate));
+                String note = (p.getNote() != null && !p.getNote().isEmpty()) ? p.getNote() : labelPaiement;
+                html.append("<div class='payment-row'>")
+                    .append("<div><div class='payment-amount'>+").append(p.getMontant().setScale(2, RoundingMode.HALF_UP)).append(" DH</div>")
+                    .append("<div class='payment-note'>").append(note).append("</div></div>")
+                    .append("<div class='payment-date'>").append(payDate).append("</div></div>");
             }
             html.append("</div>");
             if (montantRestant.compareTo(BigDecimal.ZERO) > 0) {
-                html.append(String.format("<div class='unpaid-alert'><div class='unpaid-alert-title'>⚠️ Solde restant à payer</div><div class='unpaid-alert-ar'>المبلغ المتبقي للدفع</div><div class='unpaid-amount'>%s DH</div></div>",
-                        montantRestant.setScale(2, RoundingMode.HALF_UP)));
+                html.append("<div class='unpaid-alert'><div class='unpaid-title'>").append(labelSolde).append("</div>")
+                    .append("<div class='unpaid-amount'>").append(montantRestant.setScale(2, RoundingMode.HALF_UP)).append(" DH</div></div>");
             } else {
-                html.append("<div class='paid-badge'><div class='paid-badge-text'>✅ Entièrement payé</div><div class='paid-badge-ar'>تم الدفع بالكامل</div></div>");
+                html.append("<div class='paid-badge'><div class='paid-badge-text'>&#10003; ").append(labelEntPaye).append("</div></div>");
             }
         } else if (montantRestant.compareTo(BigDecimal.ZERO) > 0 && montantPaye.compareTo(BigDecimal.ZERO) == 0) {
-            html.append(String.format("<div class='unpaid-alert'><div class='unpaid-alert-title'>⚠️ Solde restant à payer</div><div class='unpaid-alert-ar'>المبلغ المتبقي للدفع</div><div class='unpaid-amount'>%s DH</div></div>",
-                    montantRestant.setScale(2, RoundingMode.HALF_UP)));
+            html.append("<div class='unpaid-alert'><div class='unpaid-title'>").append(labelSolde).append("</div>")
+                .append("<div class='unpaid-amount'>").append(montantRestant.setScale(2, RoundingMode.HALF_UP)).append(" DH</div></div>");
         }
 
+        // ── Failed attempts ─────────────────────────────────────────────────────
         List<OrderAttempt> attempts = commande.getAttempts();
         if (attempts != null && !attempts.isEmpty()) {
-            html.append("<div class='section-header'><span class='section-label-fr'>⚠️ Historique des tentatives</span><span class='section-label-ar'>سجل المحاولات</span></div>");
+            html.append("<div class='section-header'>&#9888; ").append(labelTentatives).append("</div>");
             for (OrderAttempt attempt : attempts) {
                 String attemptDate = attempt.getAttemptedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
                 String typeLabel = attempt.getAttemptType() == AttemptType.PICKUP
-                        ? "Collecte / استلام" : "Livraison / تسليم";
-                String reasonFr = OrderAttempt.getReasonLabel(attempt.getReason(), "FR");
-                String reasonAr = OrderAttempt.getReasonLabel(attempt.getReason(), "AR");
+                        ? (ar ? "استلام" : "Collecte")
+                        : (ar ? "تسليم"  : "Livraison");
+                String reason = OrderAttempt.getReasonLabel(attempt.getReason(), ar ? "AR" : "FR");
                 String meta = attemptDate;
                 if (attempt.getDriver() != null) meta += " · " + attempt.getDriver().getName();
                 if (attempt.getNotes() != null && !attempt.getNotes().isEmpty()) meta += " · " + attempt.getNotes();
-                if (attempt.getRescheduledTo() != null)
-                    meta += " · Reporté: " + attempt.getRescheduledTo().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-                html.append(String.format(
-                    "<div class='attempt-row'><div class='attempt-type-label'>%s</div><div class='attempt-reason'>%s · %s</div><div class='attempt-meta'>%s</div></div>",
-                    typeLabel, reasonFr, reasonAr, meta));
+                if (attempt.getRescheduledTo() != null) {
+                    String reschedLabel = ar ? "موعد جديد" : "Reporté";
+                    meta += " · " + reschedLabel + ": " + attempt.getRescheduledTo().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+                }
+                html.append("<div class='attempt-row'>")
+                    .append("<div class='attempt-type'>").append(typeLabel).append("</div>")
+                    .append("<div class='attempt-reason'>").append(reason).append("</div>")
+                    .append("<div class='attempt-meta'>").append(meta).append("</div></div>");
             }
         }
 
+        // ── Signature boxes (delivery only) ─────────────────────────────────────
         if (receiptType.equals("DELIVERY")) {
-            html.append("<div class='signature-section'>" +
-                "<div class='signature-box'><div class='signature-label'>Signature client / توقيع العميل</div><div class='signature-line'>Nom et signature</div></div>" +
-                "<div class='signature-box'><div class='signature-label'>Signature livreur / توقيع السائق</div><div class='signature-line'>Nom et signature</div></div>" +
-                "</div>");
+            html.append("<div class='signature-section'>")
+                .append("<div class='signature-box'><div class='signature-label'>").append(labelSigClient).append("</div>")
+                .append("<div class='signature-line'>").append(labelSignLine).append("</div></div>")
+                .append("<div class='signature-box'><div class='signature-label'>").append(labelSigLivr).append("</div>")
+                .append("<div class='signature-line'>").append(labelSignLine).append("</div></div>")
+                .append("</div>");
         }
 
-        html.append(String.format("<div class='footer'><div class='footer-text'>Merci pour votre confiance · شكراً لثقتكم</div><div class='footer-text'>Pour toute question: %s</div><div class='footer-text-ar'>للاستفسار يرجى التواصل معنا</div><div class='footer-brand'>%s</div></div>",
-                businessPhone, businessName));
+        // ── Footer ──────────────────────────────────────────────────────────────
+        html.append("<div class='footer'>")
+            .append("<div class='footer-text'>").append(footerThanks).append("</div>")
+            .append("<div class='footer-text'>").append(footerContact).append("</div>")
+            .append("<div class='footer-brand'>").append(businessName).append("</div>")
+            .append("</div>");
+
         html.append("</body></html>");
         return html.toString();
     }
@@ -558,15 +645,30 @@ public class PdfService {
     }
 
     private String translateStatus(String status) {
+        return translateStatus(status, false);
+    }
+
+    private String translateStatus(String status, boolean ar) {
+        if (ar) return switch (status) {
+            case "PENDING_PICKUP"     -> "قيد الانتظار";
+            case "PICKED_UP"          -> "تم الاستلام";
+            case "IN_PROCESS"         -> "قيد المعالجة";
+            case "READY_FOR_DELIVERY" -> "جاهز للتسليم";
+            case "DELIVERED"          -> "تم التسليم";
+            case "PICKUP_FAILED"      -> "فشل الاستلام";
+            case "DELIVERY_FAILED"    -> "فشل التسليم";
+            case "CANCELLED"          -> "ملغي";
+            default -> status;
+        };
         return switch (status) {
-            case "PENDING_PICKUP"      -> "En attente · قيد الانتظار";
-            case "PICKED_UP"           -> "Récupéré · تم الاستلام";
-            case "IN_PROCESS"          -> "En traitement · قيد المعالجة";
-            case "READY_FOR_DELIVERY"  -> "Prêt · جاهز للتسليم";
-            case "DELIVERED"           -> "Livré · تم التسليم";
-            case "PICKUP_FAILED"       -> "Échec collecte · فشل الاستلام";
-            case "DELIVERY_FAILED"     -> "Échec livraison · فشل التسليم";
-            case "CANCELLED"           -> "Annulé · ملغي";
+            case "PENDING_PICKUP"     -> "En attente";
+            case "PICKED_UP"          -> "Récupéré";
+            case "IN_PROCESS"         -> "En traitement";
+            case "READY_FOR_DELIVERY" -> "Prêt à livrer";
+            case "DELIVERED"          -> "Livré";
+            case "PICKUP_FAILED"      -> "Échec collecte";
+            case "DELIVERY_FAILED"    -> "Échec livraison";
+            case "CANCELLED"          -> "Annulé";
             default -> status;
         };
     }

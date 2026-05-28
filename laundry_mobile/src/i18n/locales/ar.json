@@ -53,7 +53,18 @@
     "whatsapp": "واتساب",
     "print": "طباعة",
     "done": "تم",
-    "other": "أخرى"
+    "other": "أخرى",
+    "load_more": "تحميل المزيد",
+    "camera": "الكاميرا",
+    "gallery": "المعرض",
+    "ok": "موافق",
+    "update": "تحديث",
+    "confirm_msg": "هل أنت متأكد؟",
+    "me": "أنا",
+    "change": "تغيير",
+    "deleted": "محذوف",
+    "add_photo": "إضافة صورة",
+    "share": "مشاركة"
   },
   "errors": {
     "network": "خطأ في الشبكة. يرجى التحقق من الاتصال.",
@@ -157,7 +168,10 @@
       "loading": "جاري الدخول...",
       "error": "معلومات الدخول غير صحيحة",
       "problem": "مشكلة في تسجيل الدخول؟",
-      "contact_admin": "اتصل بالمدير"
+      "contact_admin": "اتصل بالمدير",
+      "account_disabled": "تم تعطيل حسابك. تواصل مع المدير.",
+      "email_placeholder": "بريدك@الإلكتروني.com",
+      "invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
     }
   },
   "admin": {
@@ -563,6 +577,59 @@
     "no_overdue_sub": "جميع التوصيلات في الموعد.",
     "send_receipt_prompt": "هل تريد إرسال الإيصال للزبون؟",
     "driver_fallback": "مندوب"
+  },
+  "notifications": {
+    "empty": "لا توجد إشعارات",
+    "mark_all_read": "تحديد الكل كمقروء"
+  },
+  "receipt": {
+    "choose_language": "لغة الوصل / Langue du reçu"
+  },
+  "audit": {
+    "title": "سجل المراجعة",
+    "subtitle": "سجل العمليات",
+    "tab": "المراجعة",
+    "actions": {
+      "order_created": "تم إنشاء طلب",
+      "order_status_changed": "تغيير الحالة",
+      "order_updated": "تم تعديل الطلب",
+      "order_deleted": "تم حذف الطلب",
+      "order_driver_assigned": "تم تعيين السائق",
+      "order_items_updated_by_driver": "تم تعديل المنتجات",
+      "payment_recorded": "تم تسجيل الدفع",
+      "payment_added": "تمت إضافة دفع",
+      "user_created": "تم إنشاء مستخدم",
+      "user_updated": "تم تعديل المستخدم",
+      "user_deactivated": "تم التعطيل",
+      "user_activated": "تم التفعيل",
+      "user_deleted": "تم حذف المستخدم",
+      "user_password_changed": "تم تغيير كلمة المرور",
+      "catalog_category_created": "تم إنشاء فئة",
+      "catalog_category_updated": "تم تعديل الفئة",
+      "catalog_category_toggled": "تم تفعيل/تعطيل الفئة",
+      "catalog_category_deleted": "تم حذف الفئة",
+      "catalog_product_created": "تم إنشاء منتج",
+      "catalog_product_updated": "تم تعديل المنتج",
+      "catalog_product_toggled": "تم تفعيل/تعطيل المنتج",
+      "catalog_product_deleted": "تم حذف المنتج",
+      "client_updated": "تم تعديل الزبون"
+    }
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "branding": "التخصيص",
+    "branding_sub": "تعديل الاسم والشعار",
+    "branding_page_title": "إعدادات العلامة التجارية",
+    "visual_identity": "الهوية البصرية",
+    "app_name": "اسم التطبيق",
+    "app_name_placeholder": "أدخل اسم التطبيق",
+    "business_phone": "هاتف العمل",
+    "app_logo": "شعار التطبيق",
+    "change_logo": "تغيير الشعار",
+    "save_changes": "حفظ التعديلات",
+    "app_name_required": "اسم التطبيق لا يمكن أن يكون فارغاً",
+    "updated_success": "تم تحديث الإعدادات بنجاح",
+    "update_failed": "فشل تحديث الإعدادات"
   },
   "orders": {
     "no_pickup_driver": "بدون مندوب استلام",

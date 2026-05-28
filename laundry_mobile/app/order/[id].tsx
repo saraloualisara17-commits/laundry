@@ -320,6 +320,30 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     t
   );
 
+  const pickLangAndShare = useCallback(() => {
+    Alert.alert(
+      t('receipt.choose_language', { defaultValue: 'Langue du reçu' }),
+      '',
+      [
+        { text: '🇫🇷 Français', onPress: () => handleShareWhatsApp('fr') },
+        { text: '🇲🇦 العربية',  onPress: () => handleShareWhatsApp('ar') },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]
+    );
+  }, [handleShareWhatsApp, t]);
+
+  const pickLangAndPrint = useCallback(() => {
+    Alert.alert(
+      t('receipt.choose_language', { defaultValue: 'Langue du reçu' }),
+      '',
+      [
+        { text: '🇫🇷 Français', onPress: () => handlePrint('fr') },
+        { text: '🇲🇦 العربية',  onPress: () => handlePrint('ar') },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]
+    );
+  }, [handlePrint, t]);
+
   const getClientPhone = useCallback((client: any) => {
     if (!client) return '';
     if (client.phone) return client.phone;
@@ -352,7 +376,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowDeliveryModal(false);
-      Alert.alert(t('delivery.delivery_success'), t('delivery.send_receipt_prompt'), [{ text: t('common.cancel'), style: 'cancel' }, { text: '📱 WhatsApp', onPress: () => handleShareWhatsApp() }]);
+      Alert.alert(t('delivery.delivery_success'), t('delivery.send_receipt_prompt'), [{ text: t('common.cancel'), style: 'cancel' }, { text: '🇫🇷 Français', onPress: () => handleShareWhatsApp('fr') }, { text: '🇲🇦 العربية', onPress: () => handleShareWhatsApp('ar') }]);
     } catch (e) {
       Alert.alert(t('common.error'), t('common.error_msg'));
     }
@@ -708,7 +732,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               isArabic={isArabic}
               t={t}
               onClientPress={handleClientPress}
-              handleShareReceipt={handleShareWhatsApp}
+              handleShareReceipt={pickLangAndShare}
               sharing={sharingAction === 'whatsapp'}
               getClientPhone={getClientPhone}
               setShowDriverModal={setShowDriverModal}
@@ -741,14 +765,14 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       {/* ── Sticky Bottom Bar ── */}
       {(permissions.isAdmin || permissions.isEmploye) && (
         <View style={[styles.bottomBar, row(isArabic)]}>
-          <TouchableOpacity style={styles.bottomBarBtn} onPress={handleShareWhatsApp} disabled={!!sharingAction}>
+          <TouchableOpacity style={styles.bottomBarBtn} onPress={pickLangAndShare} disabled={!!sharingAction}>
             {sharingAction === 'whatsapp'
               ? <ActivityIndicator size="small" color="#25D366" />
               : <Ionicons name="logo-whatsapp" size={22} color="#25D366" />}
             <Text style={[styles.bottomBarBtnText, { color: '#25D366' }]}>{t('common.whatsapp')}</Text>
           </TouchableOpacity>
           <View style={styles.bottomBarDivider} />
-          <TouchableOpacity style={styles.bottomBarBtn} onPress={handlePrint} disabled={!!sharingAction}>
+          <TouchableOpacity style={styles.bottomBarBtn} onPress={pickLangAndPrint} disabled={!!sharingAction}>
             {sharingAction === 'print'
               ? <ActivityIndicator size="small" color={Colors.primary} />
               : <Ionicons name="document-text-outline" size={22} color={Colors.primary} />}

@@ -34,11 +34,11 @@ function getAuthToken(): string | null {
 
 // ─── URL builder ─────────────────────────────────────────────────────────────
 
-function buildPdfUrl(orderId: number | string, isDelivery: boolean): string {
+function buildPdfUrl(orderId: number | string, isDelivery: boolean, lang: 'fr' | 'ar'): string {
   const url = isDelivery
-    ? adminApi.getDeliveryPdfUrl(orderId)
-    : adminApi.getOrderPdfUrl(orderId);
-  log('Built PDF URL', { orderId, isDelivery, url });
+    ? adminApi.getDeliveryPdfUrl(orderId, lang)
+    : adminApi.getOrderPdfUrl(orderId, lang);
+  log('Built PDF URL', { orderId, isDelivery, lang, url });
   return url;
 }
 
@@ -227,13 +227,13 @@ export function useReceiptActions(
 
   const isDelivery = confirmedStatus === 'DELIVERED';
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsApp = async (lang: 'fr' | 'ar' = 'fr') => {
     if (!orderId) return;
     setSharingAction('whatsapp');
-    log('WhatsApp share initiated', { orderId, confirmedStatus, isDelivery });
+    log('WhatsApp share initiated', { orderId, confirmedStatus, isDelivery, lang });
     try {
-      const url = buildPdfUrl(orderId, isDelivery);
-      const uri = await downloadPdf(url, `recu_${orderId}.pdf`);
+      const url = buildPdfUrl(orderId, isDelivery, lang);
+      const uri = await downloadPdf(url, `recu_${orderId}_${lang}.pdf`);
 
       const available = await Sharing.isAvailableAsync();
       log('Sharing availability', { available });
@@ -260,13 +260,13 @@ export function useReceiptActions(
     }
   };
 
-  const handlePrint = async () => {
+  const handlePrint = async (lang: 'fr' | 'ar' = 'fr') => {
     if (!orderId) return;
     setSharingAction('print');
-    log('Print initiated', { orderId, confirmedStatus, isDelivery });
+    log('Print initiated', { orderId, confirmedStatus, isDelivery, lang });
     try {
-      const url = buildPdfUrl(orderId, isDelivery);
-      const uri = await downloadPdf(url, `receipt_${orderId}.pdf`);
+      const url = buildPdfUrl(orderId, isDelivery, lang);
+      const uri = await downloadPdf(url, `receipt_${orderId}_${lang}.pdf`);
 
       log('Calling Print.printAsync', { uri });
       await Print.printAsync({ uri });

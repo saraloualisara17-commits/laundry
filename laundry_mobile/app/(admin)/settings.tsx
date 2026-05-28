@@ -47,7 +47,7 @@ export default function SettingsScreen() {
 
   const handleSave = async () => {
     if (!appName.trim()) {
-      Alert.alert(t('common.error'), 'Application name cannot be empty');
+      Alert.alert(t('common.error'), t('settings.app_name_required'));
       return;
     }
     try {
@@ -62,10 +62,10 @@ export default function SettingsScreen() {
             }
           : undefined,
       });
-      Alert.alert(t('common.success'), 'Settings updated successfully');
+      Alert.alert(t('common.success'), t('settings.updated_success'));
       setSelectedImage(null);
     } catch {
-      Alert.alert(t('common.error'), 'Failed to update settings');
+      Alert.alert(t('common.error'), t('settings.update_failed'));
     }
   };
 
@@ -78,27 +78,27 @@ export default function SettingsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={AdminColors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Branding Settings</Text>
+          <Text style={styles.headerTitle}>{t('settings.branding_page_title')}</Text>
         </View>
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>Visual Identity</Text>
+          <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>{t('settings.visual_identity')}</Text>
 
           <View style={styles.card}>
-            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Name</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('settings.app_name')}</Text>
             <TextInput
               style={[styles.input, isArabic && { textAlign: 'right' }]}
               value={appName}
               onChangeText={setAppName}
-              placeholder="Enter App Name"
+              placeholder={t('settings.app_name_placeholder')}
               placeholderTextColor={AdminColors.textMuted}
             />
 
             <View style={styles.divider} />
 
-            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>Business Phone</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('settings.business_phone')}</Text>
             <TextInput
               style={[styles.input, isArabic && { textAlign: 'right' }]}
               value={businessPhone}
@@ -110,7 +110,7 @@ export default function SettingsScreen() {
 
             <View style={styles.divider} />
 
-            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>App Logo</Text>
+            <Text style={[styles.label, isArabic && { textAlign: 'right' }]}>{t('settings.app_logo')}</Text>
             <View style={[styles.logoContainer, row(isArabic)]}>
               <View style={styles.logoPreview}>
                 {logoPreviewUri ? (
@@ -123,7 +123,7 @@ export default function SettingsScreen() {
               </View>
               <TouchableOpacity style={styles.pickBtn} onPress={pickImage}>
                 <Ionicons name="camera-outline" size={20} color={AdminColors.primary} />
-                <Text style={styles.pickBtnText}>Change Logo</Text>
+                <Text style={styles.pickBtnText}>{t('settings.change_logo')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -139,7 +139,7 @@ export default function SettingsScreen() {
           ) : (
             <>
               <Ionicons name="save-outline" size={20} color="white" />
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              <Text style={styles.saveBtnText}>{t('settings.save_changes')}</Text>
             </>
           )}
         </TouchableOpacity>

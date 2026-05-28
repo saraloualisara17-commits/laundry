@@ -71,8 +71,8 @@ export const adminApi = {
   resetPassword: (id: number | string, password: string) => usersApi.resetPassword(id, password),
 
   // Receipts & PDFs
-  getOrderPdfUrl: (id: number | string) => ordersApi.getOrderPdfUrl(id),
-  getDeliveryPdfUrl: (id: number | string) => ordersApi.getDeliveryPdfUrl(id),
+  getOrderPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') => ordersApi.getOrderPdfUrl(id, lang),
+  getDeliveryPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') => ordersApi.getDeliveryPdfUrl(id, lang),
   getOrderReceipt: (id: number | string) => ordersApi.getOrderReceiptWhatsapp(id),
   getDeliveryReceipt: (id: number | string) => ordersApi.getDeliveryReceiptWhatsapp(id),
 

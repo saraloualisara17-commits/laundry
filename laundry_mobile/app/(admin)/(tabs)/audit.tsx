@@ -19,43 +19,36 @@ import { AuditLogEntry } from '../../../src/services/api/auditApi';
 
 // ─── Color categories ────────────────────────────────────────────────────────
 
-const ACTION_CATEGORIES: Record<string, { color: string; bg: string; label: string }> = {
-  // Order operations
-  ORDER_CREATED:           { color: AdminColors.primary,  bg: AdminColors.primary100, label: 'Commande créée' },
-  ORDER_STATUS_CHANGED:    { color: AdminColors.info,     bg: AdminColors.infoBg,     label: 'Statut modifié' },
-  ORDER_UPDATED:           { color: AdminColors.info,     bg: AdminColors.infoBg,     label: 'Commande modifiée' },
-  ORDER_DELETED:           { color: AdminColors.danger,   bg: AdminColors.dangerBg,   label: 'Commande supprimée' },
-  ORDER_DRIVER_ASSIGNED:   { color: AdminColors.primary,  bg: AdminColors.primary100, label: 'Livreur assigné' },
-  ORDER_ITEMS_UPDATED_BY_DRIVER: { color: AdminColors.warning, bg: AdminColors.warningBg, label: 'Articles modifiés' },
-  // Payment operations
-  PAYMENT_RECORDED:        { color: AdminColors.success,  bg: AdminColors.successBg,  label: 'Paiement enregistré' },
-  PAYMENT_ADDED:           { color: AdminColors.success,  bg: AdminColors.successBg,  label: 'Paiement ajouté' },
-  // User operations
-  USER_CREATED:            { color: '#7C3AED',            bg: '#F5F3FF',              label: 'Utilisateur créé' },
-  USER_UPDATED:            { color: '#7C3AED',            bg: '#F5F3FF',              label: 'Utilisateur modifié' },
-  USER_DEACTIVATED:        { color: AdminColors.danger,   bg: AdminColors.dangerBg,   label: 'Désactivé' },
-  USER_ACTIVATED:          { color: AdminColors.success,  bg: AdminColors.successBg,  label: 'Activé' },
-  USER_DELETED:            { color: AdminColors.danger,   bg: AdminColors.dangerBg,   label: 'Utilisateur supprimé' },
-  USER_PASSWORD_CHANGED:   { color: AdminColors.warning,  bg: AdminColors.warningBg,  label: 'Mot de passe changé' },
-  // Catalog operations
-  CATALOG_CATEGORY_CREATED:{ color: '#0891B2',            bg: '#ECFEFF',              label: 'Catégorie créée' },
-  CATALOG_CATEGORY_UPDATED:{ color: '#0891B2',            bg: '#ECFEFF',              label: 'Catégorie modifiée' },
-  CATALOG_CATEGORY_TOGGLED:{ color: '#0891B2',            bg: '#ECFEFF',              label: 'Catégorie activée/désact.' },
-  CATALOG_CATEGORY_DELETED:{ color: AdminColors.danger,   bg: AdminColors.dangerBg,   label: 'Catégorie supprimée' },
-  CATALOG_PRODUCT_CREATED: { color: '#0891B2',            bg: '#ECFEFF',              label: 'Produit créé' },
-  CATALOG_PRODUCT_UPDATED: { color: '#0891B2',            bg: '#ECFEFF',              label: 'Produit modifié' },
-  CATALOG_PRODUCT_TOGGLED: { color: '#0891B2',            bg: '#ECFEFF',              label: 'Produit activé/désact.' },
-  CATALOG_PRODUCT_DELETED: { color: AdminColors.danger,   bg: AdminColors.dangerBg,   label: 'Produit supprimé' },
-  // Client operations
-  CLIENT_UPDATED:          { color: '#D97706',            bg: '#FFFBEB',              label: 'Client modifié' },
+const ACTION_COLORS: Record<string, { color: string; bg: string; key: string }> = {
+  ORDER_CREATED:                 { color: AdminColors.primary,  bg: AdminColors.primary100, key: 'audit.actions.order_created' },
+  ORDER_STATUS_CHANGED:          { color: AdminColors.info,     bg: AdminColors.infoBg,     key: 'audit.actions.order_status_changed' },
+  ORDER_UPDATED:                 { color: AdminColors.info,     bg: AdminColors.infoBg,     key: 'audit.actions.order_updated' },
+  ORDER_DELETED:                 { color: AdminColors.danger,   bg: AdminColors.dangerBg,   key: 'audit.actions.order_deleted' },
+  ORDER_DRIVER_ASSIGNED:         { color: AdminColors.primary,  bg: AdminColors.primary100, key: 'audit.actions.order_driver_assigned' },
+  ORDER_ITEMS_UPDATED_BY_DRIVER: { color: AdminColors.warning,  bg: AdminColors.warningBg,  key: 'audit.actions.order_items_updated_by_driver' },
+  PAYMENT_RECORDED:              { color: AdminColors.success,  bg: AdminColors.successBg,  key: 'audit.actions.payment_recorded' },
+  PAYMENT_ADDED:                 { color: AdminColors.success,  bg: AdminColors.successBg,  key: 'audit.actions.payment_added' },
+  USER_CREATED:                  { color: '#7C3AED',            bg: '#F5F3FF',              key: 'audit.actions.user_created' },
+  USER_UPDATED:                  { color: '#7C3AED',            bg: '#F5F3FF',              key: 'audit.actions.user_updated' },
+  USER_DEACTIVATED:              { color: AdminColors.danger,   bg: AdminColors.dangerBg,   key: 'audit.actions.user_deactivated' },
+  USER_ACTIVATED:                { color: AdminColors.success,  bg: AdminColors.successBg,  key: 'audit.actions.user_activated' },
+  USER_DELETED:                  { color: AdminColors.danger,   bg: AdminColors.dangerBg,   key: 'audit.actions.user_deleted' },
+  USER_PASSWORD_CHANGED:         { color: AdminColors.warning,  bg: AdminColors.warningBg,  key: 'audit.actions.user_password_changed' },
+  CATALOG_CATEGORY_CREATED:      { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_category_created' },
+  CATALOG_CATEGORY_UPDATED:      { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_category_updated' },
+  CATALOG_CATEGORY_TOGGLED:      { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_category_toggled' },
+  CATALOG_CATEGORY_DELETED:      { color: AdminColors.danger,   bg: AdminColors.dangerBg,   key: 'audit.actions.catalog_category_deleted' },
+  CATALOG_PRODUCT_CREATED:       { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_product_created' },
+  CATALOG_PRODUCT_UPDATED:       { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_product_updated' },
+  CATALOG_PRODUCT_TOGGLED:       { color: '#0891B2',            bg: '#ECFEFF',              key: 'audit.actions.catalog_product_toggled' },
+  CATALOG_PRODUCT_DELETED:       { color: AdminColors.danger,   bg: AdminColors.dangerBg,   key: 'audit.actions.catalog_product_deleted' },
+  CLIENT_UPDATED:                { color: '#D97706',            bg: '#FFFBEB',              key: 'audit.actions.client_updated' },
 };
 
-function getCfg(actionType: string) {
-  return ACTION_CATEGORIES[actionType] ?? {
-    color: AdminColors.textMuted,
-    bg: AdminColors.primary50,
-    label: actionType,
-  };
+function getCfg(actionType: string, t: (k: string) => string) {
+  const cfg = ACTION_COLORS[actionType];
+  if (cfg) return { color: cfg.color, bg: cfg.bg, label: t(cfg.key) };
+  return { color: AdminColors.textMuted, bg: AdminColors.primary50, label: actionType };
 }
 
 function entityNav(entityType: string, entityId: number): string | null {
@@ -77,8 +70,8 @@ function formatTs(ts: string, isRTL: boolean) {
 
 // ─── Row component ────────────────────────────────────────────────────────────
 
-function AuditRow({ entry, isRTL, onPress }: { entry: AuditLogEntry; isRTL: boolean; onPress?: () => void }) {
-  const cfg = getCfg(entry.actionType);
+function AuditRow({ entry, isRTL, t, onPress }: { entry: AuditLogEntry; isRTL: boolean; t: (k: string) => string; onPress?: () => void }) {
+  const cfg = getCfg(entry.actionType, t);
   const tappable = !!onPress;
 
   return (
@@ -163,10 +156,11 @@ export default function AuditScreen() {
       <AuditRow
         entry={item}
         isRTL={isRTL}
+        t={t}
         onPress={path ? () => handlePress(item) : undefined}
       />
     );
-  }, [isRTL, handlePress]);
+  }, [isRTL, t, handlePress]);
 
   const renderFooter = useCallback(() => {
     if (!hasNextPage) return null;
@@ -174,7 +168,7 @@ export default function AuditScreen() {
       <TouchableOpacity style={styles.loadMoreBtn} onPress={() => fetchNextPage()} disabled={isFetchingNextPage}>
         {isFetchingNextPage
           ? <ActivityIndicator color={AdminColors.primary} />
-          : <Text style={[styles.loadMoreText, font.semibold(isRTL)]}>{t('common.load_more', { defaultValue: 'Charger plus' })}</Text>}
+          : <Text style={[styles.loadMoreText, font.semibold(isRTL)]}>{t('common.load_more')}</Text>}
       </TouchableOpacity>
     );
   }, [hasNextPage, isFetchingNextPage, fetchNextPage, isRTL, t]);
@@ -187,7 +181,7 @@ export default function AuditScreen() {
           <Ionicons name="shield-checkmark" size={20} color={AdminColors.primary} />
         </View>
         <Text style={[styles.headerTitle, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-          {t('audit.title', { defaultValue: 'Journal d\'audit' })}
+          {t('audit.title')}
         </Text>
       </View>
 

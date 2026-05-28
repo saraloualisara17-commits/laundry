@@ -120,14 +120,14 @@ export const ordersApi = {
   /**
    * Get the absolute URL for the order PDF receipt.
    */
-  getOrderPdfUrl: (id: number | string) => 
-    `${api.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf`,
+  getOrderPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
+    `${api.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf?lang=${lang}`,
 
   /**
    * Get the absolute URL for the delivery PDF receipt.
    */
-  getDeliveryPdfUrl: (id: number | string) => 
-    `${api.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf`,
+  getDeliveryPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
+    `${api.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf?lang=${lang}`,
 
   /**
    * Send order receipt via WhatsApp (or get content).

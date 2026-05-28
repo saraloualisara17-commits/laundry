@@ -40,7 +40,8 @@
         "android.permission.VIBRATE",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -90,14 +91,12 @@
       "expo-updates",
       "expo-secure-store"
     ],
-    "updates": {
-      "url": "https://u.expo.dev/f81f325d-b523-433e-849e-a8fe1aa005d5"
-    },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f81f325d-b523-433e-849e-a8fe1aa005d5"
+        "projectId": "5cec7013-c82d-4a69-aebc-01172bfd7633"
       }
-    }
+    },
+    "owner": "samad_i"
   }
 }

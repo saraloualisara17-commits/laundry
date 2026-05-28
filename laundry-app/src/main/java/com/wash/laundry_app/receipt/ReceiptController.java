@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,15 +82,17 @@ public class ReceiptController {
 
     @Transactional(readOnly = true)
     @GetMapping("/order/pdf")
-    public ResponseEntity<byte[]> getOrderReceiptPdf(@PathVariable Long id) {
-        log.info("[receipt] ORDER PDF requested — orderId={} user={}", id, currentUser());
+    public ResponseEntity<byte[]> getOrderReceiptPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "lang", defaultValue = "fr") String lang) {
+        log.info("[receipt] ORDER PDF requested — orderId={} lang={} user={}", id, lang, currentUser());
         long t0 = System.currentTimeMillis();
         Commande commande = loadForReceipt(id);
         log.info("[receipt] ORDER PDF load complete — orderId={} status={} items={} payments={}",
                 id, commande.getStatus(),
                 commande.getCommandeTapis() != null ? commande.getCommandeTapis().size() : 0,
                 commande.getPaiements() != null ? commande.getPaiements().size() : 0);
-        byte[] pdf = pdfService.generatePdf(commande, "ORDER");
+        byte[] pdf = pdfService.generatePdf(commande, "ORDER", lang);
         log.info("[receipt] ORDER PDF generated — orderId={} bytes={} durationMs={}",
                 id, pdf.length, System.currentTimeMillis() - t0);
         return ResponseEntity.ok()
@@ -100,8 +103,10 @@ public class ReceiptController {
 
     @Transactional(readOnly = true)
     @GetMapping("/delivery/pdf")
-    public ResponseEntity<byte[]> getDeliveryNotePdf(@PathVariable Long id) {
-        log.info("[receipt] DELIVERY PDF requested — orderId={} user={}", id, currentUser());
+    public ResponseEntity<byte[]> getDeliveryNotePdf(
+            @PathVariable Long id,
+            @RequestParam(value = "lang", defaultValue = "fr") String lang) {
+        log.info("[receipt] DELIVERY PDF requested — orderId={} lang={} user={}", id, lang, currentUser());
         long t0 = System.currentTimeMillis();
         Commande commande = loadForReceipt(id);
         if (commande.getStatus() != CommandeStatus.DELIVERED) {
@@ -109,7 +114,7 @@ public class ReceiptController {
                     id, commande.getStatus());
             return ResponseEntity.badRequest().build();
         }
-        byte[] pdf = pdfService.generatePdf(commande, "DELIVERY");
+        byte[] pdf = pdfService.generatePdf(commande, "DELIVERY", lang);
         log.info("[receipt] DELIVERY PDF generated — orderId={} bytes={} durationMs={}",
                 id, pdf.length, System.currentTimeMillis() - t0);
         return ResponseEntity.ok()

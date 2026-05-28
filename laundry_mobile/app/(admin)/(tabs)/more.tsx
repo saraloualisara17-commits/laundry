@@ -95,8 +95,8 @@ export default function MoreScreen() {
           )}
           {renderMenuItem(
             'shield-checkmark-outline',
-            t('audit.title', { defaultValue: 'Journal d\'audit' }),
-            t('audit.subtitle', { defaultValue: 'Historique des opérations' }),
+            t('audit.title'),
+            t('audit.subtitle'),
             () => router.push('/(admin)/(tabs)/audit')
           )}
         </View>
@@ -104,8 +104,8 @@ export default function MoreScreen() {
   <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('admin.more.settings')}</Text>
   {renderMenuItem(
     'color-palette-outline',
-    'App Branding',
-    'Update name and logo',
+    t('settings.branding'),
+    t('settings.branding_sub'),
     () => router.push('/(admin)/settings')
   )}
   {renderMenuItem(

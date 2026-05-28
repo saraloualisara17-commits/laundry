@@ -186,6 +186,9 @@ function RootLayoutNav() {
       <Stack.Screen name="(admin)" />
       <Stack.Screen name="(employe)" />
       <Stack.Screen name="(livreur)" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="order/[id]" />
+      <Stack.Screen name="client/[id]" />
     </Stack>
   );
 }

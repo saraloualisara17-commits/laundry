@@ -53,7 +53,18 @@
     "whatsapp": "WhatsApp",
     "print": "Imprimer",
     "done": "Terminé",
-    "other": "Autre"
+    "other": "Autre",
+    "load_more": "Charger plus",
+    "camera": "Caméra",
+    "gallery": "Galerie",
+    "ok": "OK",
+    "update": "Mettre à jour",
+    "confirm_msg": "Êtes-vous sûr ?",
+    "me": "Moi",
+    "change": "Changer",
+    "deleted": "Supprimé",
+    "add_photo": "Ajouter une photo",
+    "share": "Partager"
   },
   "errors": {
     "network": "Erreur réseau. Veuillez vérifier votre connexion.",
@@ -157,7 +168,10 @@
       "loading": "Connexion...",
       "error": "Identifiants incorrects",
       "problem": "Problème de connexion ?",
-      "contact_admin": "Contactez l'administrateur"
+      "contact_admin": "Contactez l'administrateur",
+      "account_disabled": "Votre compte a été désactivé. Contactez l'administrateur.",
+      "email_placeholder": "votre@email.com",
+      "invalid_credentials": "Email ou mot de passe incorrect"
     }
   },
   "admin": {
@@ -563,6 +577,59 @@
     "no_overdue_sub": "Toutes les livraisons sont à jour.",
     "send_receipt_prompt": "Voulez-vous envoyer le reçu au client ?",
     "driver_fallback": "Livreur"
+  },
+  "notifications": {
+    "empty": "Aucune notification",
+    "mark_all_read": "Tout lire"
+  },
+  "receipt": {
+    "choose_language": "Langue du reçu / لغة الوصل"
+  },
+  "audit": {
+    "title": "Journal d'audit",
+    "subtitle": "Historique des opérations",
+    "tab": "Audit",
+    "actions": {
+      "order_created": "Commande créée",
+      "order_status_changed": "Statut modifié",
+      "order_updated": "Commande modifiée",
+      "order_deleted": "Commande supprimée",
+      "order_driver_assigned": "Livreur assigné",
+      "order_items_updated_by_driver": "Articles modifiés",
+      "payment_recorded": "Paiement enregistré",
+      "payment_added": "Paiement ajouté",
+      "user_created": "Utilisateur créé",
+      "user_updated": "Utilisateur modifié",
+      "user_deactivated": "Désactivé",
+      "user_activated": "Activé",
+      "user_deleted": "Utilisateur supprimé",
+      "user_password_changed": "Mot de passe changé",
+      "catalog_category_created": "Catégorie créée",
+      "catalog_category_updated": "Catégorie modifiée",
+      "catalog_category_toggled": "Catégorie activée/désact.",
+      "catalog_category_deleted": "Catégorie supprimée",
+      "catalog_product_created": "Produit créé",
+      "catalog_product_updated": "Produit modifié",
+      "catalog_product_toggled": "Produit activé/désact.",
+      "catalog_product_deleted": "Produit supprimé",
+      "client_updated": "Client modifié"
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "branding": "Personnalisation",
+    "branding_sub": "Modifier le nom et le logo",
+    "branding_page_title": "Paramètres de marque",
+    "visual_identity": "Identité visuelle",
+    "app_name": "Nom de l'application",
+    "app_name_placeholder": "Entrez le nom de l'app",
+    "business_phone": "Téléphone professionnel",
+    "app_logo": "Logo de l'application",
+    "change_logo": "Changer le logo",
+    "save_changes": "Enregistrer les modifications",
+    "app_name_required": "Le nom de l'application ne peut pas être vide",
+    "updated_success": "Paramètres mis à jour avec succès",
+    "update_failed": "Échec de la mise à jour des paramètres"
   },
   "orders": {
     "no_pickup_driver": "Sans livreur de collecte",

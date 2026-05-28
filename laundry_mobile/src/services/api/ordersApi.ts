@@ -94,11 +94,11 @@ export const ordersApi = {
 
   // --- RECEIPTS ---
 
-  getOrderPdfUrl: (id: number | string) =>
-    `${client.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf`,
+  getOrderPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
+    `${client.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf?lang=${lang}`,
 
-  getDeliveryPdfUrl: (id: number | string) =>
-    `${client.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf`,
+  getDeliveryPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
+    `${client.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf?lang=${lang}`,
 
   getOrderReceiptWhatsapp: (id: number | string) =>
     client.get(`/api/commandes/${id}/receipt/order/whatsapp`),

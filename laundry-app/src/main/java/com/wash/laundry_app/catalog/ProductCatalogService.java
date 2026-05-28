@@ -180,6 +180,13 @@ public class ProductCatalogService {
         }
     }
 
+    private static String normalizeImageUrl(String url) {
+        if (url != null && !url.startsWith("/uploads/") && !url.startsWith("http")) {
+            return "/uploads/" + url;
+        }
+        return url;
+    }
+
     private CategoryDto mapToCategoryDto(ProductCategory category) {
         return CategoryDto.builder()
                 .id(category.getId())
@@ -187,7 +194,7 @@ public class ProductCatalogService {
                 .nomAr(category.getNomAr())
                 .nomFr(category.getNomFr())
                 .icon(category.getIcon())
-                .imageUrl(category.getImageUrl())
+                .imageUrl(normalizeImageUrl(category.getImageUrl()))
                 .description(category.getDescription())
                 .isActive(category.getIsActive())
                 .sortOrder(category.getSortOrder())
@@ -204,7 +211,7 @@ public class ProductCatalogService {
                 .categoryId(product.getCategory().getId())
                 .categoryNom(product.getCategory().getNom())
                 .nom(product.getNom())
-                .imageUrl(product.getImageUrl())
+                .imageUrl(normalizeImageUrl(product.getImageUrl()))
                 .description(product.getDescription())
                 .pricingMethod(product.getPricingMethod())
                 .prixUnitaire(product.getPrixUnitaire())

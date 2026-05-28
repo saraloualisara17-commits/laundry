@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useTranslation } from 'react-i18next';
 import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
@@ -119,6 +119,7 @@ export default function MapViewScreen() {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
+        provider={PROVIDER_GOOGLE}
         showsUserLocation
         showsMyLocationButton={false}
         initialRegion={{ latitude: 33.5731, longitude: -7.5898, latitudeDelta: 0.5, longitudeDelta: 0.5 }}

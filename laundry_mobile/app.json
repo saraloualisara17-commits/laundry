@@ -21,10 +21,13 @@
     },
     "android": {
       "adaptiveIcon": {
-       "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#1B5E8E"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCPk9IgkZ7mnKV8QUbnWl5CpmMmNaQUCgE"
+        }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

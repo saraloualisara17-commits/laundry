@@ -17,8 +17,13 @@ import { AppState, AppStateStatus } from 'react-native';
 import { ConnectivityState } from './types';
 import { logger } from '../../lib/logger';
 
-const PROBE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app'}/actuator/health`;
-const PROBE_INTERVAL_MS = 30_000;
+// Probe a neutral, always-available endpoint instead of your own backend.
+// Probing /actuator/health counted against Railway free-tier request quotas
+// and caused false "offline" when the backend was cold-starting.
+// 1.1.1.1/cdn-cgi/trace is Cloudflare's trace endpoint: tiny response, no auth,
+// 99.99% uptime, global anycast — ideal for connectivity checks.
+const PROBE_URL = 'https://1.1.1.1/cdn-cgi/trace';
+const PROBE_INTERVAL_MS = 60_000; // background probe — foreground transitions already trigger a probe
 const PROBE_TIMEOUT_MS = 5_000;
 
 type Listener = (state: ConnectivityState) => void;

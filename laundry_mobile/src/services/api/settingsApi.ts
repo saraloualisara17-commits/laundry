@@ -27,7 +27,7 @@ const toFullLogoUrl = (raw: string | null | undefined): string | null => {
 export const settingsApi = {
   getSettings: (): Promise<SystemSettings> =>
     client.get<SystemSettings>('/api/public/settings').then(res => ({
-      appName: res.data.appName || 'PureClean',
+      appName: res.data.appName || 'ASTRA PROPRE',
       logoUrl: toFullLogoUrl((res.data as any).logoUrl),
       businessPhone: (res.data as any).businessPhone || null,
     })),
@@ -49,7 +49,7 @@ export const settingsApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then(res => ({
-        appName: res.data.appName || 'PureClean',
+        appName: res.data.appName || 'ASTRA PROPRE',
         logoUrl: toFullLogoUrl((res.data as any).logoUrl),
         businessPhone: (res.data as any).businessPhone || null,
       }));

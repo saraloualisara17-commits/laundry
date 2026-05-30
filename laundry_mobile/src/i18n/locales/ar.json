@@ -104,6 +104,7 @@
     "to_collect": "للتحصيل",
     "at_local": "بالمحل",
     "paid_debts": "الديون المدفوعة",
+    "settled_on": "تمت التسوية في",
     "orders_count_completed": "الطلبات المسواة",
     "self_submitted_orders": "طلبات العملاء (الويب)",
     "self_submitted_sub": "طلبات أرسلها العملاء بأنفسهم",
@@ -153,6 +154,7 @@
     "full_sub": "تم دفع الطلب بالكامل",
     "notes_placeholder": "رقم الشيك، تحويل، نقداً...",
     "notes_label": "ملاحظات الدفع (اختياري)",
+    "photo_label": "الصور (اختياري)",
     "confirm_btn": "تأكيد التسليم",
     "delivery_success": "تم التسليم بنجاح! ✅",
     "send_receipt_prompt": "هل تريد إرسال إيصال التسليم للزبون؟",
@@ -458,6 +460,7 @@
       "schedule_pickup": "جدولة استلام",
       "empty_title": "لا يوجد أي زبون",
       "empty_subtitle": "ابدأ بتسجيل أول زبون لك",
+      "already_exists": "هذا الزبون موجود بالفعل.",
       "search_placeholder": "الاسم أو رقم الهاتف...",
       "total_count": "في المجموع",
       "client_since": "زبون منذ",
@@ -576,7 +579,9 @@
     "no_overdue": "لا توجد توصيلات متأخرة",
     "no_overdue_sub": "جميع التوصيلات في الموعد.",
     "send_receipt_prompt": "هل تريد إرسال الإيصال للزبون؟",
-    "driver_fallback": "مندوب"
+    "driver_fallback": "مندوب",
+    "pickup_confirm_title": "تأكيد الاستلام",
+    "pickup_confirm_subtitle": "التقط صورة للمواد المستلمة (اختياري)."
   },
   "notifications": {
     "empty": "لا توجد إشعارات",
@@ -637,6 +642,20 @@
     "reassign_pickup_driver": "تغيير مندوب الاستلام",
     "edit_items": "المنتجات",
     "items_updated": "تم تحديث المنتجات بنجاح",
-    "not_your_order": "أنت لست مندوب استلام هذا الطلب"
+    "not_your_order": "أنت لست مندوب استلام هذا الطلب",
+    "not_pickup_driver": "فقط مندوب الاستلام المعين ({{name}}) يمكنه تأكيد الاستلام. غيّر المندوب أولاً إذا لزم الأمر.",
+    "not_delivery_driver": "فقط مندوب التوصيل المعين ({{name}}) يمكنه تأكيد التسليم. غيّر المندوب أولاً إذا لزم الأمر.",
+    "not_allowed": "غير مسموح",
+    "add_items": "إضافة / تعديل المنتجات"
+  },
+  "pickup": {
+    "choose_mode_title": "تأكيد الاستلام",
+    "choose_mode_subtitle": "كيف تريد المتابعة؟",
+    "option_items": "إضافة المنتجات",
+    "option_images": "صور فقط",
+    "option_nothing": "تأكيد بدون إضافة",
+    "images_only_title": "صور الاستلام",
+    "images_only_subtitle": "أضف صوراً قبل تأكيد الاستلام.",
+    "confirm_btn": "تأكيد الاستلام"
   }
 }

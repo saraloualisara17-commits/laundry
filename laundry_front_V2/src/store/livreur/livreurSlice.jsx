@@ -15,7 +15,8 @@ import {
   fetchLivreurDashboardStats,
   confirmPayment,
   fetchPaymentTypes,
-  fetchCarpetTypes
+  fetchCarpetTypes,
+  fetchPendingPickup,
 } from './livreurThunk'
 
 export const COMMANDE_STATUS = {
@@ -36,6 +37,7 @@ const initialState = {
 
   // Orders state
   readyForDelivery: [],
+  pendingPickup: [],
   readyOrders: [],
   canceledDeliveries: [],
   currentOrder: null,
@@ -395,6 +397,20 @@ const livreurSlice = createSlice({
       })
       .addCase(fetchCarpetTypes.rejected, (state, action) => {
         state.loading.carpetTypes = false;
+      });
+
+    // ========== FETCH PENDING PICKUP ==========
+    builder
+      .addCase(fetchPendingPickup.pending, (state) => {
+        state.loading.readyForDelivery = true;
+      })
+      .addCase(fetchPendingPickup.fulfilled, (state, action) => {
+        state.loading.readyForDelivery = false;
+        state.pendingPickup = action.payload;
+      })
+      .addCase(fetchPendingPickup.rejected, (state) => {
+        state.loading.readyForDelivery = false;
+        state.pendingPickup = [];
       });
   }
 })

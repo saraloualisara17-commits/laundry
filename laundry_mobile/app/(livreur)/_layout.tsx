@@ -4,6 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
+import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
 
 const PRIMARY = '#0D7377';
 const TEXT_MUTED = '#94A3B8';
@@ -13,7 +14,8 @@ export default function LivreurLayout() {
   const { t } = useTranslation();
   const { data: readyDeliveries = [] } = useReadyDeliveries();
   const { data: readyOrders = [] } = usePendingPickups();
-  const missionCount = readyDeliveries.length + readyOrders.length;
+  const visibleDeliveryCount = readyDeliveries.filter((o: any) => isVisibleToday(o.scheduledDeliveryDate)).length;
+  const missionCount = visibleDeliveryCount + readyOrders.length;
 
   return (
     <Tabs
@@ -50,6 +52,18 @@ export default function LivreurLayout() {
         }}
       />
       <Tabs.Screen
+        name="orders"
+        options={{
+          tabBarLabel: t('tabs.orders'),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.pill} />}
+              <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="missions"
         options={{
           tabBarLabel: t('tabs.missions'),
@@ -66,21 +80,32 @@ export default function LivreurLayout() {
           ),
         }}
       />
-      {/* Clients hidden — livreur has no client access */}
-      <Tabs.Screen name="clients" options={{ href: null }} />
       <Tabs.Screen
-        name="profile"
+        name="clients"
         options={{
-          tabBarLabel: t('tabs.profile'),
+          tabBarLabel: t('tabs.clients'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrap}>
               {focused && <View style={styles.pill} />}
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+              <Ionicons name={focused ? 'people' : 'people-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="unpaid"
+        options={{
+          tabBarLabel: t('dashboard.unpaid_balance'),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.pill} />}
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={22} color={color} />
             </View>
           ),
         }}
       />
       <Tabs.Screen name="map-view" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
       {/* Hidden screens — accessible via Stack push */}
       <Tabs.Screen name="create-order" options={{ href: null }} />
       <Tabs.Screen name="edit-order-items" options={{ href: null }} />

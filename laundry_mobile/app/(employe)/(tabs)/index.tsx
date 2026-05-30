@@ -36,7 +36,7 @@ export default function EmployeDashboard() {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
   const { data: settingsData } = useSettings();
-  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null, businessPhone: null };
   const { clearOrder, setMode } = useOrderCreation();
 
   const [showCreate, setShowCreate] = useState(false);

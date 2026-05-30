@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  ScrollView,
   Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,8 +22,8 @@ interface PickupConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void;
   confirmingPickup: boolean;
-  photoUri?: string;
-  setPhotoUri: (uri: string | undefined) => void;
+  photoUris: string[];
+  setPhotoUris: (uris: string[]) => void;
   pickupNotes: string;
   setPickupNotes: (notes: string) => void;
   isArabic?: boolean;
@@ -34,8 +35,8 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
   onClose,
   onConfirm,
   confirmingPickup,
-  photoUri,
-  setPhotoUri,
+  photoUris,
+  setPhotoUris,
   pickupNotes,
   setPickupNotes,
   t,
@@ -54,7 +55,7 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
       allowsEditing: false,
     });
     if (!result.canceled && result.assets?.[0]) {
-      setPhotoUri(result.assets[0].uri);
+      setPhotoUris([...photoUris, result.assets[0].uri]);
     }
   };
 
@@ -68,14 +69,19 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
       allowsEditing: false,
+      allowsMultipleSelection: true,
     });
-    if (!result.canceled && result.assets?.[0]) {
-      setPhotoUri(result.assets[0].uri);
+    if (!result.canceled && result.assets?.length) {
+      setPhotoUris([...photoUris, ...result.assets.map(a => a.uri)]);
     }
   };
 
+  const removePhoto = (uri: string) => {
+    setPhotoUris(photoUris.filter(u => u !== uri));
+  };
+
   const handleClose = () => {
-    setPhotoUri(undefined);
+    setPhotoUris([]);
     onClose();
   };
 
@@ -106,7 +112,7 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
     <RTLBottomSheet
       visible={visible}
       onClose={handleClose}
-      title={t('livreur.pickup_confirm_title', { defaultValue: 'Confirmer la collecte' })}
+      title={t('livreur.pickup_confirm_title')}
       footer={footer}
     >
       <View style={styles.body}>
@@ -114,34 +120,37 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
           style={[styles.subtitle, textAlign(isRTL), font.regular(isRTL)]}
           maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
         >
-          {t('livreur.pickup_confirm_subtitle', { defaultValue: 'Prenez une photo des articles récupérés (optionnel).' })}
+          {t('livreur.pickup_confirm_subtitle')}
         </Text>
 
-        {/* Proof of pickup photo */}
-        <RTLFormRow label={t('delivery.photo_label', { defaultValue: 'Photo (optionnel)' })}>
-          {photoUri ? (
-            <View style={styles.photoPreviewContainer}>
-              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-              <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => setPhotoUri(undefined)}>
-                <Ionicons name="close-circle" size={22} color={Colors.danger} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={[styles.photoActions, row(isRTL)]}>
-              <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchCamera}>
-                <Ionicons name="camera-outline" size={18} color={Colors.primary} />
-                <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                  {t('common.camera', { defaultValue: 'Caméra' })}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchGallery}>
-                <Ionicons name="images-outline" size={18} color={Colors.primary} />
-                <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                  {t('common.gallery', { defaultValue: 'Galerie' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {/* Proof of pickup photos */}
+        <RTLFormRow label={t('delivery.photo_label')}>
+          {photoUris.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbsScroll}>
+              {photoUris.map((uri) => (
+                <View key={uri} style={styles.thumbContainer}>
+                  <Image source={{ uri }} style={styles.thumb} />
+                  <TouchableOpacity style={styles.thumbRemoveBtn} onPress={() => removePhoto(uri)}>
+                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
           )}
+          <View style={[styles.photoActions, row(isRTL)]}>
+            <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchCamera}>
+              <Ionicons name="camera-outline" size={18} color={Colors.primary} />
+              <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                {t('common.camera')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchGallery}>
+              <Ionicons name="images-outline" size={18} color={Colors.primary} />
+              <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                {t('common.gallery')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </RTLFormRow>
 
         {/* Notes */}
@@ -169,6 +178,25 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 14,
   },
+  thumbsScroll: {
+    marginBottom: 10,
+  },
+  thumbContainer: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  thumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+  },
+  thumbRemoveBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: 'white',
+    borderRadius: 10,
+  },
   photoActions: {
     gap: 10,
   },
@@ -186,23 +214,6 @@ const styles = StyleSheet.create({
   photoBtnText: {
     fontSize: 13,
     color: Colors.primary,
-  },
-  photoPreviewContainer: {
-    position: 'relative',
-    alignSelf: 'flex-start',
-  },
-  photoPreview: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  photoRemoveBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'white',
-    borderRadius: 11,
   },
   notesRow: {
     marginTop: 12,

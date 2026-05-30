@@ -36,6 +36,10 @@ import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 import { BASE_URL } from '../../src/services/api/client';
 import { logger } from '../../src/lib/logger';
+import { ordersApi } from '../../src/services/api/ordersApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../src/services/query/queryKeys';
+import { uploadManager } from '../../src/services/uploads';
 
 const log = logger.ns('order-items');
 
@@ -61,16 +65,42 @@ export default function OrderItemsScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
-  const { 
-    client, items, addItem, removeItem, updateItem, 
+  const {
+    client, items, addItem, removeItem, updateItem,
     totalAmount, totalArea, itemCount,
     paidAmount, setPaidAmount, remainingAmount,
-    orderNotes, setOrderNotes, orderImages, setOrderImages, editingOrderId
+    orderNotes, setOrderNotes, orderImages, setOrderImages, editingOrderId,
+    pickupOrderId, pickupImagesOnly, clearOrder,
   } = useOrderCreation();
   
+  const qc = useQueryClient();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmingPickup, setConfirmingPickup] = useState(false);
   const modalScrollRef = useRef<ScrollView>(null);
+
+  const handleConfirmImagesOnly = async () => {
+    if (!pickupOrderId) return;
+    setConfirmingPickup(true);
+    try {
+      await ordersApi.confirmPickup(pickupOrderId, []);
+      const localImages = orderImages.filter(u => u.startsWith('file://') || u.startsWith('content://'));
+      if (localImages.length > 0) {
+        uploadManager.addImages(localImages, pickupOrderId as string, 'reception', 'standard')
+          .catch(e => log.error('Background image upload failed', { err: String(e) }));
+      }
+      qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      qc.invalidateQueries({ queryKey: queryKeys.livreur.all });
+      qc.invalidateQueries({ queryKey: queryKeys.statistics.all });
+      clearOrder();
+      router.replace(`/order/${pickupOrderId}`);
+    } catch {
+      Alert.alert(t('common.error'), t('common.error_msg'));
+    } finally {
+      setConfirmingPickup(false);
+    }
+  };
 
   // Modals
   const [configModal, setConfigModal] = useState<{ open: boolean, product: any, editCartId: string | null }>({
@@ -499,13 +529,44 @@ export default function OrderItemsScreen() {
       </View>
 
       <FlatList
-        data={products}
+        data={pickupImagesOnly ? [] : products}
         renderItem={renderProductRow}
         keyExtractor={item => item.id.toString()}
         ListHeaderComponent={
           <View>
-            {renderActionBar()}
-            {renderSummaryCard()}
+            {!pickupImagesOnly && renderActionBar()}
+            {!pickupImagesOnly && renderSummaryCard()}
+
+            {pickupImagesOnly && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: AdminColors.textPrimary, marginBottom: 4 }}>
+                  {t('pickup.images_only_title', { defaultValue: 'Photos de collecte' })}
+                </Text>
+                <Text style={{ fontSize: 13, color: AdminColors.textSecondary, marginBottom: 16 }}>
+                  {t('pickup.images_only_subtitle', { defaultValue: 'Ajoutez des photos de l\'ordre avant de confirmer la collecte.' })}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14, backgroundColor: '#E8F5E9' }}
+                    onPress={() => pickImage('gallery')}
+                  >
+                    <Ionicons name="images-outline" size={20} color="#388E3C" />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#388E3C' }}>
+                      {t('common.gallery', { defaultValue: 'Galerie' })}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 14, backgroundColor: '#E3F2FD' }}
+                    onPress={() => pickImage('camera')}
+                  >
+                    <Ionicons name="camera" size={20} color="#1976D2" />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1976D2' }}>
+                      {t('common.camera', { defaultValue: 'Caméra' })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {orderImages.length > 0 && (
               <View style={styles.orderPhotosContainer}>
@@ -528,31 +589,35 @@ export default function OrderItemsScreen() {
               </View>
             )}
 
-            <View style={styles.bagSection}>
-               <View style={[styles.sectionHeader, row(isArabic)]}>
-                  <View style={styles.bagIconBox}>
-                    <MaterialCommunityIcons name="shopping" size={16} color="white" />
-                  </View>
-                  <Text style={styles.sectionTitle}>{t('admin.orders.create.items.bag')}</Text>
-                  <View style={styles.pillBadge}><Text style={styles.pillText}>{items.length}</Text></View>
-               </View>
-               
-               {items.length === 0 ? (
-                 <View style={styles.emptyBag}>
-                    <Ionicons name="basket-outline" size={48} color={AdminColors.textMuted} />
-                    <Text style={styles.emptyBagText}>{t('admin.orders.create.items.bag_empty')}</Text>
+            {!pickupImagesOnly && (
+              <View style={styles.bagSection}>
+                 <View style={[styles.sectionHeader, row(isArabic)]}>
+                    <View style={styles.bagIconBox}>
+                      <MaterialCommunityIcons name="shopping" size={16} color="white" />
+                    </View>
+                    <Text style={styles.sectionTitle}>{t('admin.orders.create.items.bag')}</Text>
+                    <View style={styles.pillBadge}><Text style={styles.pillText}>{items.length}</Text></View>
                  </View>
-               ) : (
-                 items.map(renderCartItem)
-               )}
-            </View>
 
-            <View style={[styles.section, { marginTop: 24, marginBottom: 8 }]}>
-              <View style={[styles.sectionHeader, row(isArabic)]}>
-                <Ionicons name="list" size={20} color={AdminColors.primary} />
-                <Text style={styles.sectionTitle}>{t('admin.orders.create.items.available_products')}</Text>
+                 {items.length === 0 ? (
+                   <View style={styles.emptyBag}>
+                      <Ionicons name="basket-outline" size={48} color={AdminColors.textMuted} />
+                      <Text style={styles.emptyBagText}>{t('admin.orders.create.items.bag_empty')}</Text>
+                   </View>
+                 ) : (
+                   items.map(renderCartItem)
+                 )}
               </View>
-            </View>
+            )}
+
+            {!pickupImagesOnly && (
+              <View style={[styles.section, { marginTop: 24, marginBottom: 8 }]}>
+                <View style={[styles.sectionHeader, row(isArabic)]}>
+                  <Ionicons name="list" size={20} color={AdminColors.primary} />
+                  <Text style={styles.sectionTitle}>{t('admin.orders.create.items.available_products')}</Text>
+                </View>
+              </View>
+            )}
           </View>
         }
         contentContainerStyle={{ paddingBottom: 150 }}
@@ -563,15 +628,30 @@ export default function OrderItemsScreen() {
         ) : null}
       />
 
-      {/* Footer Continue Btn */}
+      {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity 
-          style={[styles.continueBtn, items.length === 0 && styles.continueBtnDisabled]} 
-          onPress={() => router.push('/(admin)/order-summary')}
-          disabled={items.length === 0}
-        >
-          <Text style={styles.continueBtnText}>{t('common.continue')} {isArabic ? '←' : '→'}</Text>
-        </TouchableOpacity>
+        {pickupImagesOnly ? (
+          <TouchableOpacity
+            style={[styles.continueBtn, confirmingPickup && styles.continueBtnDisabled]}
+            onPress={handleConfirmImagesOnly}
+            disabled={confirmingPickup}
+          >
+            {confirmingPickup
+              ? <ActivityIndicator color="white" />
+              : <Text style={styles.continueBtnText}>
+                  {t('pickup.confirm_btn', { defaultValue: 'Confirmer la collecte' })}
+                </Text>
+            }
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.continueBtn, items.length === 0 && styles.continueBtnDisabled]}
+            onPress={() => router.push('/(admin)/order-summary')}
+            disabled={items.length === 0}
+          >
+            <Text style={styles.continueBtnText}>{t('common.continue')} {isArabic ? '←' : '→'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Config Modal */}

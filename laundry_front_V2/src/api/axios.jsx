@@ -1,19 +1,24 @@
 import axios from "axios"
 import { store } from "../store/store"
 import { logOut, setCredentials } from "../store/auth/authSlice"
-import { toast } from "react-toastify"
 
 const BASE_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '')
 
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
 })
 
 const refreshApi = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 15000,
 })
+
+// Dedup guard: if multiple 401s fire at once, only one refresh call goes out
+let _refreshPromise = null
 
 api.interceptors.request.use((config) => {
   const token = store.getState()?.auth?.token
@@ -28,8 +33,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-
-    if (error.response?.status === 403) {
+    if (
+      error.response?.status === 403 &&
+      !originalRequest?.url?.includes("/auth/refresh") &&
+      !originalRequest?.url?.includes("/auth/login")
+    ) {
       if (error.response?.data?.error === "ACCOUNT_DISABLED") {
         store.dispatch(logOut())
         localStorage.removeItem('user')
@@ -37,10 +45,7 @@ api.interceptors.response.use(
         return Promise.reject(error)
       }
 
-      // Check if inactive natively via cache
-      const user = JSON.parse(
-        localStorage.getItem('user') || 'null'
-      )
+      const user = JSON.parse(localStorage.getItem('user') || 'null')
       store.dispatch(logOut())
       if (user?.isActive === false) {
         window.location.href = '/compte-suspendu'
@@ -60,14 +65,28 @@ api.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        const res = await refreshApi.post("/auth/refresh")
-        const token = res.data.token   // Fixed: was res.data.tocken (typo)
+        if (!_refreshPromise) {
+          const refreshToken = store.getState()?.auth?.refreshToken
+          _refreshPromise = refreshApi
+            .post("/auth/refresh", null, {
+              headers: { 'X-Refresh-Token': refreshToken },
+            })
+            .then((res) => {
+              const newToken = res.data.accessToken || res.data.token
+              const newRefreshToken = res.data.refreshToken
+              store.dispatch(setCredentials({ token: newToken, refreshToken: newRefreshToken }))
+              return newToken
+            })
+            .finally(() => {
+              _refreshPromise = null
+            })
+        }
 
-        store.dispatch(setCredentials({ token }))
-        originalRequest.headers.Authorization = `Bearer ${token}`
-
+        const newToken = await _refreshPromise
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
         return api(originalRequest)
       } catch (err) {
+        _refreshPromise = null
         store.dispatch(logOut())
         localStorage.removeItem('user')
         window.location.href = '/'
@@ -80,4 +99,3 @@ api.interceptors.response.use(
 )
 
 export { refreshApi }
-

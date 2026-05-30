@@ -12,7 +12,7 @@ const SETTINGS_STALE_TIME = Infinity;
 const SETTINGS_GC_TIME = 1000 * 60 * 30;
 
 const SETTINGS_DEFAULTS: SystemSettings = {
-  appName: 'PureClean',
+  appName: 'ASTRA PROPRE',
   logoUrl: null,
   businessPhone: null,
 };

@@ -1,12 +1,14 @@
 import { Colors } from './theme';
 
-export type OrderStatus = 
-  | 'PENDING_PICKUP' 
-  | 'PICKED_UP' 
-  | 'IN_PROCESS' 
-  | 'READY_FOR_DELIVERY' 
-  | 'DELIVERED' 
-  | 'CANCELLED';
+export type OrderStatus =
+  | 'PENDING_PICKUP'
+  | 'PICKED_UP'
+  | 'IN_PROCESS'
+  | 'READY_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'PICKUP_FAILED'
+  | 'DELIVERY_FAILED';
 
 export interface WorkflowAction {
   labelKey: string;
@@ -42,7 +44,7 @@ export const ORDER_WORKFLOW: Record<OrderStatus, WorkflowAction> = {
     bg: Colors.accent,
     icon: 'check-circle',
     textColor: '#0D1B2A',
-    requiresDriverModal: true
+    requiresDriverModal: true,
   },
   READY_FOR_DELIVERY: {
     labelKey: 'admin.orders.actions.mark_delivered',
@@ -64,7 +66,23 @@ export const ORDER_WORKFLOW: Record<OrderStatus, WorkflowAction> = {
     bg: Colors.danger,
     disabled: true,
     icon: 'times-circle'
-  }
+  },
+  // Failure states — Admin can reschedule from these on the backend.
+  // No direct UI action button; they show as informational terminal states.
+  PICKUP_FAILED: {
+    labelKey: 'status.PICKUP_FAILED',
+    nextStatus: null,
+    bg: Colors.danger,
+    disabled: true,
+    icon: 'exclamation-circle'
+  },
+  DELIVERY_FAILED: {
+    labelKey: 'status.DELIVERY_FAILED',
+    nextStatus: null,
+    bg: Colors.danger,
+    disabled: true,
+    icon: 'exclamation-triangle'
+  },
 };
 
 /**
@@ -98,7 +116,7 @@ export const isTransitionAllowedForRole = (status: OrderStatus, role: string): b
  * Helper to identify if the order is in the pickup phase.
  */
 export const isPickupPhase = (status: OrderStatus | string): boolean => {
-  return status === 'PENDING_PICKUP' || status === 'PICKED_UP';
+  return status === 'PENDING_PICKUP' || status === 'PICKED_UP' || status === 'PICKUP_FAILED';
 };
 
 /**

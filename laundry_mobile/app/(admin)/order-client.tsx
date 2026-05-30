@@ -50,17 +50,19 @@ export default function OrderClientScreen() {
   const isImmediate = mode === 'immediate';
   const isScheduled = mode === 'scheduled';
 
-  const { 
-    pendingLocation, 
+  const {
+    pendingLocation,
     setPendingLocation,
     client: contextClient,
-    setClient, 
-    setDeliveryType: setCtxDeliveryType, 
+    setClient,
+    setDeliveryType: setCtxDeliveryType,
     deliveryType: contextDeliveryType,
     livreurId: contextLivreurId,
     scheduledDate: contextScheduledDate,
-    setLivreur, 
-    setScheduledDate 
+    setLivreur,
+    setScheduledDate,
+    clearOrder,
+    creationIdempotencyKey,
   } = useOrderCreation();
   
   // States
@@ -128,7 +130,7 @@ export default function OrderClientScreen() {
       const res = await adminApi.getUsers();
       const allUsers = res.data?.data || res.data || [];
       const livreurs = allUsers.filter(
-        (u: any) => ['LIVREUR', 'ADMIN', 'EMPLOYE'].includes(u.role?.toUpperCase())
+        (u: any) => ['LIVREUR', 'ADMIN'].includes(u.role?.toUpperCase())
       );
       setDrivers(livreurs);
     } catch (error) {
@@ -233,33 +235,60 @@ export default function OrderClientScreen() {
         finalClientId = res.data.id;
       }
 
-      setClient({
-        id: finalClientId!,
-        name: clientName,
-        phone: phone,
-        address: address,
-        quartier: region,
-        latitude: gpsCoords?.lat,
-        longitude: gpsCoords?.lng,
-        notes: clientNotes
-      });
-      
-      if (isImmediate) {
-        setCtxDeliveryType(deliveryType);
-      } else {
-        setLivreur(selectedDriver.id);
-        
+      // Build scheduled date for scheduled mode
+      let scheduledIso: string | null = null;
+      if (isScheduled) {
         const finalScheduledDate = new Date(pickupDate!);
         finalScheduledDate.setHours(pickupTime!.getHours());
         finalScheduledDate.setMinutes(pickupTime!.getMinutes());
         finalScheduledDate.setSeconds(0);
-        
-        setScheduledDate(finalScheduledDate.toISOString());
+        scheduledIso = finalScheduledDate.toISOString();
       }
 
-      router.push('/(admin)/order-items');
-    } catch (error) {
-      Alert.alert(t('common.error'), t('admin.users.required_fields'));
+      // Create the order immediately with no items — status will be PENDING_PICKUP.
+      // Items are added later when the driver taps "Confirm Picked Up".
+      const orderRes = await adminApi.createOrder({
+        clientId: finalClientId,
+        tapis: [],
+        imageUrls: [],
+        mode: isImmediate ? 'IMMEDIATE' : 'SCHEDULED',
+        deliveryType: isImmediate ? deliveryType : undefined,
+        pickupDriverId: isScheduled ? selectedDriver?.id : undefined,
+        scheduledPickupDate: scheduledIso ?? undefined,
+        paymentMethod: 'especes',
+        montantPaye: 0,
+        notes: '',
+        source: 'ADMIN_APP',
+        deliveryAddress: address || region || null,
+        deliveryLatitude: gpsCoords?.lat ?? null,
+        deliveryLongitude: gpsCoords?.lng ?? null,
+        creationIdempotencyKey,
+      });
+
+      const savedOrder = orderRes.data?.data ?? orderRes.data;
+      const orderId = savedOrder?.id;
+      if (!orderId) throw new Error('Server did not return an order ID');
+
+      clearOrder();
+
+      router.push({
+        pathname: '/(admin)/order-confirmation',
+        params: { orderId, orderNumber: savedOrder?.numeroCommande },
+      });
+    } catch (error: any) {
+      const status = error?.status ?? error?.response?.status;
+      const data = error?.details ?? error?.response?.data;
+      if (status === 400) {
+        const fieldErrors = data?.errors;
+        const firstMsg = fieldErrors
+          ? (Object.values(fieldErrors)[0] as string)
+          : data?.message;
+        Alert.alert(t('common.error'), firstMsg || t('admin.users.required_fields'));
+      } else if (status === 409) {
+        Alert.alert(t('common.error'), data?.message || t('admin.clients.already_exists'));
+      } else {
+        Alert.alert(t('common.error'), t('common.error_msg'));
+      }
     } finally {
       setSubmitting(false);
     }

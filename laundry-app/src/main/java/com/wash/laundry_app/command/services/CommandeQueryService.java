@@ -149,18 +149,21 @@ public class CommandeQueryService {
 
         java.time.LocalDateTime dateTimeDebut = dateDebut != null ? dateDebut.atStartOfDay() : null;
         java.time.LocalDateTime dateTimeFin = dateFin != null ? dateFin.atTime(23, 59, 59) : null;
-        java.time.LocalDateTime thirtyDaysAgo = java.time.LocalDateTime.now().minusDays(30);
 
-        Sort sort = Sort.by("dateCreation");
+        // When filtering paid debts, the user-supplied date range applies to debtSettledAt,
+        // not dateCreation — so we pass it through as-is and let the query use it for
+        // the standard dateDebut/dateFin filter (which for paidDebts=true effectively
+        // narrows to settlement date via the debtSettledAt field in the WHERE clause).
+        Sort sort = Sort.by(Boolean.TRUE.equals(paidDebts) ? "debtSettledAt" : "dateCreation");
         sort = "asc".equalsIgnoreCase(sortDirection) ? sort.ascending() : sort.descending();
 
         PageRequest pageable = PageRequest.of(page, size, sort);
         Page<Commande> pageResult = commandeRepository.findFiltered(
-                statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, thirtyDaysAgo, dateTimeDebut, dateTimeFin, search, livreurId, pageable);
+                statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId, pageable);
 
-        java.math.BigDecimal totalValue  = commandeRepository.findFilteredTotalValue(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, thirtyDaysAgo, dateTimeDebut, dateTimeFin, search, livreurId);
-        java.math.BigDecimal totalUnpaid = commandeRepository.findFilteredTotalUnpaid(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, thirtyDaysAgo, dateTimeDebut, dateTimeFin, search, livreurId);
-        Long totalVolumes = commandeRepository.findFilteredTotalVolume(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, thirtyDaysAgo, dateTimeDebut, dateTimeFin, search, livreurId);
+        java.math.BigDecimal totalValue  = commandeRepository.findFilteredTotalValue(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
+        java.math.BigDecimal totalUnpaid = commandeRepository.findFilteredTotalUnpaid(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
+        Long totalVolumes = commandeRepository.findFilteredTotalVolume(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
 
         return AdminOrdersResponseDTO.builder()
                 .content(pageResult.getContent().stream().map(commandeMapper::toDto).toList())

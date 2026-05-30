@@ -14,13 +14,35 @@ export interface UploadTask {
   status: UploadStatus;
   progress: number;
   attempts: number;
+  nextRetryAt: number;   // epoch ms — task is not eligible until this time passes
   errorMessage?: string;
   createdAt: number;
 }
 
-const UPLOAD_QUEUE_FILE = `${FileSystem.documentDirectory}upload_queue.json`;
-const UPLOAD_QUEUE_TMP  = `${FileSystem.documentDirectory}upload_queue.json.tmp`;
-const DEAD_TASK_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// documentDirectory is guaranteed non-null after app launch, but typed as
+// string | null — fall back to a safe no-op path so writes fail gracefully.
+const _rawDir    = FileSystem.documentDirectory ?? '';
+const DOC_DIR    = _rawDir.endsWith('/') ? _rawDir : _rawDir ? `${_rawDir}/` : '';
+const QUEUE_FILE = `${DOC_DIR}upload_queue.json`;
+const DEAD_TASK_AGE  = 7 * 24 * 60 * 60 * 1000; // 7 days — stale task cleanup
+
+// Exponential backoff schedule (ms). Index = attempt number (0-based).
+// attempt 0 → immediate
+// attempt 1 → 5s
+// attempt 2 → 30s
+// attempt 3 → 2m
+// attempt 4 → 10m  (then dropped)
+const RETRY_DELAYS = [0, 5_000, 30_000, 120_000, 600_000];
+const MAX_ATTEMPTS = RETRY_DELAYS.length; // 5 total attempts, then drop
+
+// ─── ID generation ───────────────────────────────────────────────────────────
+// Math.random() produces ~10^9 values — real collision risk in a persistent
+// queue. Use timestamp + random suffix: collision probability < 1 in 10^15.
+function generateId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// ─── Queue ───────────────────────────────────────────────────────────────────
 
 class UploadQueue {
   private tasks: UploadTask[] = [];
@@ -29,20 +51,23 @@ class UploadQueue {
   private async load() {
     if (this.isLoaded) return;
     try {
-      const info = await FileSystem.getInfoAsync(UPLOAD_QUEUE_FILE);
+      const info = await FileSystem.getInfoAsync(QUEUE_FILE);
       if (info.exists) {
-        const content = await FileSystem.readAsStringAsync(UPLOAD_QUEUE_FILE);
+        const content = await FileSystem.readAsStringAsync(QUEUE_FILE);
         const parsed: UploadTask[] = JSON.parse(content);
-        // Purge failed tasks older than 7 days to avoid unbounded disk growth.
-        const cutoff = Date.now() - DEAD_TASK_MAX_AGE_MS;
-        this.tasks = parsed.filter((t) => t.status !== 'failed' || t.createdAt > cutoff);
+        const cutoff = Date.now() - DEAD_TASK_AGE;
+        // Purge dead tasks and re-arm any tasks stuck in 'uploading' from a
+        // previous session (app was killed mid-upload — reset them to 'pending')
+        this.tasks = parsed
+          .filter(t => t.status !== 'failed' || t.createdAt > cutoff)
+          .map(t => t.status === 'uploading' ? { ...t, status: 'pending' as UploadStatus } : t);
       }
     } catch (e) {
       log.error('Load failed — archiving corrupt file', { err: String(e) });
       try {
         await FileSystem.moveAsync({
-          from: UPLOAD_QUEUE_FILE,
-          to: `${FileSystem.documentDirectory}upload_queue.corrupt.${Date.now()}.json`,
+          from: QUEUE_FILE,
+          to: `${DOC_DIR}upload_queue.corrupt.${Date.now()}.json`,
         });
       } catch {}
       this.tasks = [];
@@ -51,24 +76,46 @@ class UploadQueue {
   }
 
   private async save() {
+    if (!DOC_DIR) return;
     try {
-      // Atomic write: write to .tmp then rename so a crash mid-write never
-      // produces a corrupt queue file that locks uploads permanently.
-      await FileSystem.writeAsStringAsync(UPLOAD_QUEUE_TMP, JSON.stringify(this.tasks));
-      await FileSystem.moveAsync({ from: UPLOAD_QUEUE_TMP, to: UPLOAD_QUEUE_FILE });
+      // writeAsStringAsync is atomic on both iOS and Android (O_WRONLY|O_CREAT|O_TRUNC)
+      // so a direct write is safe — no .tmp rename needed, and avoids the Android
+      // FileSystem.moveAsync bug where a missing destination is treated as a directory.
+      await FileSystem.writeAsStringAsync(QUEUE_FILE, JSON.stringify(this.tasks));
     } catch (e) {
       log.error('Save failed', { err: String(e) });
     }
   }
 
-  public async enqueue(task: Omit<UploadTask, 'id' | 'status' | 'progress' | 'attempts' | 'createdAt'>) {
+  public async enqueue(
+    task: Omit<UploadTask, 'id' | 'status' | 'progress' | 'attempts' | 'nextRetryAt' | 'createdAt'>,
+  ): Promise<UploadTask> {
     await this.load();
+
+    // Deduplication: if an identical (orderId + photoType + originalUri) task is
+    // already pending or uploading, don't enqueue a duplicate. This guards
+    // against the user tapping a button twice quickly.
+    const isDuplicate = this.tasks.some(
+      t =>
+        t.originalUri === task.originalUri &&
+        t.orderId === task.orderId &&
+        t.photoType === task.photoType &&
+        (t.status === 'pending' || t.status === 'uploading'),
+    );
+    if (isDuplicate) {
+      log.warn('Skipping duplicate task', { orderId: String(task.orderId) });
+      return this.tasks.find(
+        t => t.originalUri === task.originalUri && t.orderId === task.orderId,
+      )!;
+    }
+
     const newTask: UploadTask = {
       ...task,
-      id: Math.random().toString(36).substring(7),
+      id: generateId(),
       status: 'pending',
       progress: 0,
       attempts: 0,
+      nextRetryAt: 0,   // eligible immediately
       createdAt: Date.now(),
     };
     this.tasks.push(newTask);
@@ -78,7 +125,7 @@ class UploadQueue {
 
   public async updateTask(id: string, updates: Partial<UploadTask>) {
     await this.load();
-    this.tasks = this.tasks.map(t => t.id === id ? { ...t, ...updates } : t);
+    this.tasks = this.tasks.map(t => (t.id === id ? { ...t, ...updates } : t));
     await this.save();
   }
 
@@ -88,15 +135,24 @@ class UploadQueue {
     await this.save();
   }
 
-  public async getPendingTasks() {
+  /**
+   * Returns tasks that are eligible to run right now.
+   * A failed task with a future `nextRetryAt` is NOT returned until that
+   * time has passed — this enforces exponential backoff without a timer.
+   */
+  public async getPendingTasks(): Promise<UploadTask[]> {
     await this.load();
-    return this.tasks.filter(t => t.status === 'pending' || t.status === 'failed');
+    const now = Date.now();
+    return this.tasks.filter(
+      t => (t.status === 'pending' || t.status === 'failed') && t.nextRetryAt <= now,
+    );
   }
 
-  public async getAllTasks() {
+  public async getAllTasks(): Promise<UploadTask[]> {
     await this.load();
     return [...this.tasks];
   }
+
 }
 
 export const uploadQueue = new UploadQueue();

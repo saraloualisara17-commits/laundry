@@ -13,13 +13,13 @@ import { AdminColors as Colors, AdminShadows } from '../../constants/AdminColors
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 import DeliveryConfirmModal from '../../components/orders/modals/DeliveryConfirmModal';
-import PickupConfirmModal from '../../components/orders/modals/PickupConfirmModal';
 import ReceiptActionsModal from '../../components/orders/modals/ReceiptActionsModal';
 import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { isScheduledToday, isScheduledOverdue } from '../../src/utils/deliveryDateUtils';
 import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } from '../../src/hooks/queries/useLivreur';
 import { ordersApi } from '../../src/services/api';
 import { uploadManager } from '../../src/services/uploads';
+import { useOrderCreation } from '../../src/context/OrderCreationContext';
 
 const C = Colors; // alias — all values sourced from AdminColors design tokens
 
@@ -172,7 +172,7 @@ function DeliveryCard({ order, onDeliver, onReportProblem }: any) {
 }
 
 // ─── PickupCard ───────────────────────────────────────────────────────────────
-function PickupCard({ order, onCollect, collecting, onReportProblem }: any) {
+function PickupCard({ order, onCollect, onReportProblem }: any) {
   const { t } = useTranslation();
   const addr = order.client?.addresses?.[0]?.address || order.clientAdresse;
   const phone = order.client?.phones?.[0]?.phoneNumber || order.clientPhone;
@@ -230,9 +230,8 @@ function PickupCard({ order, onCollect, collecting, onReportProblem }: any) {
             <TouchableOpacity
               style={[styles.mainActionBtn, { flex: 3, backgroundColor: C.warning }]}
               onPress={() => onCollect(order)}
-              disabled={collecting}
             >
-              {collecting ? <ActivityIndicator color="white" /> : <Text style={styles.mainActionText}>{t('livreur.collect_btn')}</Text>}
+              <Text style={styles.mainActionText}>{t('livreur.collect_btn')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.refusBtn, { flex: 1 }]}
@@ -261,7 +260,6 @@ export default function LivreurMissionsScreen() {
     }
   }, [tab]);
   const [deliverySubTab, setDeliverySubTab] = useState<'today' | 'overdue'>('today');
-  const [collectingId, setCollectingId] = useState<string | null>(null);
   const [selOrder, setSelOrder] = useState<any>(null);
 
   // Unified modal state matching Admin
@@ -273,12 +271,10 @@ export default function LivreurMissionsScreen() {
   // Delivery flow state
   const [collectedAmount, setCollectedAmount] = useState('0');
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [deliveryPhotoUri, setDeliveryPhotoUri] = useState<string | undefined>(undefined);
+  const [deliveryPhotoUris, setDeliveryPhotoUris] = useState<string[]>([]);
 
-  // Pickup flow state
-  const [showPickupModal, setShowPickupModal] = useState(false);
-  const [pickupNotes, setPickupNotes] = useState('');
-  const [pickupPhotoUri, setPickupPhotoUri] = useState<string | undefined>(undefined);
+
+  const { clearOrder, setPickupOrderId, setOrderNotes, driverLocalImages, clearDriverLocalImages } = useOrderCreation();
 
   const { data: pickupOrders = [], isLoading: loadingPickups, isFetching: fetchingPickups, refetch: refetchPickups } = usePendingPickups();
   const { data: deliveryOrders = [], isLoading: loadingDeliveries, isFetching: fetchingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
@@ -302,29 +298,37 @@ export default function LivreurMissionsScreen() {
   }, [refetchPickups, refetchDeliveries]);
 
   const handleStatusUpdate = (orderId: number, status: 'PICKED_UP' | 'DELIVERED', extraData?: any) => {
-    const photoAtConfirm = deliveryPhotoUri;
+    const photosAtConfirm = [...deliveryPhotoUris];
+    const pendingDetailImages = [...(driverLocalImages[String(orderId)] ?? [])];
     updateStatusMutation.mutate(
       {
         orderId,
         status,
         amount: extraData?.amount,
         notesPaiement: extraData?.notesPaiement,
-        // Fresh UUID per delivery confirmation tap — server uses it to
-        // deduplicate the embedded payment if the network drops after commit.
         paymentIdempotencyKey: status === 'DELIVERED' ? randomUUID() : undefined,
       },
       {
         onSuccess: async (res) => {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setShowPaymentModal(false);
-          setDeliveryPhotoUri(undefined);
+          setDeliveryPhotoUris([]);
           const updatedOrder = (res as any).data ?? selOrder;
           setSelOrder(updatedOrder);
 
-          // Upload delivery proof photo in background after order is confirmed
-          if (photoAtConfirm) {
-            uploadManager.addImage(photoAtConfirm, orderId, 'livraison', 'standard')
-              .catch(() => { /* silent — upload will retry via queue */ });
+          // Upload delivery proof photos from the modal
+          photosAtConfirm.forEach(uri => {
+            uploadManager.addImage(uri, orderId, 'livraison', 'standard')
+              .catch(() => {});
+          });
+
+          // Upload images added on the order detail page before confirming delivery
+          if (status === 'DELIVERED' && pendingDetailImages.length > 0) {
+            clearDriverLocalImages(String(orderId));
+            pendingDetailImages.forEach(uri => {
+              uploadManager.addImage(uri, orderId, 'livraison', 'standard')
+                .catch(() => {});
+            });
           }
 
           setShowReceiptModal(true);
@@ -334,39 +338,13 @@ export default function LivreurMissionsScreen() {
     );
   };
 
+  // Navigate to order-items so the driver adds items before confirming PICKED_UP.
+  // This mirrors the flow triggered from the order detail page.
   const handleCollect = (order: any) => {
-    setSelOrder(order);
-    setPickupNotes('');
-    setPickupPhotoUri(undefined);
-    setShowPickupModal(true);
-  };
-
-  const handlePickupConfirm = () => {
-    if (!selOrder) return;
-    const photoAtConfirm = pickupPhotoUri;
-    setCollectingId(String(selOrder.id));
-    updateStatusMutation.mutate(
-      { orderId: selOrder.id, status: 'PICKED_UP' },
-      {
-        onSuccess: async (res) => {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setShowPickupModal(false);
-          setPickupPhotoUri(undefined);
-          const updatedOrder = (res as any).data ?? selOrder;
-          setSelOrder(updatedOrder);
-
-          // Upload pickup proof photo in background after order is confirmed
-          if (photoAtConfirm) {
-            uploadManager.addImage(photoAtConfirm, selOrder.id, 'reception', 'standard')
-              .catch(() => { /* silent — upload will retry via queue */ });
-          }
-
-          setShowReceiptModal(true);
-        },
-        onError: () => Alert.alert(t('common.error'), t('livreur.action_failed')),
-        onSettled: () => setCollectingId(null),
-      }
-    );
+    clearOrder();
+    setPickupOrderId(String(order.id));
+    setOrderNotes(order.notes || '');
+    router.push('/(admin)/order-items');
   };
 
   const todayOrders = deliveryOrders.filter(o => isScheduledToday(o.scheduledDeliveryDate));
@@ -374,8 +352,8 @@ export default function LivreurMissionsScreen() {
   const activeDeliveryList = deliverySubTab === 'today' ? todayOrders : overdueOrders;
 
   const tabs: Array<{ key: 'delivery' | 'pickup'; label: string; badge?: number; badgeColor?: string }> = [
-    { key: 'delivery', label: t('livreur.deliveries_tab'), badge: deliveryOrders.length || undefined, badgeColor: C.danger },
-    { key: 'pickup',   label: t('livreur.pickups_tab'),   badge: pickupOrders.length || undefined,   badgeColor: C.warning },
+    { key: 'delivery', label: t('livreur.deliveries_tab'), badge: (todayOrders.length + overdueOrders.length) || undefined, badgeColor: C.danger },
+    { key: 'pickup',   label: t('livreur.pickups_tab'),   badge: pickupOrders.length || undefined,                         badgeColor: C.warning },
   ];
 
   const emptyIcon  = activeTab === 'delivery' ? '🎉' : '📭';
@@ -453,7 +431,7 @@ export default function LivreurMissionsScreen() {
                   setSelOrder(o);
                   setCollectedAmount(String(o.montantRestant || 0));
                   setDeliveryNotes('');
-                  setDeliveryPhotoUri(undefined);
+                  setDeliveryPhotoUris([]);
                   setShowPaymentModal(true);
                 }}
                 onReportProblem={(o: any) => { setSelOrder(o); setProbType('DELIVERY'); setShowProb(true); }}
@@ -486,7 +464,6 @@ export default function LivreurMissionsScreen() {
             <PickupCard
               order={item}
               onCollect={handleCollect}
-              collecting={collectingId === String(item.id)}
               onReportProblem={(o: any) => { setSelOrder(o); setProbType('PICKUP'); setShowProb(true); }}
             />
           )}
@@ -513,7 +490,7 @@ export default function LivreurMissionsScreen() {
         <DeliveryConfirmModal
           visible={showPaymentModal}
           onClose={() => {
-            setDeliveryPhotoUri(undefined);
+            setDeliveryPhotoUris([]);
             setShowPaymentModal(false);
           }}
           onConfirm={() => handleStatusUpdate(selOrder.id, 'DELIVERED', {
@@ -526,26 +503,8 @@ export default function LivreurMissionsScreen() {
           deliveryNotes={deliveryNotes}
           setDeliveryNotes={setDeliveryNotes}
           confirmingDelivery={updating}
-          photoUri={deliveryPhotoUri}
-          setPhotoUri={setDeliveryPhotoUri}
-          isArabic={isArabic}
-          t={t}
-        />
-      )}
-
-      {selOrder && (
-        <PickupConfirmModal
-          visible={showPickupModal}
-          onClose={() => {
-            setPickupPhotoUri(undefined);
-            setShowPickupModal(false);
-          }}
-          onConfirm={handlePickupConfirm}
-          confirmingPickup={updating}
-          photoUri={pickupPhotoUri}
-          setPhotoUri={setPickupPhotoUri}
-          pickupNotes={pickupNotes}
-          setPickupNotes={setPickupNotes}
+          photoUris={deliveryPhotoUris}
+          setPhotoUris={setDeliveryPhotoUris}
           isArabic={isArabic}
           t={t}
         />

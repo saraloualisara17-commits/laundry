@@ -1,72 +1,119 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Image, Platform } from 'react-native';
 import { logger } from '../../lib/logger';
 
 const log = logger.ns('compress');
 
-// ─── Profiles ────────────────────────────────────────────────────────────────
-// Different use-cases need different quality/size trade-offs.
-// thumbnail: tiny preview grid images shown in list screens
-// standard:  order/item photos — good quality, still small enough to upload fast
-// full:      proof-of-delivery or high-value documentation photos
-
 export type CompressionProfile = 'thumbnail' | 'standard' | 'full';
 
-const PROFILES: Record<CompressionProfile, { maxWidth: number; quality: number }> = {
-  thumbnail: { maxWidth: 400,  quality: 0.55 },
-  standard:  { maxWidth: 1080, quality: 0.72 },
-  full:      { maxWidth: 1600, quality: 0.82 },
+// ─── Profiles ────────────────────────────────────────────────────────────────
+// maxWidth:  longest side in pixels — aspect ratio is always preserved
+// quality:   0–1 JPEG/WebP encoder quality
+// skipBytes: skip compression if file is already below this size AND fits
+//            within maxWidth — avoids 300–800ms JS-thread work for tiny files
+
+const PROFILES: Record<CompressionProfile, { maxWidth: number; quality: number; skipBytes: number }> = {
+  thumbnail: { maxWidth: 400,  quality: 0.60, skipBytes:  80 * 1024 },  // 80 KB
+  standard:  { maxWidth: 1080, quality: 0.75, skipBytes: 150 * 1024 },  // 150 KB
+  full:      { maxWidth: 1600, quality: 0.82, skipBytes: 300 * 1024 },  // 300 KB
 };
 
-// Source files larger than this get compressed regardless of profile
-const ALWAYS_COMPRESS_ABOVE_BYTES = 300 * 1024; // 300 KB
+// Android has supported WebP encoding since API 18 (2013).
+// expo-image-manipulator emits valid WebP on Android from SDK 50+.
+// iOS WebP encode requires SDK 51+ — use JPEG as fallback until then.
+const PREFERRED_FORMAT = Platform.OS === 'android'
+  ? ImageManipulator.SaveFormat.WEBP
+  : ImageManipulator.SaveFormat.JPEG;
 
-// ─── Core ─────────────────────────────────────────────────────────────────────
+// ─── Dimension helper ────────────────────────────────────────────────────────
+
+function getImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      (err) => reject(err),
+    );
+  });
+}
+
+// ─── Core ────────────────────────────────────────────────────────────────────
 
 export async function compressImage(
   uri: string,
   profile: CompressionProfile = 'standard',
 ): Promise<string> {
-  // Skip compression for remote URLs — they're already on the server
+  // Remote URLs are already on the server — never re-compress
   if (!uri.startsWith('file://') && !uri.startsWith('content://')) return uri;
 
-  const { maxWidth, quality } = PROFILES[profile];
+  const { maxWidth, quality, skipBytes } = PROFILES[profile];
 
   try {
-    // Check if the file is small enough to skip compression entirely.
-    // Skipping saves ~300-800ms of JS-thread work per image.
-    const info = await FileSystem.getInfoAsync(uri, { size: true });
+    // Read file size and pixel dimensions in parallel — both are cheap I/O
+    const [info, dimensions] = await Promise.all([
+      FileSystem.getInfoAsync(uri, { size: true }),
+      getImageDimensions(uri).catch(() => null),
+    ]);
+
     const bytes = (info as any).size ?? Infinity;
-    if (bytes < ALWAYS_COMPRESS_ABOVE_BYTES) {
-      log.debug('Skipping compression — file already small', { bytes });
+    const imgWidth = dimensions?.width ?? Infinity;
+
+    // Skip compression only when BOTH conditions are met:
+    //   1. File is already below the profile's size threshold
+    //   2. Image dimensions are already within the profile's max width
+    // A 290 KB 4032-pixel photo still needs resizing even though it's "small".
+    if (bytes < skipBytes && imgWidth <= maxWidth) {
+      log.debug('Skipping — already fits profile', { bytes, imgWidth, profile });
       return uri;
     }
 
-    const result = await ImageManipulator.manipulateAsync(
-      uri,
-      [{ resize: { width: maxWidth } }],
-      {
-        compress: quality,
-        format: ImageManipulator.SaveFormat.JPEG,
-        // base64 is NOT requested — we only need the file URI
-      },
-    );
+    // Only add a resize action if the image is actually wider than the target.
+    // Upscaling small images wastes space and degrades quality.
+    const actions: ImageManipulator.Action[] =
+      imgWidth > maxWidth ? [{ resize: { width: maxWidth } }] : [];
 
-    const afterInfo = await FileSystem.getInfoAsync(result.uri, { size: true });
-    log.debug('Compressed', {
-      before: `${Math.round(bytes / 1024)}KB`,
-      after: `${Math.round(((afterInfo as any).size ?? 0) / 1024)}KB`,
-      profile,
+    const result = await ImageManipulator.manipulateAsync(uri, actions, {
+      compress: quality,
+      format: PREFERRED_FORMAT,
     });
 
+    if (__DEV__) {
+      const afterInfo = await FileSystem.getInfoAsync(result.uri, { size: true });
+      log.debug('Compressed', {
+        before: `${Math.round(bytes / 1024)}KB @ ${imgWidth}px`,
+        after:  `${Math.round(((afterInfo as any).size ?? 0) / 1024)}KB`,
+        format: PREFERRED_FORMAT,
+        profile,
+      });
+    }
+
     return result.uri;
+
   } catch (err) {
-    log.error('Compression failed — using original', { err: String(err) });
-    return uri; // graceful degradation
+    // First failure: retry at lower quality before giving up.
+    // A compression crash is rare (memory pressure, corrupt EXIF) but when it
+    // happens we still want to upload something rather than silently drop.
+    log.warn('Compression failed — retrying at reduced quality', { err: String(err), profile });
+    try {
+      const fallbackQuality = quality - 0.15;
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: Math.min(maxWidth, 800) } }],
+        { compress: Math.max(0.4, fallbackQuality), format: ImageManipulator.SaveFormat.JPEG },
+      );
+      log.info('Fallback compression succeeded');
+      return result.uri;
+    } catch (fallbackErr) {
+      // Both attempts failed — return original rather than dropping the photo
+      log.error('Fallback compression also failed — using original', { err: String(fallbackErr) });
+      return uri;
+    }
   }
 }
 
-// Parallel compression — all images run at the same time
+// Parallel compression — all images run simultaneously on the JS thread.
+// Do not serialize: a 4-image batch compresses in ~max(t) not ~sum(t).
 export async function compressImages(
   uris: string[],
   profile: CompressionProfile = 'standard',

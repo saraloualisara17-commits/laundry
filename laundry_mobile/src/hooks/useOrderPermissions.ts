@@ -16,6 +16,13 @@ export interface OrderPermissions {
   canAddPayment: boolean;
   canAssignDriver: boolean;
   canAssignPickupDriver: boolean;
+  // True when the current user is allowed to trigger the "Confirm Picked Up" flow
+  // (which opens order-items to add products before marking the order PICKED_UP).
+  // Only applies to SCHEDULED orders — immediate orders start as PICKED_UP already.
+  // Scheduled: Admin or the assigned Livreur.
+  canConfirmPickup: boolean;
+  // Livreur-specific: true only when they are the assigned pickup or delivery driver
+  canChangeStatus: boolean;
 }
 
 export const useOrderPermissions = (user: any, order: any): OrderPermissions => {
@@ -38,14 +45,31 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
     const canEdit = (isAdmin || isEmploye || (isLivreur && isPickupPhase(status))) && !delivered;
 
     // No photos needed once the order is delivered
-    const canAddLaboPhoto = (isAdmin || isEmploye) && !delivered;
+    const canAddLaboPhoto = (isAdmin || isEmploye || isLivreur) && !delivered;
     const canAddReceptionPhoto = (isAdmin || isEmploye || isLivreur) && !delivered;
 
     // No payment button when already fully paid
-    const canAddPayment = (isAdmin || isEmploye) && delivered && !fullyPaid;
+    // LIVREUR can also add payment — they collect cash at delivery
+    const canAddPayment = (isAdmin || isEmploye || isLivreur) && delivered && !fullyPaid;
 
-    const canAssignDriver = (isAdmin || isEmploye) && isReadyForDelivery(status);
-    const canAssignPickupDriver = (isAdmin || isEmploye) && status === 'PENDING_PICKUP';
+    const canAssignDriver = (isAdmin || isEmploye || isLivreur) && isReadyForDelivery(status);
+    const orderMode = order?.mode?.toLowerCase(); // 'immediate' or 'scheduled'
+    const isScheduled = orderMode === 'scheduled';
+
+    // Pickup driver assignment only relevant for scheduled orders
+    const canAssignPickupDriver = (isAdmin || isEmploye || isLivreur) && status === 'PENDING_PICKUP' && isScheduled;
+
+    // Confirm pickup: scheduled orders only (immediate start as PICKED_UP, no pickup step)
+    // Scheduled: Admin or the assigned Livreur
+    const canConfirmPickup =
+      status === 'PENDING_PICKUP' &&
+      isScheduled &&
+      (isAdmin || isLivreur);
+
+    // Livreur can only change status when they are the assigned pickup OR delivery driver
+    const livreurIsPickupDriver = isLivreur && order?.livreur?.id != null && String(order.livreur.id) === String(user?.id);
+    const livreurIsDeliveryDriver = isLivreur && order?.deliveryDriver?.id != null && String(order.deliveryDriver.id) === String(user?.id);
+    const canChangeStatus = isAdmin || isEmploye || livreurIsPickupDriver || livreurIsDeliveryDriver;
 
     return {
       isAdmin,
@@ -58,8 +82,10 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
       canAddPayment,
       canAssignDriver,
       canAssignPickupDriver,
+      canConfirmPickup,
+      canChangeStatus,
     };
-  }, [user, order?.status, order?.montantTotal, order?.montantPaye]);
+  }, [user, order?.status, order?.mode, order?.montantTotal, order?.montantPaye, order?.livreur?.id, order?.deliveryDriver?.id]);
 };
 
 export default useOrderPermissions;

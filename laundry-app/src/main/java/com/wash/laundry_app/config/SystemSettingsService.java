@@ -18,7 +18,7 @@ public class SystemSettingsService {
                 .orElseGet(() -> {
                     SystemSettings defaultSettings = SystemSettings.builder()
                             .id(1L)
-                            .appName("PureClean")
+                            .appName("ASTRA PROPRE")
                             .businessPhone("0600000000")
                             .updatedAt(LocalDateTime.now())
                             .build();

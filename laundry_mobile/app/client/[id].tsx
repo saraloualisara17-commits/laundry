@@ -13,6 +13,8 @@ import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useClient, useClientOrders, useSaveClient } from '../../src/hooks/query/useClients';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
 
 export default function ClientDetailsScreen() {
   const { t, i18n } = useTranslation();
@@ -20,6 +22,8 @@ export default function ClientDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { clearOrder, setMode, setClient } = useOrderCreation();
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isLivreur = user?.role === 'LIVREUR';
 
   const clientId = id as string;
   const { data: selectedClient, isLoading: loadingClient, refetch: refetchClient } = useClient(clientId);
@@ -62,12 +66,17 @@ export default function ClientDetailsScreen() {
 
   const getClientDisplayName = (c: any) => c?.name || c?.nom || `${t('tabs.clients')} #${id}`;
 
+  const visibleCommandes = useMemo(() => {
+    if (!Array.isArray(clientCommandes)) return [];
+    return isLivreur ? clientCommandes.filter((c) => c.status !== 'DELIVERED') : clientCommandes;
+  }, [clientCommandes, isLivreur]);
+
   const stats = useMemo(() => {
-    if (!Array.isArray(clientCommandes)) return { total: 0, articles: 0 };
-    const total = clientCommandes.reduce((acc, c) => acc + (c.montantTotal || 0), 0);
-    const articles = clientCommandes.reduce((acc, c) => acc + (c.commandeTapis?.length || 0), 0);
+    if (!Array.isArray(visibleCommandes)) return { total: 0, articles: 0 };
+    const total = visibleCommandes.reduce((acc, c) => acc + (c.montantTotal || 0), 0);
+    const articles = visibleCommandes.reduce((acc, c) => acc + (c.commandeTapis?.length || 0), 0);
     return { total, articles };
-  }, [clientCommandes]);
+  }, [visibleCommandes]);
 
   const handleSaveEdit = async () => {
     if (!editForm.name.trim()) {
@@ -128,9 +137,12 @@ export default function ClientDetailsScreen() {
             <Feather name={isArabic ? 'arrow-right' : 'arrow-left'} size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('admin.clients.details_title')}</Text>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowEditModal(true)}>
-            <Feather name="edit-2" size={20} color={Colors.primary} />
-          </TouchableOpacity>
+          {!isLivreur && (
+            <TouchableOpacity style={styles.headerBtn} onPress={() => setShowEditModal(true)}>
+              <Feather name="edit-2" size={20} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+          {isLivreur && <View style={styles.headerBtn} />}
         </View>
       </SafeAreaView>
 
@@ -171,7 +183,7 @@ export default function ClientDetailsScreen() {
             </View>
           ) : null}
 
-          {/* New order buttons */}
+          {/* New order button */}
           <View style={[styles.orderBtnRow, row(isArabic)]}>
             <TouchableOpacity
               style={[styles.orderBtn, { backgroundColor: Colors.primary }]}
@@ -179,15 +191,7 @@ export default function ClientDetailsScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="add-circle-outline" size={18} color="white" />
-              <Text style={styles.orderBtnText}>{t('admin.orders.create.btn_now')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.orderBtn, { backgroundColor: Colors.primaryDark || '#0A5C60' }]}
-              onPress={() => handleNewOrder('scheduled')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="time-outline" size={18} color="white" />
-              <Text style={styles.orderBtnText}>{t('admin.clients.schedule_pickup')}</Text>
+              <Text style={styles.orderBtnText}>{t('admin.clients.new_order_for')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -195,34 +199,37 @@ export default function ClientDetailsScreen() {
         {/* Stats */}
         <View style={[styles.statsRow, row(isArabic)]}>
           <View style={styles.statBox}>
-            <Text style={styles.statVal}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
+            <Text style={styles.statVal}>{visibleCommandes.length}</Text>
             <Text style={styles.statLbl}>{t('dashboard.orders_count')}</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statVal}>{stats.articles}</Text>
             <Text style={styles.statLbl}>{t('admin.catalog.products_count')}</Text>
           </View>
-          <View style={[styles.statBox, { backgroundColor: Colors.primary }]}>
-            <Text style={[styles.statVal, { color: 'white' }]}>{stats.total.toFixed(0)}</Text>
-            <Text style={[styles.statLbl, { color: 'rgba(255,255,255,0.8)' }]}>{t('common.total')} {t('common.dh')}</Text>
-          </View>
+          {/* Total amount hidden for livreur */}
+          {!isLivreur && (
+            <View style={[styles.statBox, { backgroundColor: Colors.primary }]}>
+              <Text style={[styles.statVal, { color: 'white' }]}>{stats.total.toFixed(0)}</Text>
+              <Text style={[styles.statLbl, { color: 'rgba(255,255,255,0.8)' }]}>{t('common.total')} {t('common.dh')}</Text>
+            </View>
+          )}
         </View>
 
         {/* Orders list */}
         <View style={[styles.sectionRow, row(isArabic)]}>
           <Text style={styles.sectionTitle}>{t('dashboard.recent_orders')}</Text>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{Array.isArray(clientCommandes) ? clientCommandes.length : 0}</Text>
+            <Text style={styles.badgeText}>{visibleCommandes.length}</Text>
           </View>
         </View>
 
-        {!Array.isArray(clientCommandes) || clientCommandes.length === 0 ? (
+        {visibleCommandes.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="package" size={44} color={Colors.textMuted} />
             <Text style={styles.emptyText}>{t('admin.orders.empty_title')}</Text>
           </View>
         ) : (
-          clientCommandes.map((commande) => (
+          visibleCommandes.map((commande) => (
             <TouchableOpacity
               key={commande.id}
               style={styles.orderCard}

@@ -71,6 +71,15 @@ public class CommandePaymentService {
         BigDecimal totalPaid = paiementRepository.sumByCommandeId(commande.getId());
         commande.setMontantPaye(totalPaid != null ? totalPaid : BigDecimal.ZERO);
         commande.setModePaiement(mode);
+
+        // Mark the moment this debt was fully settled — set once, never reset.
+        if (commande.getDebtSettledAt() == null
+                && commande.getMontantTotal() != null
+                && commande.getMontantTotal().compareTo(BigDecimal.ZERO) > 0
+                && commande.getMontantPaye().compareTo(commande.getMontantTotal()) >= 0) {
+            commande.setDebtSettledAt(LocalDateTime.now());
+        }
+
         commande = commandeRepository.save(commande);
 
         helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser,
@@ -126,6 +135,15 @@ public class CommandePaymentService {
 
         BigDecimal totalPaid = paiementRepository.sumByCommandeId(commande.getId());
         commande.setMontantPaye(totalPaid != null ? totalPaid : BigDecimal.ZERO);
+
+        // Mark the moment this debt was fully settled — set once, never reset.
+        if (commande.getDebtSettledAt() == null
+                && commande.getMontantTotal() != null
+                && commande.getMontantTotal().compareTo(BigDecimal.ZERO) > 0
+                && commande.getMontantPaye().compareTo(commande.getMontantTotal()) >= 0) {
+            commande.setDebtSettledAt(LocalDateTime.now());
+        }
+
         commandeRepository.save(commande);
 
         helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser,

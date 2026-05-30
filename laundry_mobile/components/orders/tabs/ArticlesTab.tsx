@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../../constants/theme';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
@@ -65,6 +66,10 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                     <Image
                       source={{ uri: `${BASE_URL}${img.imageUrl}` }}
                       style={styles.itemGalleryImg}
+                      contentFit="cover"
+                      transition={150}
+                      cachePolicy="memory-disk"
+                      recyclingKey={`${img.id ?? i}-${img.imageUrl}`}
                     />
                   </TouchableOpacity>
                 ))}

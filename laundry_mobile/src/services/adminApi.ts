@@ -79,8 +79,7 @@ export const adminApi = {
   // Unpaid
   getUnpaidOverview: () => paymentsApi.getUnpaidOverview(),
   getClientDebtList: () => paymentsApi.getClientDebtList(),
-  // getAllUnpaidOrders is missing from the new specialized ones, I'll add it to ordersApi
-  getAllUnpaidOrders: () => ordersApi.getOrders({ status: 'UNPAID' }), // Placeholder mapping
+  getAllUnpaidOrders: () => paymentsApi.getAllUnpaidOrders(),
 
   // Uploads
   uploadFiles: (files: any[]) => uploadsApi.uploadFiles(files),

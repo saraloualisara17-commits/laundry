@@ -46,6 +46,10 @@ public class Commande {
     @Column(name = "date_livraison")
     private LocalDateTime dateLivraison;
 
+    /** Set once when montantPaye first reaches montantTotal on a DELIVERED order. Never reset. */
+    @Column(name = "debt_settled_at")
+    private LocalDateTime debtSettledAt;
+
     @Column(name = "montant_total", precision = 10, scale = 2)
     private BigDecimal montantTotal = BigDecimal.ZERO;
 
@@ -220,6 +224,14 @@ public class Commande {
 
     public void setDateLivraison(LocalDateTime dateLivraison) {
         this.dateLivraison = dateLivraison;
+    }
+
+    public LocalDateTime getDebtSettledAt() {
+        return debtSettledAt;
+    }
+
+    public void setDebtSettledAt(LocalDateTime debtSettledAt) {
+        this.debtSettledAt = debtSettledAt;
     }
 
     public BigDecimal getMontantTotal() {

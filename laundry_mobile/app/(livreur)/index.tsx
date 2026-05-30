@@ -1,67 +1,71 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Animated, Linking, Platform, Alert,
+  RefreshControl, ActivityIndicator, Animated, Image
 } from 'react-native';
+import { row } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store/store';
+import { useDispatch } from 'react-redux';
 import { logOut } from '../../src/store/authSlice';
+import { useSettings } from '../../src/hooks/query/useSettings';
 import * as SecureStore from 'expo-secure-store';
-import { authApi } from '../../src/services/api';
+import { AdminColors, AdminShadows } from '../../constants/AdminColors';
+import { StatusBadge } from '../../components/admin/StatusBadge';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../src/i18n';
+import { useStatusOverview, useUnpaidOverview } from '../../src/hooks/query/useDashboard';
+import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { useOrders } from '../../src/hooks/query/useOrders';
+import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
 import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
-import { useRTL, row, font, arabicSafe, pos, textProps } from '../../src/utils/rtl';
-import { useLivreurStats, useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
-import { queryClient } from '../../src/services/query/queryClient';
-import { socketClient } from '../../src/services/realtime';
+
+function changeLanguage(lang: string) {
+  i18n.changeLanguage(lang);
+}
+
+const STATUS_CARDS = [
+  { key: 'PENDING_PICKUP',     color: '#C2185B', bg: 'rgba(194, 24, 91, 0.08)' },
+  { key: 'PICKED_UP',          color: '#D32F2F', bg: 'rgba(211, 47, 47, 0.08)' },
+  { key: 'READY_FOR_DELIVERY', color: '#00897B', bg: 'rgba(0, 137, 123, 0.08)' },
+];
 
 const C = {
   primary: '#0D7377',
-  primaryDark: '#0A5C5F',
   success: '#10B981',
   successBg: 'rgba(16,185,129,0.12)',
   warning: '#F59E0B',
   warningBg: 'rgba(245,158,11,0.12)',
-  danger: '#EF4444',
-  bg: '#F4F6F8',
-  surface: '#FFFFFF',
-  textPrimary: '#0D1B2A',
-  textSecondary: '#4A5568',
-  textMuted: '#94A3B8',
 };
 
-function openMapsNavigation(lat?: number, lng?: number, address?: string) {
-  const url = Platform.select({
-    ios: lat && lng
-      ? `maps://?daddr=${lat},${lng}`
-      : `maps://?daddr=${encodeURIComponent(address || '')}`,
-    android: lat && lng
-      ? `geo:${lat},${lng}?q=${lat},${lng}`
-      : `geo:0,0?q=${encodeURIComponent(address || '')}`,
-  });
-  if (url) {
-    Linking.openURL(url).catch(() =>
-      Linking.openURL(`https://maps.google.com/?daddr=${lat},${lng}`)
-    );
-  }
-}
-
 export default function LivreurDashboard() {
-  const { t, isRTL } = useRTL();
-  const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((s: RootState) => s.auth);
+  const { t, i18n: i18nHook } = useTranslation();
+  const isArabic = i18nHook.language === 'ar';
+  const dispatch = useDispatch();
+  const { clearOrder, setMode } = useOrderCreation();
+  const [showCreate, setShowCreate] = useState(false);
 
-  const { refetch: refetchStats } = useLivreurStats();
-  const { data: readyDeliveries = [], isLoading: loadingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
-  const { data: readyOrders = [], isLoading: loadingPickups, refetch: refetchPickups } = usePendingPickups();
+  const handleCreate = (mode: 'immediate' | 'scheduled') => {
+    clearOrder();
+    setMode(mode);
+    setShowCreate(false);
+    router.push({ pathname: '/(admin)/order-client', params: { mode } });
+  };
 
-  const loading = loadingDeliveries || loadingPickups;
-  const [refreshing, setRefreshing] = useState(false);
+  const { data: settingsData } = useSettings();
+  const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null };
+
+  const readyAnim = useRef(new Animated.Value(0.4)).current;
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(readyAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(readyAnim, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
@@ -70,196 +74,180 @@ export default function LivreurDashboard() {
     ).start();
   }, []);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([refetchStats(), refetchDeliveries(), refetchPickups()]);
-    setRefreshing(false);
-  }, [refetchStats, refetchDeliveries, refetchPickups]);
+  const { data: overviewRes, isFetching: fetchingOverview, refetch: refetchOverview } = useStatusOverview();
+  const { data: unpaidData, refetch: refetchUnpaid } = useUnpaidOverview();
+  const { data: recentOrdersData, isLoading: loading, isFetching: fetchingOrders, refetch: refetchOrders } = useOrders({ limit: 5 });
+  const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
+  const { data: readyOrders = [], refetch: refetchPickups } = usePendingPickups();
 
-  const handleLogout = async () => {
-    Alert.alert(t('common.logout_confirm_title'), t('common.logout_confirm_msg'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.logout_btn'), style: 'destructive',
-        onPress: async () => {
-          try { await authApi.logout(); } catch { }
-          await SecureStore.deleteItemAsync('user');
-          await SecureStore.deleteItemAsync('accessToken');
-          await SecureStore.deleteItemAsync('refreshToken');
-          socketClient.disconnect();
-          queryClient.clear();
-          dispatch(logOut());
-        },
-      },
-    ]);
-  };
+  const overview = overviewRes?.data ?? overviewRes ?? null;
+  const unpaid = unpaidData ?? null;
+  const recentOrders = useMemo(() => {
+    const raw = recentOrdersData?.content || recentOrdersData || [];
+    return (Array.isArray(raw) ? raw : []).filter((o: any) => o.status !== 'DELIVERED').slice(0, 5);
+  }, [recentOrdersData]);
 
-  // Filter delivery orders to only those due today or overdue — not future-scheduled
   const visibleDeliveries = readyDeliveries.filter((o: any) => isVisibleToday(o.scheduledDeliveryDate));
-
-  // Build "next mission" from existing data
-  const allMissions = [...visibleDeliveries, ...readyOrders];
   const deliveryCount = visibleDeliveries.length;
   const pickupCount = readyOrders.length;
 
-  const nextMission = allMissions.length > 0 ? (() => {
-    const first = visibleDeliveries[0] || readyOrders[0];
-    const isDelivery = readyDeliveries.length > 0;
-    const addr = first?.client?.addresses?.[0];
-    return first ? {
-      type: isDelivery ? 'delivery' : 'pickup',
-      orderId: first.id,
-      clientName: first.client?.name || first.clientNom || '—',
-      clientPhone: first.client?.phones?.[0]?.phoneNumber || '',
-      clientAddress: addr?.address || addr?.fullAddress || '—',
-      clientLatitude: addr?.latitude ? parseFloat(addr.latitude) : null,
-      clientLongitude: addr?.longitude ? parseFloat(addr.longitude) : null,
-      montantTotal: first.montantTotal || 0,
-      montantRestant: first.montantRestant || 0,
-      itemCount: first.commandeTapis?.length || 0,
-    } : null;
-  })() : null;
+  const refreshing = (fetchingOverview || fetchingOrders) && !loading;
+  const onRefresh = () => {
+    refetchOverview();
+    refetchUnpaid();
+    refetchOrders();
+    refetchDeliveries();
+    refetchPickups();
+  };
 
-  const missionBg = nextMission?.type === 'delivery' ? C.success : C.warning;
-  const missionTextColor = nextMission?.type === 'delivery' ? 'white' : C.textPrimary;
+  const handleLogout = async () => {
+    dispatch(logOut());
+    await SecureStore.deleteItemAsync('refreshToken');
+    await SecureStore.deleteItemAsync('accessToken');
+    await SecureStore.deleteItemAsync('user');
+    router.replace('/(auth)/login');
+  };
 
-  // Preview missions (first 3 from combined list)
-  const previewMissions = allMissions.slice(0, 3);
+  if (loading) {
+    return (
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator color={AdminColors.primary} size="large" />
+      </View>
+    );
+  }
+
+  const readyCount = overview?.READY_FOR_DELIVERY?.count ?? 0;
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <SafeAreaView edges={['top']} style={{ backgroundColor: C.primary }}>
-        <View style={styles.header}>
-          <View style={[styles.headerRow, row(isRTL)]}>
-            <View>
-              <Text style={[styles.greeting, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.greeting')}</Text>
-              <Text style={[styles.userName, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{user?.name || t('livreur.driver_fallback')}</Text>
-            </View>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={20} color="white" />
-            </TouchableOpacity>
+      {/* Header */}
+      <SafeAreaView edges={['top']} style={styles.headerSafe}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoCircle}>
+            {settings.logoUrl ? (
+              <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
+            ) : (
+              <Ionicons name="water-outline" size={28} color={AdminColors.primary} />
+            )}
           </View>
+          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={() => changeLanguage(isArabic ? 'fr' : 'ar')}
+              >
+                <Text style={styles.headerBtnText}>{isArabic ? 'FR' : 'AR'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerBtn} onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.headerAppName}>{settings.appName}</Text>
+          </View>
+        </View>
 
-          {/* Stats chips */}
-          <View style={styles.statsRow}>
-            <View style={styles.statChip}>
-              <View style={[styles.chipRow, row(isRTL)]}>
-                <Animated.View style={[styles.dot, { backgroundColor: C.success, opacity: pulseAnim }]} />
-                <Text style={[styles.chipNumber, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{deliveryCount}</Text>
-              </View>
-              <Text style={[styles.chipLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.deliveries')}</Text>
-            </View>
-            <View style={styles.statChip}>
-              <View style={[styles.chipRow, row(isRTL)]}>
-                <Animated.View style={[styles.dot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
-                <Text style={[styles.chipNumber, font.extrabold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{pickupCount}</Text>
-              </View>
-              <Text style={[styles.chipLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.pickups')}</Text>
-            </View>
-          </View>
+        {/* Mission count chips */}
+        <View style={styles.missionChipsRow}>
+          <TouchableOpacity
+            style={styles.missionChip}
+            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'delivery' } })}
+            activeOpacity={0.8}
+          >
+            <Animated.View style={[styles.chipDot, { backgroundColor: C.success, opacity: pulseAnim }]} />
+            <Text style={styles.chipNumber}>{deliveryCount}</Text>
+            <Text style={styles.chipLabel}>{t('livreur.deliveries')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.missionChip}
+            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'pickup' } })}
+            activeOpacity={0.8}
+          >
+            <Animated.View style={[styles.chipDot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
+            <Text style={styles.chipNumber}>{pickupCount}</Text>
+            <Text style={styles.chipLabel}>{t('livreur.pickups')}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />
+        }
       >
-        {/* NEXT MISSION CARD */}
-        <View style={styles.sectionPad}>
-          {nextMission ? (
-            <View style={[styles.missionCard, { backgroundColor: missionBg }]}>
-              {/* BG circle decoration */}
-              <View style={[styles.missionCircle, pos.end(-30, isRTL)]} />
+        {/* Ready notification banner */}
+        {readyCount > 0 && (
+          <View style={[styles.readyBanner, row(isArabic)]}>
+            <Animated.View style={[styles.readyDot, { opacity: readyAnim }]} />
+            <Text style={styles.readyText}>
+              {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready')}
+            </Text>
+          </View>
+        )}
 
-              <View style={[styles.missionTop, row(isRTL)]}>
-                <View style={styles.missionBadge}>
-                  <Text style={[styles.missionBadgeText, { color: missionTextColor }]}>
-                    {nextMission.type === 'delivery' ? t('livreur.delivery_badge') : t('livreur.pickup_badge')}
-                  </Text>
-                </View>
-                <Text style={[styles.missionLabel, arabicSafe(isRTL)]}>{t('livreur.next_mission')}</Text>
-              </View>
-
-              <Text style={[styles.missionClientName, { color: 'white' }]}>{nextMission.clientName}</Text>
-
-              <View style={[styles.missionInfoRow, row(isRTL)]}>
-                <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.missionInfoText} numberOfLines={1}>{nextMission.clientAddress}</Text>
-              </View>
-              {nextMission.clientPhone ? (
-                <View style={[styles.missionInfoRow, row(isRTL)]}>
-                  <Ionicons name="call-outline" size={14} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.missionInfoText}>{nextMission.clientPhone}</Text>
-                </View>
-              ) : null}
-
-              {nextMission.type === 'delivery' && (
-                <View style={[styles.financialRow, row(isRTL)]}>
-                  <View>
-                    <Text style={[styles.finLabel, font.semibold(isRTL)]}>{t('common.total')}</Text>
-                    <Text style={[styles.finValue, font.extrabold(isRTL)]}>{nextMission.montantTotal} DH</Text>
-                  </View>
-                  <View style={styles.finDivider} />
-                  <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
-                    <Text style={[styles.finLabel, font.semibold(isRTL)]}>{t('livreur.remaining_to_collect')}</Text>
-                    <Text style={[styles.finValue, { fontSize: 18 }, font.extrabold(isRTL)]}>{nextMission.montantRestant} DH</Text>
-                  </View>
-                </View>
-              )}
-
-              {nextMission.type === 'pickup' && (
-                <Text style={styles.itemsText}>{nextMission.itemCount} {t('livreur.items_to_collect')}</Text>
-              )}
-
-              <View style={[styles.missionActions, row(isRTL)]}>
-                {nextMission.clientPhone ? (
-                  <TouchableOpacity
-                    style={[styles.callBtn, row(isRTL)]}
-                    onPress={() => Linking.openURL(`tel:${nextMission.clientPhone}`)}
-                  >
-                    <Ionicons name="call" size={16} color="white" />
-                    <Text style={[styles.callBtnText, font.semibold(isRTL)]}>{t('common.call')}</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  style={[styles.startBtn, { borderColor: missionBg }]}
-                  onPress={() => router.push({
-                    pathname: '/(livreur)/missions',
-                    params: { tab: nextMission.type, orderId: nextMission.orderId },
-                  })}
-                >
-                  <Text style={[styles.startBtnText, { color: missionBg }]}>
-                    {t('livreur.start_mission')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+        {/* Create Order */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.createBtn, showCreate && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}
+            onPress={() => setShowCreate(!showCreate)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.createIcon}>
+              <Text style={styles.plusText}>{showCreate ? '−' : '+'}</Text>
             </View>
-          ) : (
-            <View style={[styles.missionCard, { backgroundColor: C.primary, alignItems: 'center', paddingVertical: 32 }]}>
-              <Text style={{ fontSize: 28 }}>✅</Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: 'white', marginTop: 10, textAlign: 'center' }}>
-                {t('livreur.all_done')}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.createTitle, isArabic && { textAlign: 'right' }]}>
+                {t('dashboard.create_order')}
               </Text>
-              <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>{t('livreur.good_day')}</Text>
+              <Text style={[styles.createSub, isArabic && { textAlign: 'right' }]}>
+                {t('dashboard.create_order_sub')}
+              </Text>
+            </View>
+            <Ionicons name={showCreate ? 'chevron-up' : 'chevron-down'} size={18} color={AdminColors.primary} />
+          </TouchableOpacity>
+          {showCreate && (
+            <View style={styles.createOptions}>
+              <TouchableOpacity
+                style={[styles.createOption, { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}
+                onPress={() => handleCreate('immediate')}
+              >
+                <Text style={styles.createOptionText}>{t('admin.orders.create.btn_now')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.createOption} onPress={() => handleCreate('scheduled')}>
+                <Text style={styles.createOptionText}>{t('admin.orders.create.btn_later')}</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* QUICK ACTIONS */}
-        <View style={[styles.sectionPad, { flexDirection: 'row', gap: 10 }]}>
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => router.push('/(livreur)/map-view')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.quickIcon}>
-              <Text style={{ fontSize: 26 }}>🗺️</Text>
-            </View>
-            <Text style={styles.quickLabel}>{t('livreur.view_map')}</Text>
-          </TouchableOpacity>
+        {/* Status Cards */}
+        <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
+          {t('dashboard.overview')}
+        </Text>
+        <View style={[styles.statusRow, row(isArabic)]}>
+          {STATUS_CARDS.map(({ key, color, bg }) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.statusCard, { borderTopColor: color, backgroundColor: bg }]}
+              onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { status: key } })}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.statusCount, { color }]}>
+                {overview?.[key]?.count ?? 0}
+              </Text>
+              <Text style={styles.statusLabel} numberOfLines={2}>
+                {t(`status.${key}`)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
+        {/* Mission Quick Actions */}
+        <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
+          {t('livreur.missions_today')}
+        </Text>
+        <View style={[styles.missionActions, row(isArabic)]}>
           <TouchableOpacity
             style={styles.quickCard}
             onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'delivery' } })}
@@ -270,7 +258,7 @@ export default function LivreurDashboard() {
             </View>
             <Text style={styles.quickLabel}>{t('livreur.deliveries_tab')}</Text>
             {deliveryCount > 0 && (
-              <View style={[styles.quickBadge, { backgroundColor: C.success }, pos.end(8, isRTL), { top: 8 }]}>
+              <View style={[styles.quickBadge, { backgroundColor: C.success }]}>
                 <Text style={styles.quickBadgeText}>{deliveryCount}</Text>
               </View>
             )}
@@ -286,69 +274,72 @@ export default function LivreurDashboard() {
             </View>
             <Text style={styles.quickLabel}>{t('livreur.pickups_tab')}</Text>
             {pickupCount > 0 && (
-              <View style={[styles.quickBadge, { backgroundColor: C.warning }, pos.end(8, isRTL), { top: 8 }]}>
+              <View style={[styles.quickBadge, { backgroundColor: C.warning }]}>
                 <Text style={styles.quickBadgeText}>{pickupCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* TODAY'S MISSIONS PREVIEW */}
-        {previewMissions.length > 0 && (
-          <>
-            <View style={[styles.sectionHeader, row(isRTL)]}>
-              <Text style={[styles.sectionTitle, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.missions_today')}</Text>
-              <TouchableOpacity onPress={() => router.push('/(livreur)/missions')}>
-                <Text style={[styles.seeAll, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('livreur.see_all')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {previewMissions.map((mission: any, idx: number) => {
-              const isDelivery = visibleDeliveries.some((d: any) => d.id === mission.id);
-              const addr = mission.client?.addresses?.[0];
-              return (
-                <TouchableOpacity
-                  key={mission.id}
-                  style={[styles.miniCard, row(isRTL)]}
-                  onPress={() => router.push(`/order/${mission.id}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.miniAccent, { backgroundColor: isDelivery ? C.success : C.warning }]} />
-                  <View style={[styles.miniIconCircle, { backgroundColor: isDelivery ? C.successBg : C.warningBg }]}>
-                    <Text style={{ fontSize: 18 }}>{isDelivery ? '🚚' : '📦'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.miniClientName, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{mission.client?.name || mission.clientNom || '—'}</Text>
-                    <Text style={[styles.miniAddress, font.regular(isRTL)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                      {addr?.address || addr?.fullAddress || '—'}
-                    </Text>
-                  </View>
-                  {isDelivery ? (
-                    <Text style={[styles.miniAmount, { color: C.success }, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{mission.montantTotal} DH</Text>
-                  ) : (
-                    <Text style={[styles.miniAmount, { color: C.warning }, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                      {t('livreur.items_count', { count: mission.commandeTapis?.length || 0 })}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-
-            {allMissions.length > 3 && (
-              <TouchableOpacity
-                style={{ alignItems: 'center', marginTop: 8 }}
-                onPress={() => router.push('/(livreur)/missions')}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '600', color: C.primary }}>
-                  {t('livreur.more_missions', { count: allMissions.length - 3 })}
+        {/* Unpaid Card */}
+        {unpaid && (
+          <TouchableOpacity
+            style={styles.unpaidCard}
+            onPress={() => router.push('/(livreur)/unpaid')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.unpaidRow, row(isArabic)]}>
+              <View style={styles.unpaidIcon}>
+                <Text style={{ fontSize: 22 }}>{unpaid.totalRemaining > 0 ? '💰' : '✅'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.unpaidTitle, isArabic && { textAlign: 'right' }]}>
+                  {unpaid.totalRemaining > 0 ? t('dashboard.unpaid_balance') : t('dashboard.all_settled')}
                 </Text>
-              </TouchableOpacity>
-            )}
-          </>
+                {unpaid.totalRemaining > 0 && (
+                  <Text style={[styles.unpaidSub, isArabic && { textAlign: 'right' }]}>
+                    {unpaid.clientsWithDebt} {t('dashboard.clients')} · {unpaid.totalOrders} {t('dashboard.orders_count')}
+                  </Text>
+                )}
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.unpaidAmount, { color: unpaid.totalRemaining > 0 ? AdminColors.danger : AdminColors.success }]}>
+                  {unpaid.totalRemaining} {t('common.dh')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={AdminColors.textMuted} />
+              </View>
+            </View>
+          </TouchableOpacity>
         )}
 
-        {loading && allMissions.length === 0 && (
-          <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
+        {/* Recent Orders */}
+        <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
+          {t('dashboard.recent_orders')}
+        </Text>
+
+        {recentOrders.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>{t('admin.orders.empty_title')}</Text>
+          </View>
+        ) : (
+          recentOrders.map((order) => (
+            <TouchableOpacity
+              key={order.id}
+              style={[styles.orderRow, row(isArabic)]}
+              onPress={() => router.push(`/order/${order.id}`)}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>
+                  #{order.numeroCommande}
+                </Text>
+                <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>
+                  {order.client?.name || order.clientNom}
+                </Text>
+              </View>
+              <StatusBadge status={order.status} />
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
     </View>
@@ -356,109 +347,91 @@ export default function LivreurDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  header: { paddingHorizontal: 20, paddingBottom: 18, paddingTop: 12 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  greeting: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  userName: { fontSize: 22, color: 'white', fontWeight: '800', marginTop: 2 },
-  logoutBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerSafe: { backgroundColor: AdminColors.primary, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
+  logoCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...AdminShadows.shadowSmall },
+  logoImage: { width: 52, height: 52, borderRadius: 26 },
+  headerAppName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  headerBtnText: { color: 'white', fontWeight: '700', fontSize: 12 },
+  missionChipsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingBottom: 20 },
+  missionChip: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  chipDot: { width: 8, height: 8, borderRadius: 4 },
+  chipNumber: { fontSize: 20, fontWeight: '800', color: 'white' },
+  chipLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '600', flex: 1 },
+  scroll: { flex: 1, marginTop: -20 },
+  readyBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(16,185,129,0.1)', borderLeftWidth: 3,
+    borderLeftColor: AdminColors.success, marginHorizontal: 16, marginTop: 14,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+  },
+  readyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: AdminColors.success },
+  readyText: { fontSize: 13, color: AdminColors.success, fontWeight: '600', flex: 1 },
+  section: { marginHorizontal: 16, marginTop: 16 },
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
+    borderRadius: 14, padding: 16, gap: 12, ...AdminShadows.shadowSmall,
+  },
+  createIcon: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: AdminColors.primary100,
     alignItems: 'center', justifyContent: 'center',
   },
-  statsRow: { flexDirection: 'row', gap: 10 },
-  statChip: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  plusText: { fontSize: 22, fontWeight: '700', color: AdminColors.primary, lineHeight: 26 },
+  createTitle: { fontSize: 15, fontWeight: '700', color: AdminColors.textPrimary },
+  createSub: { fontSize: 12, color: AdminColors.textMuted, marginTop: 2 },
+  createOptions: {
+    backgroundColor: 'white', borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+    borderTopWidth: 1, borderTopColor: '#F1F5F9', ...AdminShadows.shadowSmall,
   },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  chipNumber: { fontSize: 24, fontWeight: '800', color: 'white' },
-  chipAmount: { fontSize: 16, fontWeight: '800', color: 'white', marginBottom: 4 },
-  chipLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  scroll: { flex: 1 },
-  sectionPad: { paddingHorizontal: 16, marginTop: 16 },
-  missionCard: {
-    borderRadius: 20, padding: 20,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
+  createOption: { paddingHorizontal: 20, paddingVertical: 14 },
+  createOptionText: { fontSize: 14, color: AdminColors.textSecondary, fontWeight: '500' },
+  sectionTitle: {
+    fontSize: 13, fontWeight: '700', color: AdminColors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+    marginHorizontal: 16, marginTop: 20, marginBottom: 10,
   },
-  missionCircle: {
-    position: 'absolute', top: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  missionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  missionBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 999, paddingVertical: 4, paddingHorizontal: 12,
-  },
-  missionBadgeText: { fontSize: 11, fontWeight: '700' },
-  missionLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '700', letterSpacing: 1.5 },
-  missionClientName: { fontSize: 22, fontWeight: '800', marginBottom: 8 },
-  missionInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  missionInfoText: { fontSize: 13, color: 'rgba(255,255,255,0.85)', flex: 1 },
-  financialRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderRadius: 10, padding: 10, paddingHorizontal: 14, marginTop: 14,
-  },
-  finLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginBottom: 2 },
-  finValue: { fontSize: 16, color: 'white', fontWeight: '800' },
-  finDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
-  itemsText: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 10 },
-  missionActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  callBtn: {
-    flex: 1, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-  },
-  callBtnText: { fontSize: 14, color: 'white', fontWeight: '600' },
-  startBtn: {
-    flex: 2, height: 44, borderRadius: 12,
-    backgroundColor: 'white',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  startBtnText: { fontSize: 14, fontWeight: '700' },
+  statusRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
+  statusCard: { flex: 1, borderTopWidth: 3, borderRadius: 12, padding: 14, alignItems: 'center', ...AdminShadows.shadowSmall },
+  statusCount: { fontSize: 26, fontWeight: '800', marginBottom: 6 },
+  statusLabel: { fontSize: 10, fontWeight: '600', color: AdminColors.textMuted, textTransform: 'uppercase', textAlign: 'center', letterSpacing: 0.3 },
+  missionActions: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
   quickCard: {
-    flex: 1, backgroundColor: C.surface, borderRadius: 16,
-    padding: 14, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 14,
+    alignItems: 'center', position: 'relative',
+    ...AdminShadows.shadowSmall,
   },
-  quickIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    backgroundColor: 'rgba(13,115,119,0.08)',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
-  },
-  quickLabel: { fontSize: 11, fontWeight: '600', color: C.textPrimary, textAlign: 'center' },
+  quickIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  quickLabel: { fontSize: 11, fontWeight: '600', color: AdminColors.textPrimary, textAlign: 'center' },
   quickBadge: {
-    position: 'absolute',
+    position: 'absolute', top: 8, right: 8,
     minWidth: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
   quickBadgeText: { fontSize: 10, fontWeight: '800', color: 'white' },
-  sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, marginTop: 20, marginBottom: 10,
+  unpaidCard: {
+    backgroundColor: 'white', borderRadius: 14, marginHorizontal: 16, marginTop: 12, padding: 16,
+    ...AdminShadows.shadowSmall,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.textPrimary },
-  seeAll: { fontSize: 13, fontWeight: '600', color: C.primary },
-  miniCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: C.surface, borderRadius: 14,
-    marginHorizontal: 16, marginBottom: 8, padding: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  unpaidRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  unpaidIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
+  unpaidTitle: { fontSize: 14, fontWeight: '700', color: AdminColors.textPrimary },
+  unpaidSub: { fontSize: 12, color: AdminColors.textMuted, marginTop: 2 },
+  unpaidAmount: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  orderRow: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
+    borderRadius: 12, marginHorizontal: 16, marginBottom: 8, padding: 14, gap: 12,
+    ...AdminShadows.shadowSmall,
   },
-  miniAccent: { width: 4, height: 40, borderRadius: 2 },
-  miniIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  miniClientName: { fontSize: 14, fontWeight: '600', color: C.textPrimary },
-  miniAddress: { fontSize: 12, color: C.textMuted, marginTop: 2 },
-  miniAmount: { fontSize: 14, fontWeight: '700' },
+  orderRef: { fontSize: 13, fontWeight: '700', color: AdminColors.textPrimary },
+  orderClient: { fontSize: 12, color: AdminColors.textMuted, marginTop: 2 },
+  emptyBox: { alignItems: 'center', marginTop: 30 },
+  emptyText: { color: AdminColors.textMuted, fontSize: 14 },
 });

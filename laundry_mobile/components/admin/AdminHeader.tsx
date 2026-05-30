@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useSettings } from '../../src/hooks/query/useSettings';
@@ -14,7 +15,7 @@ interface AdminHeaderProps {
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, rightAction }) => {
   const { isRTL: isArabic } = useRTL();
   const { data: settingsData } = useSettings();
-  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null, businessPhone: null };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -25,7 +26,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, right
               <Image
                 source={{ uri: settings.logoUrl }}
                 style={styles.logo}
-                resizeMode="contain"
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                transition={100}
               />
             )}
             <Text style={[styles.title, textAlign(isArabic)]}>{title}</Text>

@@ -157,11 +157,16 @@ function RootLayoutNav() {
       const inLivreurGroup = rootSegment === '(livreur)';
       const inAdminGroup   = rootSegment === '(admin)';
       const inEmployeGroup = rootSegment === '(employe)';
-      // Employees can visit (admin) for the shared order-creation flow
-      const isSharedRoute = ['order', 'client', 'modal'].includes(rootSegment);
+      // Employees can visit (admin) for the shared order-creation flow.
+      // Livreurs can visit specific (admin) screens:
+      //   - order-items, order-summary: pickup confirmation flow
+      //   - client-debt-detail: linked from livreur unpaid screen
+      const livreurAdminScreens = ['order-items', 'order-summary', 'client-debt-detail', 'orders-by-status', 'order-client', 'map-picker'];
+      const inLivreurPickupFlow = isLivreur && inAdminGroup && livreurAdminScreens.some(s => segments.includes(s));
+      const isSharedRoute = ['order', 'client', 'modal', 'notifications'].includes(rootSegment);
 
       if (!isSharedRoute) {
-        if (isLivreur && !inLivreurGroup) {
+        if (isLivreur && !inLivreurGroup && !inLivreurPickupFlow) {
           router.replace('/(livreur)');
         } else if (isEmploye && !inEmployeGroup && !inAdminGroup) {
           router.replace('/(employe)');

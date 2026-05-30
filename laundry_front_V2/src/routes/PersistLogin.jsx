@@ -17,12 +17,17 @@ const PersistLogin = () => {
 
     const verifyRefreshToken = async () => {
       try {
-        const res = await refreshApi.post("/auth/refresh")
-        const newToken = res.data.token
+        const storedRefreshToken = localStorage.getItem('refreshToken')
+        const res = await refreshApi.post("/auth/refresh", null, {
+          headers: storedRefreshToken ? { 'X-Refresh-Token': storedRefreshToken } : {}
+        })
+        const newToken = res.data.accessToken || res.data.token
+        const newRefreshToken = res.data.refreshToken
         const decoded = jwtDecode(newToken)
         if (isMounted) {
           dispatch(setCredentials({
             token: newToken,
+            refreshToken: newRefreshToken,
             user: {
               id: decoded.sub,
               email: decoded.email,
@@ -32,7 +37,10 @@ const PersistLogin = () => {
           }))
         }
       } catch (err) {
-        // Silent catch for token refresh failure
+        // Refresh failed (expired/invalid token) — clear stale storage so
+        // the 403 interceptor in axios won't misread the old user as active
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
       } finally {
         if (isMounted) setLoading(false)
       }

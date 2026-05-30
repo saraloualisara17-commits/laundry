@@ -51,6 +51,27 @@ function getCfg(actionType: string, t: (k: string) => string) {
   return { color: AdminColors.textMuted, bg: AdminColors.primary50, label: actionType };
 }
 
+// Translate raw backend values that appear in previousValue / newValue.
+// Status codes and None/null are the most common raw values.
+const STATUS_KEYS: Record<string, string> = {
+  PENDING_PICKUP:     'status.PENDING_PICKUP',
+  PICKED_UP:          'status.PICKED_UP',
+  IN_PROCESS:         'status.IN_PROCESS',
+  READY_FOR_DELIVERY: 'status.READY_FOR_DELIVERY',
+  DELIVERED:          'status.DELIVERED',
+  CANCELLED:          'status.CANCELLED',
+  PICKUP_FAILED:      'status.PICKUP_FAILED',
+  DELIVERY_FAILED:    'status.DELIVERY_FAILED',
+};
+
+function translateAuditValue(value: string | null | undefined, t: (k: string) => string): string {
+  if (!value) return '';
+  const key = STATUS_KEYS[value.trim()];
+  if (key) return t(key);
+  if (value === 'None' || value === 'null') return t('common.none');
+  return value;
+}
+
 function entityNav(entityType: string, entityId: number): string | null {
   switch (entityType) {
     case 'COMMANDE': return `/order/${entityId}`;
@@ -125,8 +146,8 @@ function AuditRow({ entry, isRTL, t, onPress }: { entry: AuditLogEntry; isRTL: b
             maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
             numberOfLines={1}>
             {entry.previousValue && entry.newValue
-              ? `${entry.previousValue} → ${entry.newValue}`
-              : entry.newValue || entry.previousValue}
+              ? `${translateAuditValue(entry.previousValue, t)} → ${translateAuditValue(entry.newValue, t)}`
+              : translateAuditValue(entry.newValue || entry.previousValue, t)}
           </Text>
         )}
       </View>

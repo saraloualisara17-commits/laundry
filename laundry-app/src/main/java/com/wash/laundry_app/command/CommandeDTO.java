@@ -49,4 +49,5 @@ public class CommandeDTO {
     private ModeCommande mode;
     private LocalDateTime scheduledDeliveryDate;
     private boolean selfSubmitted;
+    private LocalDateTime debtSettledAt;
 }

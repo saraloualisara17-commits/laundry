@@ -15,8 +15,8 @@ import {
   TextInput,
   Dimensions,
   KeyboardAvoidingView,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -45,6 +45,9 @@ import { getWorkflowAction, OrderStatus, WorkflowAction, isDelivered } from '../
 import { useOrder, useUpdateOrderStatus, useAddPayment, useAddOrderImages } from '../../src/hooks/query/useOrder';
 import { useDriversList, usePickupDriversList, useAssignDeliveryDriver, useAssignPickupDriver } from '../../src/hooks/query/useDrivers';
 import { useDeleteOrder } from '../../src/hooks/query/useOrders';
+import { ordersApi } from '../../src/services/api/ordersApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../src/services/query/queryKeys';
 import * as Haptics from 'expo-haptics';
 import { logger } from '../../src/lib/logger';
 
@@ -65,10 +68,6 @@ export default function OrderDetailsScreen() {
     );
   }
 
-  if (currentUser?.role === 'LIVREUR') {
-    return <DriverOrderDetail order={order} />;
-  }
-
   return <AdminOrderDetail order={order} id={id as string} currentUser={currentUser} />;
 }
 
@@ -77,7 +76,8 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
   const f = useFormStyles();
   const isArabic = f.isArabic;
   const router = useRouter();
-  const { loadOrderForEditing, clearOrder } = useOrderCreation();
+  const { clearOrder, setPickupOrderId, setOrderNotes, setPickupImagesOnly, loadOrderForEditing } = useOrderCreation();
+  const qc = useQueryClient();
 
   // Queries
   const { payments, history, refetch, isRefreshing } = useOrder(id as string);
@@ -117,7 +117,8 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     canAddReceptionPhoto,
     canAddPayment,
     canAssignPickupDriver,
-    canAssignDriver
+    canAssignDriver,
+    canChangeStatus,
   } = permissions;
 
   const [deliveryDate, setDeliveryDate] = useState<Date>(new Date());
@@ -166,9 +167,68 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     }
   }, [id, updateStatusMutation, t]);
 
+  // Show 3-choice alert then branch into the appropriate pickup sub-flow.
+  const handleConfirmPickup = useCallback(() => {
+    Alert.alert(
+      t('pickup.choose_mode_title', { defaultValue: 'Confirmer la collecte' }),
+      t('pickup.choose_mode_subtitle', { defaultValue: 'Comment souhaitez-vous procéder ?' }),
+      [
+        {
+          text: t('pickup.option_items', { defaultValue: 'Ajouter les articles' }),
+          onPress: () => {
+            clearOrder();
+            setPickupOrderId(id as string);
+            setPickupImagesOnly(false);
+            setOrderNotes(order?.notes || '');
+            router.push('/(admin)/order-items');
+          },
+        },
+        {
+          text: t('pickup.option_images', { defaultValue: 'Photos seulement' }),
+          onPress: () => {
+            clearOrder();
+            setPickupOrderId(id as string);
+            setPickupImagesOnly(true);
+            setOrderNotes(order?.notes || '');
+            router.push('/(admin)/order-items');
+          },
+        },
+        {
+          text: t('pickup.option_nothing', { defaultValue: 'Confirmer sans ajout' }),
+          onPress: async () => {
+            try {
+              await ordersApi.confirmPickup(id as string, []);
+              qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+              qc.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+              qc.invalidateQueries({ queryKey: queryKeys.livreur.all });
+              qc.invalidateQueries({ queryKey: queryKeys.statistics.all });
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {
+              Alert.alert(t('common.error'), t('common.error_msg'));
+            }
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]
+    );
+  }, [clearOrder, setPickupOrderId, setPickupImagesOnly, setOrderNotes, id, order?.notes, router, qc, t]);
+
   const handleUpdateStatus = useCallback(async (action: WorkflowAction) => {
     const nextStatus = action.nextStatus;
     if (!nextStatus) return;
+
+    // PENDING_PICKUP → PICKED_UP: must be the assigned pickup driver
+    if (nextStatus === 'PICKED_UP') {
+      if (order?.livreur && String(order.livreur.id) !== String(currentUser?.id)) {
+        Alert.alert(
+          t('orders.not_allowed'),
+          t('orders.not_pickup_driver', { name: order.livreur.name })
+        );
+        return;
+      }
+      handleConfirmPickup();
+      return;
+    }
 
     if (action.requiresDriverModal) {
       setSelectedDriverId(order?.deliveryDriver?.id || null);
@@ -178,16 +238,13 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     }
 
     if (action.requiresDeliveryModal) {
-      if (order?.deliveryDriver && order.deliveryDriver.id !== currentUser?.id) {
-        // Driver is assigned AND it's not the current admin — they are responsible for confirming delivery and payment.
-        // Admin should not intercept; show informational alert instead.
+      if (order?.deliveryDriver && String(order.deliveryDriver.id) !== String(currentUser?.id)) {
         Alert.alert(
-          t('common.info'),
-          t('admin.orders.driver_responsible_msg', { name: order.deliveryDriver.name })
+          t('orders.not_allowed'),
+          t('orders.not_delivery_driver', { name: order.deliveryDriver.name })
         );
         return;
       }
-      // No driver assigned OR it's the current admin — handle delivery themselves.
       setCollectedAmount('0');
       setDeliveryNotes('');
       setShowDeliveryModal(true);
@@ -195,7 +252,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     }
 
     performStatusUpdate(nextStatus);
-  }, [order, performStatusUpdate, t]);
+  }, [order, currentUser?.id, handleConfirmPickup, performStatusUpdate, t]);
 
   const handleAssignAndMarkReady = useCallback(async () => {
     if (!selectedDriverId) {
@@ -204,7 +261,6 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     }
 
     try {
-      // Build local-timezone ISO string to avoid UTC midnight shifting the date (UTC+1 issue)
       const y = deliveryDate.getFullYear();
       const mo = String(deliveryDate.getMonth() + 1).padStart(2, '0');
       const d = String(deliveryDate.getDate()).padStart(2, '0');
@@ -215,8 +271,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
         driverId: selectedDriverId,
         scheduledDeliveryDate: isoDate,
       });
-      // Only advance status when the order is not already READY_FOR_DELIVERY.
-      // Re-sending the same status triggers a workflow validation error on the backend.
+      // Advance status only when coming from IN_PROCESS (not when changing driver on READY_FOR_DELIVERY)
       if (order?.status !== 'READY_FOR_DELIVERY') {
         await performStatusUpdate('READY_FOR_DELIVERY', {});
       }
@@ -405,9 +460,12 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(admin)/(tabs)');
+      const role = currentUser?.role?.toLowerCase();
+      if (role === 'livreur') router.replace('/(livreur)');
+      else if (role === 'employe') router.replace('/(employe)');
+      else router.replace('/(admin)/(tabs)');
     }
-  }, [router]);
+  }, [router, currentUser?.role]);
 
   // Only show edit when order hasn't been picked up yet (still in pickup phase)
   const canEditOrder = canEdit && order.status === 'PENDING_PICKUP';
@@ -529,8 +587,17 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
 
             return (
               <>
-                {/* Workflow action button */}
-                {showWorkflowBtn && !permissions.isEmploye && (
+                {/* Workflow action button
+                    - ADMIN: all statuses (isEmploye block handled separately below)
+                    - EMPLOYE: all statuses (isEmploye block handled separately below)
+                    - LIVREUR: only when canChangeStatus (assigned driver). PENDING_PICKUP needs canConfirmPickup, READY_FOR_DELIVERY direct */}
+                {showWorkflowBtn && (
+                  order.status === 'PENDING_PICKUP'
+                    ? permissions.canConfirmPickup
+                    : permissions.isLivreur
+                      ? canChangeStatus && order.status === 'READY_FOR_DELIVERY'
+                      : !permissions.isEmploye
+                ) && (
                   <TouchableOpacity
                     style={[styles.bigActionBtn, { backgroundColor: statusAction!.bg }]}
                     onPress={() => handleUpdateStatus(statusAction!)}
@@ -552,8 +619,8 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                   </TouchableOpacity>
                 )}
 
-                {/* Employé workflow (PICKED_UP / IN_PROCESS only) */}
-                {permissions.isEmploye && (order.status === 'PICKED_UP' || order.status === 'IN_PROCESS') && statusAction && (
+                {/* Employé / Livreur workflow (PICKED_UP / IN_PROCESS only) */}
+                {(permissions.isEmploye || (permissions.isLivreur && canChangeStatus)) && (order.status === 'PICKED_UP' || order.status === 'IN_PROCESS') && statusAction && (
                   <TouchableOpacity
                     style={[styles.bigActionBtn, { backgroundColor: order.status === 'PICKED_UP' ? '#3B82F6' : '#C9A84C' }]}
                     onPress={() => handleUpdateStatus(statusAction)}
@@ -619,8 +686,26 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                   </TouchableOpacity>
                 )}
 
-                {/* Ready — no driver: employé waiting banner */}
-                {isReadyNoDriver && permissions.isEmploye && (
+                {/* Add / edit items button — visible once the order is picked up and not yet ready for delivery */}
+                {(order.status === 'PICKED_UP' || order.status === 'IN_PROCESS') &&
+                  (permissions.isAdmin || permissions.isEmploye || (permissions.isLivreur && canChangeStatus)) && (
+                  <TouchableOpacity
+                    style={styles.addItemsBtn}
+                    onPress={() => {
+                      clearOrder();
+                      loadOrderForEditing(order);
+                      router.push('/(admin)/order-items');
+                    }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.addItemsBtnText}>
+                      {t('orders.add_items', { defaultValue: 'Ajouter / modifier les articles' })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Ready — no driver: employé/livreur waiting banner */}
+                {isReadyNoDriver && (permissions.isEmploye || permissions.isLivreur) && (
                   <View style={styles.waitingBanner}>
                     <Ionicons name="time-outline" size={22} color="#0284C7" />
                     <Text style={[styles.waitingText, isArabic && { textAlign: 'right' }]}>
@@ -694,7 +779,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
             <Ionicons name="time-outline" size={18} color={activeTab === 'suivi' ? Colors.primary : Colors.textMuted} />
             <Text style={[styles.tabText, activeTab === 'suivi' && styles.tabTextActive]}>{t('admin.orders.history')}</Text>
           </TouchableOpacity>
-          {(permissions.isAdmin || permissions.isEmploye) && (
+          {(permissions.isAdmin || permissions.isEmploye || permissions.isLivreur) && (
             <TouchableOpacity style={[styles.tabBtn, activeTab === 'historique' && styles.tabBtnActive]} onPress={() => setActiveTab('historique')}>
               <Ionicons name="shield-checkmark-outline" size={18} color={activeTab === 'historique' ? Colors.primary : Colors.textMuted} />
               <Text style={[styles.tabText, activeTab === 'historique' && styles.tabTextActive]}>{t('audit.tab', { defaultValue: 'Audit' })}</Text>
@@ -712,7 +797,14 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[row(isArabic), { gap: 10 }]}>
                     {order.images.map((img: any, idx: number) => (
                       <TouchableOpacity key={idx} onPress={() => setViewImage(`${BASE_URL}${img.imageUrl}`)}>
-                        <Image source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={styles.galleryImg} />
+                        <Image
+                          source={{ uri: `${BASE_URL}${img.imageUrl}` }}
+                          style={styles.galleryImg}
+                          contentFit="cover"
+                          transition={150}
+                          cachePolicy="memory-disk"
+                          recyclingKey={`${img.id}-${img.imageUrl}`}
+                        />
                         <View style={[styles.imgBadge, isArabic ? { left: 6, right: undefined } : { right: 6 }]}>
                           <Text style={styles.imgBadgeText}>{img.photoType === 'reception' ? t('common.photo_reception') : img.photoType === 'livraison' ? t('status.DELIVERED') : t('common.photo_lab')}</Text>
                         </View>
@@ -736,6 +828,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
               sharing={sharingAction === 'whatsapp'}
               getClientPhone={getClientPhone}
               setShowDriverModal={setShowDriverModal}
+              canAssignDriver={canAssignDriver}
             />
           )}
 
@@ -763,7 +856,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
       </ScrollView>
 
       {/* ── Sticky Bottom Bar ── */}
-      {(permissions.isAdmin || permissions.isEmploye) && (
+      {(permissions.isAdmin || permissions.isEmploye || permissions.isLivreur) && (
         <View style={[styles.bottomBar, row(isArabic)]}>
           <TouchableOpacity style={styles.bottomBarBtn} onPress={pickLangAndShare} disabled={!!sharingAction}>
             {sharingAction === 'whatsapp'
@@ -1042,7 +1135,7 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
         t={t}
       />
 
-      <Modal visible={!!viewImage} transparent animationType="fade" onRequestClose={() => setViewImage(null)}><View style={styles.imagePreviewOverlay}><TouchableOpacity style={styles.imagePreviewClose} onPress={() => setViewImage(null)}><Ionicons name="close" size={30} color="white" /></TouchableOpacity>{viewImage && (<Image source={{ uri: viewImage }} style={styles.fullImage} resizeMode="contain" />)}</View></Modal>
+      <Modal visible={!!viewImage} transparent animationType="fade" onRequestClose={() => setViewImage(null)}><View style={styles.imagePreviewOverlay}><TouchableOpacity style={styles.imagePreviewClose} onPress={() => setViewImage(null)}><Ionicons name="close" size={30} color="white" /></TouchableOpacity>{viewImage && (<Image source={{ uri: viewImage }} style={styles.fullImage} contentFit="contain" cachePolicy="memory-disk" />)}</View></Modal>
     </View>
   );
 }
@@ -1050,11 +1143,22 @@ function AdminOrderDetail({ order, id, currentUser }: { order: any, id: string, 
 function DriverOrderDetail({ order }: { order: any }) {
   const router = useRouter();
   const { t } = useTranslation();
+  const currentUser = useSelector((state: any) => state.auth.user);
+  const { clearOrder, setPickupOrderId, setOrderNotes, setOrderImages, driverLocalImages, addDriverLocalImage, removeDriverLocalImage, clearDriverLocalImages } = useOrderCreation();
+  const { id } = useLocalSearchParams();
+  const orderId = String(id);
+  const addPaymentMutation = useAddPayment();
+
   const [viewImage, setViewImage] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const localImages = driverLocalImages[orderId] ?? [];
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+
   const client = order.client || {};
   const phone = client.phone || (client.phones?.[0]?.phoneNumber);
-  const addr = client.addresses?.[0]?.address || order.clientAdresse;
+  // deliveryAddress is the snapshotted address on the order; fall back to client's address
+  const addr = order.deliveryAddress || client.addresses?.[0]?.address;
 
   const total = parseFloat(order.montantTotal ?? 0);
   const paid = parseFloat(order.montantPaye ?? 0);
@@ -1062,7 +1166,77 @@ function DriverOrderDetail({ order }: { order: any }) {
   const fullyPaid = total > 0 && remaining < 0.05;
   const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
 
-  const handleAddReceptionPhoto = () => handleAddPhotos('reception');
+  const isDeliveredOrder = order.status === 'DELIVERED';
+  const isPendingPickup = order.status === 'PENDING_PICKUP';
+  const isAssignedPickupDriver = order.livreur?.id === currentUser?.id || order.pickupDriver?.id === currentUser?.id;
+
+  const handleConfirmPickup = () => {
+    const images = driverLocalImages[orderId] ?? [];
+    clearOrder();
+    setPickupOrderId(orderId);
+    setOrderNotes(order.notes || '');
+    setOrderImages(images);
+    clearDriverLocalImages(orderId);
+    router.push('/(admin)/order-items');
+  };
+
+  const handleAddPayment = async () => {
+    const amount = parseFloat(paymentAmount);
+    if (!paymentAmount || isNaN(amount) || amount <= 0) {
+      return Alert.alert(t('common.error'), t('admin.unpaid.enter_valid_amount'));
+    }
+    if (amount > remaining + 0.05) {
+      return Alert.alert(t('common.error'), `${t('admin.unpaid.payment_exceeds_remaining')} (${remaining.toFixed(2)} DH)`);
+    }
+    try {
+      // Upload any pending local images before recording payment
+      const pendingImages = driverLocalImages[orderId] ?? [];
+      if (pendingImages.length > 0) {
+        await Promise.all(pendingImages.map(uri => uploadManager.addImage(uri, orderId, 'livraison')));
+        clearDriverLocalImages(orderId);
+      }
+      await addPaymentMutation.mutateAsync({ id: String(order.id), amount, note: paymentNote });
+      setShowPaymentModal(false);
+      setPaymentAmount('');
+      setPaymentNote('');
+    } catch {
+      Alert.alert(t('common.error'), t('common.error_msg'));
+    }
+  };
+
+  const handleAddReceptionPhoto = () => {
+    Alert.alert(
+      t('common.add_photo', { defaultValue: 'Ajouter une photo' }),
+      '',
+      [
+        {
+          text: t('common.camera', { defaultValue: 'Caméra' }),
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+            if (result.canceled) return;
+            result.assets.forEach(a => addDriverLocalImage(orderId, a.uri));
+          },
+        },
+        {
+          text: t('common.gallery', { defaultValue: 'Galerie' }),
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsMultipleSelection: true,
+              quality: 1,
+            });
+            if (result.canceled) return;
+            result.assets.forEach(a => addDriverLocalImage(orderId, a.uri));
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -1138,14 +1312,58 @@ function DriverOrderDetail({ order }: { order: any }) {
           <TouchableOpacity
             style={[driverStyles.actionBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
             onPress={handleAddReceptionPhoto}
-            disabled={uploadingImage}
           >
-            {uploadingImage
-              ? <ActivityIndicator color={Colors.info} size="small" />
-              : <Feather name="camera" size={20} color={Colors.info} />}
+            <Feather name="camera" size={20} color={Colors.info} />
             <Text style={[driverStyles.actionBtnText, { color: Colors.info }]}>{t('admin.orders.create.items.photos')}</Text>
           </TouchableOpacity>
+
+          {/* Local image previews — not yet uploaded */}
+          {localImages.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              {localImages.map((uri, idx) => (
+                <View key={idx} style={{ position: 'relative' }}>
+                  <TouchableOpacity onPress={() => setViewImage(uri)}>
+                    <Image source={{ uri }} style={driverStyles.itemImg} contentFit="cover" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => removeDriverLocalImage(orderId, idx)}
+                    style={driverStyles.removeImageBtn}
+                  >
+                    <Ionicons name="close" size={12} color="white" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
         </View>
+
+        {/* Confirm Pickup — only for PENDING_PICKUP + assigned driver */}
+        {isPendingPickup && isAssignedPickupDriver && (
+          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+            <TouchableOpacity
+              style={[driverStyles.primaryAction, { backgroundColor: Colors.primary }]}
+              onPress={handleConfirmPickup}
+            >
+              <Ionicons name="checkmark-circle-outline" size={22} color="white" />
+              <Text style={driverStyles.primaryActionText}>{t('admin.orders.actions.confirm_received')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Collect payment — only for DELIVERED + unpaid */}
+        {isDeliveredOrder && !fullyPaid && (
+          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+            <TouchableOpacity
+              style={[driverStyles.primaryAction, { backgroundColor: Colors.danger }]}
+              onPress={() => setShowPaymentModal(true)}
+            >
+              <Ionicons name="cash-outline" size={22} color="white" />
+              <Text style={driverStyles.primaryActionText}>
+                {t('admin.unpaid.add_payment')} — {remaining.toFixed(2)} {t('common.dh')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Articles */}
         <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
@@ -1177,7 +1395,14 @@ function DriverOrderDetail({ order }: { order: any }) {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }} contentContainerStyle={{ gap: 8 }}>
                 {item.images.map((img: any, i: number) => (
                   <TouchableOpacity key={i} onPress={() => setViewImage(`${BASE_URL}${img.imageUrl}`)}>
-                    <Image source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={driverStyles.itemImg} />
+                    <Image
+                      source={{ uri: `${BASE_URL}${img.imageUrl}` }}
+                      style={driverStyles.itemImg}
+                      contentFit="cover"
+                      transition={150}
+                      cachePolicy="memory-disk"
+                      recyclingKey={`item-${img.id ?? i}-${img.imageUrl}`}
+                    />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -1187,11 +1412,18 @@ function DriverOrderDetail({ order }: { order: any }) {
 
         {(order.images && order.images.length > 0) && (
           <View style={[styles.financialCard, { marginTop: 10 }]}>
-            <Text style={[styles.sectionLabel, f.sectionLabel, { marginBottom: 12 }]}>{t('common.order_photos', { defaultValue: 'Photos' })}</Text>
+            <Text style={[styles.sectionLabel, { marginBottom: 12 }]}>{t('common.order_photos', { defaultValue: 'Photos' })}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {order.images.map((img: any, idx: number) => (
                 <TouchableOpacity key={idx} onPress={() => setViewImage(`${BASE_URL}${img.imageUrl}`)}>
-                  <Image source={{ uri: `${BASE_URL}${img.imageUrl}` }} style={driverStyles.itemImg} />
+                  <Image
+                    source={{ uri: `${BASE_URL}${img.imageUrl}` }}
+                    style={driverStyles.itemImg}
+                    contentFit="cover"
+                    transition={150}
+                    cachePolicy="memory-disk"
+                    recyclingKey={`order-${img.id ?? idx}-${img.imageUrl}`}
+                  />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1199,12 +1431,26 @@ function DriverOrderDetail({ order }: { order: any }) {
         )}
       </ScrollView>
 
+      <PaymentModal
+        visible={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSubmit={handleAddPayment}
+        remaining={remaining}
+        loading={addPaymentMutation.isPending}
+        paymentAmount={paymentAmount}
+        setPaymentAmount={setPaymentAmount}
+        paymentNote={paymentNote}
+        setPaymentNote={setPaymentNote}
+        isArabic={false}
+        t={t}
+      />
+
       <Modal visible={!!viewImage} transparent animationType="fade" onRequestClose={() => setViewImage(null)}>
         <View style={styles.imagePreviewOverlay}>
           <TouchableOpacity style={styles.imagePreviewClose} onPress={() => setViewImage(null)}>
             <Ionicons name="close" size={30} color="white" />
           </TouchableOpacity>
-          {viewImage && <Image source={{ uri: viewImage }} style={styles.fullImage} resizeMode="contain" />}
+          {viewImage && <Image source={{ uri: viewImage }} style={styles.fullImage} contentFit="contain" cachePolicy="memory-disk" />}
         </View>
       </Modal>
     </View>
@@ -1212,6 +1458,8 @@ function DriverOrderDetail({ order }: { order: any }) {
 }
 
 const driverStyles = StyleSheet.create({
+  primaryAction: { height: 56, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadows.md },
+  primaryActionText: { color: 'white', fontSize: 16, fontWeight: '800' },
   callBtn: { height: 56, backgroundColor: Colors.success, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12, ...Shadows.md },
   callBtnText: { color: 'white', fontSize: 18, fontWeight: '700' },
   navBtn: { height: 52, backgroundColor: 'white', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
@@ -1228,6 +1476,13 @@ const driverStyles = StyleSheet.create({
   itemPrice: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
   itemMeta: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500' },
   itemImg: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#F1F5F9', marginRight: 8 },
+  removeImageBtn: {
+    position: 'absolute', top: -6, right: 2,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: Colors.danger,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 10,
+  },
   cameraBtn: { height: 48, backgroundColor: Colors.primary, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20, ...Shadows.sm },
   cameraBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
 });
@@ -1277,6 +1532,8 @@ const styles = StyleSheet.create({
   waitingText: { fontSize: 15, fontWeight: '700', color: '#0284C7', flex: 1 },
   assignDriverBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16, backgroundColor: Colors.primary100, borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed' },
   assignDriverText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  addItemsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 16, backgroundColor: Colors.primary100, borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed' },
+  addItemsBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
   actionChevron: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   driverAssignedCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'white', borderRadius: 18, padding: 16, borderWidth: 1.5, borderColor: Colors.success + '50', ...Shadows.sm },
   driverAssignedAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },

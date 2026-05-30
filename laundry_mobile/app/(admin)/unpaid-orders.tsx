@@ -178,7 +178,7 @@ export default function UnpaidOrdersScreen() {
           </View>
           <View style={styles.finCol}>
             <Text style={styles.finLabel}>{t('financial.remaining')}</Text>
-            <Text style={[styles.finValue, styles.orderFinDanger]}>{item.montantRestant || item.resteAPayer} {t('common.dh')}</Text>
+            <Text style={[styles.finValue, styles.orderFinDanger]}>{item.montantRestant} {t('common.dh')}</Text>
           </View>
         </View>
         
@@ -231,7 +231,7 @@ export default function UnpaidOrdersScreen() {
       <FlatList
         data={activeTab === 'client' ? clients : orders}
         renderItem={activeTab === 'client' ? renderClientCard : renderOrderCard}
-        keyExtractor={(item, index) => activeTab === 'client' ? item.clientId?.toString() || index.toString() : item.id?.toString() || index.toString()}
+        keyExtractor={(item, index) => activeTab === 'client' ? item.clientId?.toString() || index.toString() : item.orderId?.toString() || index.toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={

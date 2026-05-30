@@ -59,6 +59,13 @@ public class OrderController {
         return ResponseEntity.ok(commandeService.updateCommande(id, request));
     }
 
+    @PostMapping("/{id}/confirm-pickup")
+    public ResponseEntity<CommandeDTO> confirmPickup(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.List<CreateCommandeRequest.TapisItem> items) {
+        return ResponseEntity.ok(commandeService.confirmPickup(id, items));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCommande(@PathVariable Long id) {
         commandeService.deleteCommande(id);

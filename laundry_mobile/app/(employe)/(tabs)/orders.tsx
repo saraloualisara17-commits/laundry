@@ -25,6 +25,8 @@ export default function EmployeOrdersScreen() {
     { id: 'PICKED_UP',          label: t('status.PICKED_UP') },
     { id: 'IN_PROCESS',         label: t('status.IN_PROCESS') },
     { id: 'READY_FOR_DELIVERY', label: t('status.READY_FOR_DELIVERY') },
+    { id: 'PICKUP_FAILED',      label: t('status.PICKUP_FAILED') },
+    { id: 'DELIVERY_FAILED',    label: t('status.DELIVERY_FAILED') },
     { id: 'CANCELLED',          label: t('status.CANCELLED') },
   ];
 
@@ -47,10 +49,12 @@ export default function EmployeOrdersScreen() {
   } = useInfiniteOrders(filters);
 
   const orders = useMemo(
-    () => (ordersPages?.pages ?? []).flatMap((p: any) => p.content || p || []),
+    () => (ordersPages?.pages ?? [])
+      .flatMap((p: any) => p.content || p || [])
+      .filter((o: any) => o.status !== 'DELIVERED'),
     [ordersPages]
   );
-  const totalCount = ordersPages?.pages?.[0]?.totalElements ?? orders.length;
+  const totalCount = orders.length;
   const refreshing = isFetching && !loading && !loadingMore;
 
   const onRefresh = () => { refetch(); };
@@ -103,7 +107,7 @@ export default function EmployeOrdersScreen() {
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{t('employe.orders.title')}</Text>
+          <Text style={styles.headerTitle}>{t('tabs.orders')}</Text>
           <View style={styles.countBadge}>
             <Text style={styles.countText}>{totalCount} Total</Text>
           </View>

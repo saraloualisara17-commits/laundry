@@ -24,9 +24,9 @@ import java.util.Set;
  * <pre>
  *   PENDING_PICKUP  → PICKED_UP              [LIVREUR (pickup driver only), ADMIN]
  *   PENDING_PICKUP  → CANCELLED              [LIVREUR (pickup driver only), EMPLOYE, ADMIN]
- *   PICKED_UP       → IN_PROCESS             [EMPLOYE, ADMIN]
+ *   PICKED_UP       → IN_PROCESS             [LIVREUR, EMPLOYE, ADMIN]
  *   PICKED_UP       → CANCELLED              [EMPLOYE, ADMIN]
- *   IN_PROCESS      → READY_FOR_DELIVERY     [EMPLOYE, ADMIN]
+ *   IN_PROCESS      → READY_FOR_DELIVERY     [LIVREUR, EMPLOYE, ADMIN]
  *   IN_PROCESS      → CANCELLED              [EMPLOYE, ADMIN]
  *   READY_FOR_DELIVERY → DELIVERED           [LIVREUR (delivery driver only), ADMIN]
  *   READY_FOR_DELIVERY → CANCELLED           [ADMIN]
@@ -84,9 +84,9 @@ public class CommandeWorkflowValidator {
         addRole(CommandeStatus.PENDING_PICKUP,    CommandeStatus.PICKED_UP,           Role.LIVREUR, Role.ADMIN);
         addRole(CommandeStatus.PENDING_PICKUP,    CommandeStatus.PICKUP_FAILED,       Role.LIVREUR, Role.ADMIN);
         addRole(CommandeStatus.PENDING_PICKUP,    CommandeStatus.CANCELLED,           Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
-        addRole(CommandeStatus.PICKED_UP,         CommandeStatus.IN_PROCESS,          Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.PICKED_UP,         CommandeStatus.IN_PROCESS,          Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
         addRole(CommandeStatus.PICKED_UP,         CommandeStatus.CANCELLED,           Role.EMPLOYE, Role.ADMIN);
-        addRole(CommandeStatus.IN_PROCESS,        CommandeStatus.READY_FOR_DELIVERY,  Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.IN_PROCESS,        CommandeStatus.READY_FOR_DELIVERY,  Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
         addRole(CommandeStatus.IN_PROCESS,        CommandeStatus.CANCELLED,           Role.EMPLOYE, Role.ADMIN);
         addRole(CommandeStatus.READY_FOR_DELIVERY, CommandeStatus.DELIVERED,          Role.LIVREUR, Role.ADMIN);
         addRole(CommandeStatus.READY_FOR_DELIVERY, CommandeStatus.DELIVERY_FAILED,    Role.LIVREUR, Role.ADMIN);

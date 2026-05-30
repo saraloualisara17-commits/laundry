@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -134,10 +133,15 @@ public class StatisticsService {
         unpaidData.put("clientsCount", unpaid.getClientsWithDebt());
         unpaidData.put("amount",       unpaid.getTotalRemaining() != null ? unpaid.getTotalRemaining() : BigDecimal.ZERO);
 
+        long todayClients = todayCommandes.stream()
+                .map(c -> c.getClient().getId())
+                .distinct()
+                .count();
+
         StatisticsDTO.StatisticsDTOBuilder builder = StatisticsDTO.builder()
                 .totalCommandesToday((long) todayCommandes.size())
                 .totalCommandes(commandeRepository.count())
-                .totalClients(clientRepository.count())
+                .totalClients(todayClients)
                 .commandesEnAttente(enAttente)
                 .commandesValidees(validees)
                 .commandesEnTraitement(enTraitement)
@@ -183,23 +187,21 @@ public class StatisticsService {
                           && c.getMontantPaye().compareTo(c.getMontantTotal()) >= 0)
                 .count();
 
-        // Remaining unpaid balance on delivered orders created in this period
-        BigDecimal unpaidAmount = period.stream()
-                .filter(c -> c.getStatus() == CommandeStatus.DELIVERED)
-                .map(c -> {
-                    BigDecimal total     = c.getMontantTotal() != null ? c.getMontantTotal() : BigDecimal.ZERO;
-                    BigDecimal paid      = c.getMontantPaye()  != null ? c.getMontantPaye()  : BigDecimal.ZERO;
-                    BigDecimal remaining = total.subtract(paid);
-                    return remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO;
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long periodClients = period.stream()
+                .map(c -> c.getClient().getId())
+                .distinct()
+                .count();
 
+        // Global unpaid (same as today tab — unpaid debt is business-wide, not period-scoped)
+        UnpaidOverviewDto unpaid = unpaidService.getOverview();
         Map<String, Object> unpaidData = new HashMap<>();
-        unpaidData.put("amount", unpaidAmount);
-        unpaidData.put("count",  livrees - paidOrders);
+        unpaidData.put("count",        unpaid.getTotalOrders());
+        unpaidData.put("clientsCount", unpaid.getClientsWithDebt());
+        unpaidData.put("amount",       unpaid.getTotalRemaining() != null ? unpaid.getTotalRemaining() : BigDecimal.ZERO);
 
         StatisticsDTO.StatisticsDTOBuilder builder = StatisticsDTO.builder()
                 .totalCommandes(totalCommandes)
+                .totalClients(periodClients)
                 .commandesEnAttente(enAttente)
                 .commandesValidees(validees)
                 .commandesEnTraitement(enTraitement)
@@ -214,27 +216,15 @@ public class StatisticsService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // OVERALL (ALL-TIME)
+    // OVERALL (ALL-TIME) — delegates to date-range for consistent breakdown
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public StatisticsDTO getOverallStatistics() {
-        List<Commande> all = commandeRepository.findAll();
-
-        // All-time revenue = sum of all payments ever recorded
-        BigDecimal revenue = all.stream()
-                .map(c -> c.getMontantPaye() != null ? c.getMontantPaye() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        Map<String, Long> byStatus = all.stream()
-                .collect(Collectors.groupingBy(c -> c.getStatus().name(), Collectors.counting()));
-
-        return StatisticsDTO.builder()
-                .totalCommandes((long) all.size())
-                .totalRevenue(revenue)
-                .totalRevenues(revenue)
-                .commandesByStatus(byStatus)
-                .build();
+        LocalDate earliest = commandeRepository.findEarliestCreationDate()
+                .map(LocalDateTime::toLocalDate)
+                .orElse(LocalDate.of(2020, 1, 1));
+        return getStatisticsByDateRange(earliest, LocalDate.now());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -327,11 +317,11 @@ public class StatisticsService {
             "total", commandeRepository.sumActiveImmediateOrders()
         ));
 
-        // PAID_DEBTS: fully-paid delivered orders created in last 30 days
+        // PAID_DEBTS: orders where debt was fully settled in the last 30 days
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         data.put("PAID_DEBTS", Map.of(
-            "count", commandeRepository.countRecentlyFullyPaidDelivered(thirtyDaysAgo),
-            "total", commandeRepository.sumRecentlyFullyPaidDelivered(thirtyDaysAgo)
+            "count", commandeRepository.countSettledDebts(thirtyDaysAgo),
+            "total", commandeRepository.sumSettledDebts(thirtyDaysAgo)
         ));
 
         return data;

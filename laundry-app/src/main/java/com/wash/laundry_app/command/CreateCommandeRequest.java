@@ -1,7 +1,6 @@
 package com.wash.laundry_app.command;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -30,7 +29,6 @@ public class CreateCommandeRequest {
     private java.math.BigDecimal deliveryLongitude;
     private List<String> imageUrls;
 
-    @NotEmpty(message = "Au moins un article est requis")
     @Valid
     private List<TapisItem> tapis;
 

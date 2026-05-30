@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class UpdateCommandeRequest {
 
+    private Long version;
     private Long livreurId;
     private Long deliveryDriverId;
     private LocalDateTime dateLivraison;
@@ -23,6 +24,8 @@ public class UpdateCommandeRequest {
     private java.util.List<CreateCommandeRequest.TapisItem> tapis;
     private java.util.List<String> imageUrls;
 
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
     public Long getLivreurId() { return livreurId; }
     public void setLivreurId(Long livreurId) { this.livreurId = livreurId; }
     public Long getDeliveryDriverId() { return deliveryDriverId; }

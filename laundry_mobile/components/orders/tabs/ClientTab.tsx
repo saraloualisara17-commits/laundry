@@ -15,6 +15,7 @@ interface ClientTabProps {
   sharing: boolean;
   getClientPhone: (client: any) => string;
   setShowDriverModal: (visible: boolean) => void;
+  canAssignDriver?: boolean;
 }
 
 const ClientTab: React.FC<ClientTabProps> = ({
@@ -26,6 +27,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
   sharing,
   getClientPhone,
   setShowDriverModal,
+  canAssignDriver = false,
 }) => {
   const f = useFormStyles();
   return (
@@ -118,7 +120,7 @@ const ClientTab: React.FC<ClientTabProps> = ({
           </View>
         )}
 
-        {order.status !== 'DELIVERED' && !order.deliveryDriver && (
+        {order.status !== 'DELIVERED' && !order.deliveryDriver && canAssignDriver && (
           <TouchableOpacity
             style={[styles.infoRow, row(isArabic)]}
             onPress={() => setShowDriverModal(true)}

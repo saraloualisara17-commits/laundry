@@ -28,6 +28,18 @@ export const paymentsApi = {
    */
   getClientDebtList: () =>
     client.get('/api/admin/unpaid/clients'),
+
+  /**
+   * Get flat list of all unpaid orders (across all clients)
+   */
+  getAllUnpaidOrders: () =>
+    client.get('/api/admin/unpaid/orders'),
+
+  /**
+   * Get debt detail for a specific client (orders with remaining balance)
+   */
+  getClientDebtDetail: (clientId: number | string) =>
+    client.get(`/api/admin/unpaid/clients/${clientId}`),
 };
 
 export default paymentsApi;

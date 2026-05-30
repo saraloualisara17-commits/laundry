@@ -17,7 +17,8 @@ import {
   confirmPaymentRequest,
   getPaymentTypes,
   returnToWorkshopRequest,
-  getCarpetTypes
+  getCarpetTypes,
+  getPendingPickup,
 } from './livreurService'
 
 // ========== CLIENT THUNKS ==========
@@ -233,4 +234,16 @@ export const fetchCarpetTypes = createAsyncThunk(
       return rejectWithValue(error.response?.data?.message || 'Erreur types tapis');
     }
   }
-);
+);
+
+export const fetchPendingPickup = createAsyncThunk(
+  'livreur/fetchPendingPickup',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getPendingPickup();
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Erreur chargement collectes');
+    }
+  }
+);

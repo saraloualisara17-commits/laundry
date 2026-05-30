@@ -7,12 +7,18 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 const log = logger.ns('upload');
 
-// Maximum number of images uploading simultaneously.
-// 3 is the sweet spot: saturates a typical mobile connection without
-// overwhelming the Railway free-tier backend or causing OOM on older devices.
+// 3 simultaneous uploads: saturates a typical 4G connection without OOM on
+// mid-range devices. Railway free tier handles 3 concurrent multipart requests
+// comfortably. Do not raise above 4 without load testing.
 const MAX_CONCURRENT = 3;
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB source file hard limit
+// Hard reject source files above this size before compression runs.
+// Compressing a 30 MB RAW export would spike JS-thread memory badly.
+const MAX_SOURCE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// If a task has been 'uploading' for longer than this, it is considered stalled
+// (network dropped mid-stream, Axios timeout didn't fire). Reset to 'pending'.
+const STALL_TIMEOUT_MS = 90_000; // 90 seconds
 
 // ─── Progress tracking ────────────────────────────────────────────────────────
 
@@ -23,11 +29,14 @@ const progressListeners = new Map<string, ProgressListener>();
 
 class UploadManager {
   private activeCount = 0;
+  // Track when each task started uploading — for stall detection
+  private uploadStartTimes = new Map<string, number>();
 
   constructor() {
+    // Drain queue whenever connectivity is restored
     connectivity.subscribe((state) => {
       if (state.isConnected && state.isInternetReachable) {
-        this.processQueue();
+        this.recoverStalledTasks().then(() => this.processQueue());
       }
     });
   }
@@ -35,8 +44,7 @@ class UploadManager {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**
-   * Compress + enqueue a single image for background upload.
-   * Returns immediately after compression — upload happens in background.
+   * Compress + enqueue a single image. Returns immediately — upload is async.
    */
   public async addImage(
     uri: string,
@@ -44,25 +52,9 @@ class UploadManager {
     photoType: string,
     profile: CompressionProfile = 'standard',
   ): Promise<UploadTask> {
-    // Reject oversized source files before wasting time compressing
-    try {
-      const info = await FileSystem.getInfoAsync(uri, { size: true });
-      if (info.exists && (info as any).size > MAX_UPLOAD_BYTES) {
-        throw new Error('Image exceeds the 10 MB size limit.');
-      }
-    } catch (e: any) {
-      if (e.message?.includes('10 MB')) throw e;
-    }
-
+    await this.validateSourceSize(uri);
     const compressedUri = await compressImage(uri, profile);
-
-    const task = await uploadQueue.enqueue({
-      uri: compressedUri,
-      originalUri: uri,
-      orderId,
-      photoType,
-    });
-
+    const task = await uploadQueue.enqueue({ uri: compressedUri, originalUri: uri, orderId, photoType });
     log.info('Queued', { taskId: task.id, orderId: String(orderId) });
     this.processQueue();
     return task;
@@ -70,8 +62,7 @@ class UploadManager {
 
   /**
    * Compress + enqueue multiple images in parallel, then kick off uploads.
-   * All compressions run simultaneously so the user waits for the slowest
-   * one rather than the sum of all.
+   * All compressions run simultaneously — total wait is max(t), not sum(t).
    */
   public async addImages(
     uris: string[],
@@ -82,35 +73,26 @@ class UploadManager {
   ): Promise<UploadTask[]> {
     if (uris.length === 0) return [];
 
-    // Register progress listener keyed by orderId+photoType
-    const listenerKey = `${orderId}:${photoType}`;
-    if (onProgress) progressListeners.set(listenerKey, onProgress);
+    const key = `${orderId}:${photoType}`;
+    if (onProgress) progressListeners.set(key, onProgress);
 
-    // Compress all in parallel — independent work, no reason to serialize
     const compressedUris = await Promise.all(
       uris.map(async (uri) => {
         try {
-          const info = await FileSystem.getInfoAsync(uri, { size: true });
-          if (info.exists && (info as any).size > MAX_UPLOAD_BYTES) {
-            log.warn('Skipping oversized file', { uri });
-            return null;
-          }
-        } catch { /* non-fatal */ }
+          await this.validateSourceSize(uri);
+        } catch {
+          log.warn('Skipping oversized file', { uri });
+          return null;
+        }
         return compressImage(uri, profile);
       }),
     );
 
-    // Enqueue valid results
     const tasks = await Promise.all(
       compressedUris
         .filter((u): u is string => u !== null)
-        .map(async (compressedUri, i) =>
-          uploadQueue.enqueue({
-            uri: compressedUri,
-            originalUri: uris[i],
-            orderId,
-            photoType,
-          }),
+        .map((compressedUri, i) =>
+          uploadQueue.enqueue({ uri: compressedUri, originalUri: uris[i], orderId, photoType }),
         ),
     );
 
@@ -131,59 +113,99 @@ class UploadManager {
     const pending = await uploadQueue.getPendingTasks();
     if (pending.length === 0) return;
 
-    // Kick off up to MAX_CONCURRENT tasks simultaneously
     const slots = MAX_CONCURRENT - this.activeCount;
     if (slots <= 0) return;
 
-    const batch = pending.slice(0, slots);
-    batch.forEach(task => this.processTask(task));
+    pending.slice(0, slots).forEach(task => this.processTask(task));
   }
+
+  /**
+   * Reset tasks that have been stuck in 'uploading' state beyond STALL_TIMEOUT_MS.
+   * This happens when the app is backgrounded mid-upload or the socket closes
+   * without an error event (common on weak 3G).
+   */
+  private async recoverStalledTasks() {
+    const all = await uploadQueue.getAllTasks();
+    const now = Date.now();
+    for (const task of all) {
+      if (task.status !== 'uploading') continue;
+      const startedAt = this.uploadStartTimes.get(task.id);
+      const elapsed = startedAt ? now - startedAt : STALL_TIMEOUT_MS + 1;
+      if (elapsed > STALL_TIMEOUT_MS) {
+        log.warn('Recovering stalled task', { id: task.id });
+        this.uploadStartTimes.delete(task.id);
+        await uploadQueue.updateTask(task.id, {
+          status: 'pending',
+          nextRetryAt: computeNextRetryAt(task.attempts),
+        });
+      }
+    }
+  }
+
+  // ── Task Execution ─────────────────────────────────────────────────────────
 
   private async processTask(task: UploadTask) {
     this.activeCount++;
+    this.uploadStartTimes.set(task.id, Date.now());
     log.debug('Starting task', { id: task.id, orderId: String(task.orderId) });
 
-    try {
-      await uploadQueue.updateTask(task.id, {
-        status: 'uploading',
-        attempts: task.attempts + 1,
-      });
+    await uploadQueue.updateTask(task.id, {
+      status: 'uploading',
+      attempts: task.attempts + 1,
+    });
 
-      // Upload file to server
+    try {
       const uploadRes = await uploadsApi.uploadFile({
         uri: task.uri,
-        name: `order_${task.orderId}_${Date.now()}.jpg`,
-        type: 'image/jpeg',
+        name: `order_${task.orderId}_${Date.now()}.${task.uri.endsWith('.webp') ? 'webp' : 'jpg'}`,
+        type: task.uri.endsWith('.webp') ? 'image/webp' : 'image/jpeg',
       });
 
       const imageUrl = uploadRes.data.imageUrl;
 
-      // Attach URL to the order
       if (task.orderId) {
         await ordersApi.addImages(task.orderId, [imageUrl], task.photoType);
       }
 
       await uploadQueue.removeTask(task.id);
+      this.uploadStartTimes.delete(task.id);
       log.info('Task done', { id: task.id });
-
-      // Notify progress listeners
       this.notifyProgress(task);
 
     } catch (e: any) {
-      log.error('Task failed', { id: task.id, err: e?.message });
-      await uploadQueue.updateTask(task.id, {
-        status: 'failed',
-        errorMessage: e?.message ?? 'Upload failed',
-      });
+      this.uploadStartTimes.delete(task.id);
+      const updatedAttempts = task.attempts + 1;
+      log.error('Task failed', { id: task.id, attempt: updatedAttempts, err: e?.message });
 
-      if (task.attempts >= 5) {
+      if (updatedAttempts >= MAX_ATTEMPTS) {
         log.warn('Max attempts reached — dropping task', { id: task.id });
         await uploadQueue.removeTask(task.id);
+      } else {
+        const retryAt = computeNextRetryAt(updatedAttempts);
+        log.info('Will retry', { id: task.id, inMs: retryAt - Date.now() });
+        await uploadQueue.updateTask(task.id, {
+          status: 'failed',
+          errorMessage: e?.message ?? 'Upload failed',
+          nextRetryAt: retryAt,
+        });
       }
     } finally {
       this.activeCount = Math.max(0, this.activeCount - 1);
-      // Drain remaining queue — a slot just freed up
+      // A slot just freed — drain remaining queue immediately
       this.processQueue();
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  private async validateSourceSize(uri: string) {
+    try {
+      const info = await FileSystem.getInfoAsync(uri, { size: true });
+      if (info.exists && (info as any).size > MAX_SOURCE_BYTES) {
+        throw new Error('Image exceeds the 10 MB size limit.');
+      }
+    } catch (e: any) {
+      if (e.message?.includes('10 MB')) throw e;
     }
   }
 
@@ -196,12 +218,20 @@ class UploadManager {
     const relevant = all.filter(
       t => t.orderId === completedTask.orderId && t.photoType === completedTask.photoType,
     );
-    const total = relevant.length;
     const done = relevant.filter(t => t.status === 'completed').length;
-    listener(done, total);
-
-    if (done >= total) progressListeners.delete(key);
+    listener(done, relevant.length);
+    if (done >= relevant.length) progressListeners.delete(key);
   }
+}
+
+// Backoff table — duplicated here to avoid a circular import between manager→queue→manager.
+// Keep in sync with RETRY_DELAYS in uploadQueue.ts.
+const RETRY_DELAYS_MS = [0, 5_000, 30_000, 120_000, 600_000];
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length;
+
+function computeNextRetryAt(attempts: number): number {
+  const idx = Math.min(attempts, RETRY_DELAYS_MS.length - 1);
+  return Date.now() + RETRY_DELAYS_MS[idx];
 }
 
 export const uploadManager = new UploadManager();

@@ -11,21 +11,18 @@
   <meta name="description" content="PureClean — Gestion professionnelle de laverie de tapis. Commandes, livraisons et suivi d'atelier." />
   <meta name="robots" content="noindex, nofollow" /><!-- Private B2B app -->
 
+  <!-- ── PWA Manifest ─────────────────────────────────────────────── -->
+  <link rel="manifest" href="/manifest.json" />
+
   <!-- ── Favicon ───────────────────────────────────────────────────── -->
   <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
+  <meta name="theme-color" content="#0D7377" />
 
   <title>PureClean</title>
 
   <!-- ── Leaflet CSS ───────────────────────────────────────────────── -->
   <link rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- ── SockJS Polyfill ───────────────────────────────────────────── -->
-  <script>
-    if (typeof global === 'undefined') {
-      var global = window;
-    }
-  </script>
 
   <!-- ── Google Fonts: Plus Jakarta Sans & Inter ───────────────────── -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />

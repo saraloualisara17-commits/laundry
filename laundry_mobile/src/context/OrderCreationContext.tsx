@@ -61,6 +61,13 @@ interface OrderCreationContextType {
   paidAmount: number;
   pendingLocation: PendingLocation | null;
   editingOrderId: number | string | null;
+  // Set when the user taps "Confirm Picked Up" on an existing PENDING_PICKUP order.
+  // Tells order-items/order-summary they are adding items to an existing order
+  // and should PATCH status to PICKED_UP after saving, instead of creating a new order.
+  pickupOrderId: number | string | null;
+  // When true, order-items runs in images-only mode: hides the product catalog,
+  // shows only the photo section, and confirms pickup with an empty items array.
+  pickupImagesOnly: boolean;
   // Stable UUID for the current creation session. Injected into the submit
   // payload so the backend can deduplicate retries. Reset on clearOrder().
   creationIdempotencyKey: string;
@@ -79,9 +86,18 @@ interface OrderCreationContextType {
   setPaidAmount: (amount: number) => void;
   setPendingLocation: (loc: PendingLocation | null) => void;
   setEditingOrderId: (id: number | string | null) => void;
+  setPickupOrderId: (id: number | string | null) => void;
+  setPickupImagesOnly: (v: boolean) => void;
   loadOrderForEditing: (order: any) => void;
   clearOrder: () => void;
-  
+
+  // Per-order local image URIs for the livreur — persists across navigation,
+  // cleared when the livreur confirms pickup or delivery for that order.
+  driverLocalImages: Record<string, string[]>;
+  addDriverLocalImage: (orderId: string, uri: string) => void;
+  removeDriverLocalImage: (orderId: string, index: number) => void;
+  clearDriverLocalImages: (orderId: string) => void;
+
   totalAmount: number;
   itemCount: number;
   totalArea: number;
@@ -104,6 +120,9 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [paidAmount, setPaidAmount] = useState(0);
   const [pendingLocation, setPendingLocation] = useState<PendingLocation | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<number | string | null>(null);
+  const [pickupOrderId, setPickupOrderId] = useState<number | string | null>(null);
+  const [pickupImagesOnly, setPickupImagesOnly] = useState(false);
+  const [driverLocalImages, setDriverLocalImagesState] = useState<Record<string, string[]>>({});
   // One UUID per creation session — stays stable across wizard steps so that
   // tapping Submit multiple times or retrying after a network drop all carry
   // the same key and the backend returns the existing order on duplicate.
@@ -172,6 +191,25 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setItems(mappedItems);
   };
 
+  const addDriverLocalImage = (orderId: string, uri: string) =>
+    setDriverLocalImagesState(prev => ({
+      ...prev,
+      [orderId]: [...(prev[orderId] ?? []), uri],
+    }));
+
+  const removeDriverLocalImage = (orderId: string, index: number) =>
+    setDriverLocalImagesState(prev => ({
+      ...prev,
+      [orderId]: (prev[orderId] ?? []).filter((_, i) => i !== index),
+    }));
+
+  const clearDriverLocalImages = (orderId: string) =>
+    setDriverLocalImagesState(prev => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+
   const clearOrder = () => {
     setMode(null);
     setClient(null);
@@ -185,16 +223,19 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setPaidAmount(0);
     setPendingLocation(null);
     setEditingOrderId(null);
+    setPickupOrderId(null);
+    setPickupImagesOnly(false);
     // Rotate the key so the next creation flow starts fresh
     creationIdempotencyKeyRef.current = randomUUID();
   };
 
   const value = {
-    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId,
+    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId, pickupOrderId, pickupImagesOnly,
     creationIdempotencyKey: creationIdempotencyKeyRef.current,
     setMode, setClient, setDeliveryType, setLivreur, setScheduledDate,
-    addItem, removeItem, updateItem, setOrderNotes, setOrderImages, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId,
+    addItem, removeItem, updateItem, setOrderNotes, setOrderImages, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId, setPickupOrderId, setPickupImagesOnly,
     loadOrderForEditing, clearOrder,
+    driverLocalImages, addDriverLocalImage, removeDriverLocalImage, clearDriverLocalImages,
     totalAmount, itemCount, totalArea, totalCarpets, remainingAmount
   };
 

@@ -38,6 +38,8 @@ export default function OrdersByStatusScreen() {
   const isArabic = f.isArabic;
   const { user } = useSelector((state: RootState) => state.auth);
   const isEmploye = user?.role?.toUpperCase() === 'EMPLOYE';
+  const isLivreur = user?.role?.toUpperCase() === 'LIVREUR';
+  const isRestricted = isEmploye || isLivreur;
 
   const { status, mode, specialFilter } = useLocalSearchParams();
   const [showMap, setShowMap] = useState(false);
@@ -111,6 +113,10 @@ export default function OrdersByStatusScreen() {
 
   const { data: ordersData, isLoading: loading, isFetching, refetch } = useOrders(orderFilters);
   const refreshing = isFetching && !loading;
+  const visibleOrders = useMemo(() => {
+    const all = ordersData?.content || [];
+    return isRestricted ? all.filter((o: any) => o.status !== 'DELIVERED') : all;
+  }, [ordersData, isRestricted]);
   const { data: allUsers = [] } = useDriversList();
 
   const ordersWithGps = useMemo(() => {
@@ -232,6 +238,14 @@ export default function OrdersByStatusScreen() {
                 {item.resteAPayer > 0 && (
                   <Text style={styles.resteText}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
                 )}
+              </View>
+            )}
+            {!!item.debtSettledAt && specialFilter === 'PAID_DEBTS' && (
+              <View style={[styles.financialRow, row(isArabic)]}>
+                <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                <Text style={styles.settledText}>
+                  {t('dashboard.settled_on')}: {new Date(item.debtSettledAt).toLocaleDateString('fr-FR')}
+                </Text>
               </View>
             )}
           </View>
@@ -410,10 +424,10 @@ export default function OrdersByStatusScreen() {
               <View style={styles.summaryCol}>
                 <Text style={[styles.summaryLabel, f.statLabel]}>{t('common.total')} {t('tabs.orders')}</Text>
                 <Text style={[styles.summaryValue, { color: statusConfig.color }]}>
-                  {ordersData?.totalElements || 0}
+                  {isRestricted ? visibleOrders.length : (ordersData?.totalElements || 0)}
                 </Text>
               </View>
-              {!isEmploye && (
+              {!isRestricted && (
                 <>
                   <View style={styles.summaryDivider} />
                   <View style={styles.summaryCol}>
@@ -476,7 +490,7 @@ export default function OrdersByStatusScreen() {
             <ActivityIndicator size="large" color={statusConfig.color} style={{ marginTop: 40 }} />
           ) : (
             <FlatList
-              data={ordersData?.content || []}
+              data={visibleOrders}
               keyExtractor={(item) => item.id?.toString()}
               renderItem={renderOrderCard}
               contentContainerStyle={styles.listContainer}
@@ -737,6 +751,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#DC2626',
+  },
+  settledText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
   },
   // Modal
   modalOverlay: {

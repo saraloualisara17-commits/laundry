@@ -156,10 +156,10 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
             "(:activeOnly IS NULL OR :activeOnly = false OR c.status NOT IN ('DELIVERED', 'CANCELLED')) AND " +
-            "(:paidDebts IS NULL OR :paidDebts = false OR (c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :thirtyDaysAgo)) AND " +
+            "(:paidDebts IS NULL OR :paidDebts = false OR (c.debtSettledAt IS NOT NULL AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal)) AND " +
             "(:selfSubmitted IS NULL OR c.selfSubmitted = :selfSubmitted) AND " +
-            "(:dateDebut IS NULL OR c.dateCreation >= :dateDebut) AND " +
-            "(:dateFin IS NULL OR c.dateCreation <= :dateFin) AND " +
+            "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
+            "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))",
@@ -167,10 +167,10 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
             "(:activeOnly IS NULL OR :activeOnly = false OR c.status NOT IN ('DELIVERED', 'CANCELLED')) AND " +
-            "(:paidDebts IS NULL OR :paidDebts = false OR (c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :thirtyDaysAgo)) AND " +
+            "(:paidDebts IS NULL OR :paidDebts = false OR (c.debtSettledAt IS NOT NULL AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal)) AND " +
             "(:selfSubmitted IS NULL OR c.selfSubmitted = :selfSubmitted) AND " +
-            "(:dateDebut IS NULL OR c.dateCreation >= :dateDebut) AND " +
-            "(:dateFin IS NULL OR c.dateCreation <= :dateFin) AND " +
+            "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
+            "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
@@ -180,7 +180,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("activeOnly") Boolean activeOnly,
             @Param("paidDebts") Boolean paidDebts,
             @Param("selfSubmitted") Boolean selfSubmitted,
-            @Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin,
             @Param("search") String search,
@@ -192,10 +191,10 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
             "(:activeOnly IS NULL OR :activeOnly = false OR c.status NOT IN ('DELIVERED', 'CANCELLED')) AND " +
-            "(:paidDebts IS NULL OR :paidDebts = false OR (c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :thirtyDaysAgo)) AND " +
+            "(:paidDebts IS NULL OR :paidDebts = false OR (c.debtSettledAt IS NOT NULL AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal)) AND " +
             "(:selfSubmitted IS NULL OR c.selfSubmitted = :selfSubmitted) AND " +
-            "(:dateDebut IS NULL OR c.dateCreation >= :dateDebut) AND " +
-            "(:dateFin IS NULL OR c.dateCreation <= :dateFin) AND " +
+            "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
+            "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
@@ -205,7 +204,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("activeOnly") Boolean activeOnly,
             @Param("paidDebts") Boolean paidDebts,
             @Param("selfSubmitted") Boolean selfSubmitted,
-            @Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin,
             @Param("search") String search,
@@ -216,10 +214,10 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
             "(:activeOnly IS NULL OR :activeOnly = false OR c.status NOT IN ('DELIVERED', 'CANCELLED')) AND " +
-            "(:paidDebts IS NULL OR :paidDebts = false OR (c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :thirtyDaysAgo)) AND " +
+            "(:paidDebts IS NULL OR :paidDebts = false OR (c.debtSettledAt IS NOT NULL AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal)) AND " +
             "(:selfSubmitted IS NULL OR c.selfSubmitted = :selfSubmitted) AND " +
-            "(:dateDebut IS NULL OR c.dateCreation >= :dateDebut) AND " +
-            "(:dateFin IS NULL OR c.dateCreation <= :dateFin) AND " +
+            "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
+            "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
@@ -229,7 +227,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("activeOnly") Boolean activeOnly,
             @Param("paidDebts") Boolean paidDebts,
             @Param("selfSubmitted") Boolean selfSubmitted,
-            @Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin,
             @Param("search") String search,
@@ -240,10 +237,10 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
             "(:activeOnly IS NULL OR :activeOnly = false OR c.status NOT IN ('DELIVERED', 'CANCELLED')) AND " +
-            "(:paidDebts IS NULL OR :paidDebts = false OR (c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :thirtyDaysAgo)) AND " +
+            "(:paidDebts IS NULL OR :paidDebts = false OR (c.debtSettledAt IS NOT NULL AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal)) AND " +
             "(:selfSubmitted IS NULL OR c.selfSubmitted = :selfSubmitted) AND " +
-            "(:dateDebut IS NULL OR c.dateCreation >= :dateDebut) AND " +
-            "(:dateFin IS NULL OR c.dateCreation <= :dateFin) AND " +
+            "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
+            "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
@@ -253,7 +250,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("activeOnly") Boolean activeOnly,
             @Param("paidDebts") Boolean paidDebts,
             @Param("selfSubmitted") Boolean selfSubmitted,
-            @Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin,
             @Param("search") String search,
@@ -283,6 +279,13 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     @Query("SELECT COALESCE(SUM(c.montantPaye), 0) FROM Commande c WHERE c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :since")
     BigDecimal sumRecentlyFullyPaidDelivered(@Param("since") LocalDateTime since);
+
+    // ── Real paid-debt queries anchored on debtSettledAt ─────────────────────
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.debtSettledAt IS NOT NULL AND c.debtSettledAt >= :since")
+    long countSettledDebts(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COALESCE(SUM(c.montantPaye), 0) FROM Commande c WHERE c.debtSettledAt IS NOT NULL AND c.debtSettledAt >= :since")
+    BigDecimal sumSettledDebts(@Param("since") LocalDateTime since);
 
     // ── Unpaid / debt queries ─────────────────────────────────────────────────
     @Query("SELECT c FROM Commande c " +
@@ -384,4 +387,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     @Query("SELECT COALESCE(SUM(c.montantPaye), 0) FROM Commande c " +
            "WHERE c.id IN :ids")
     java.math.BigDecimal sumMontantPayeByIds(@Param("ids") List<Long> ids);
+
+    @Query("SELECT MIN(c.dateCreation) FROM Commande c")
+    Optional<LocalDateTime> findEarliestCreationDate();
 }

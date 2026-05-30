@@ -16,12 +16,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { useSelector } from 'react-redux';
 import { adminApi } from '../../src/services/adminApi';
+import { ordersApi } from '../../src/services/api/ordersApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { uploadManager } from '../../src/services/uploads';
 import { parseError, getFriendlyMessage } from '../../src/services/errors/errorParser';
 import { logger } from '../../src/lib/logger';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../src/services/query/queryKeys';
 
 const log = logger.ns('order-summary');
 
@@ -34,10 +38,13 @@ export default function OrderSummaryScreen() {
     mode, client, items, totalAmount, orderNotes, setOrderNotes, orderImages,
     deliveryType, livreurId, scheduledDate,
     paidAmount,
-    clearOrder, editingOrderId, creationIdempotencyKey,
+    clearOrder, editingOrderId, pickupOrderId, creationIdempotencyKey,
   } = useOrderCreation();
 
   const [loading, setLoading] = useState(false);
+  const qc = useQueryClient();
+  const currentUser = useSelector((state: any) => state.auth.user);
+  const isLivreur = currentUser?.role?.toUpperCase() === 'LIVREUR';
 
   const totalDiscount = useMemo(
     () => items.reduce((sum, item) => sum + (item.remiseMontant || 0), 0),
@@ -56,26 +63,68 @@ export default function OrderSummaryScreen() {
 
     setLoading(true);
     try {
-      // Build the order payload — image URLs are NOT included here.
-      // Local file:// URIs have no meaning on the server. Images are uploaded
-      // after the order is created so the user never waits for uploads.
+      const tapisPayload = items.map(it => ({
+        productId: it.productId,
+        quantite: it.quantite,
+        largeur: it.largeur,
+        hauteur: it.hauteur,
+        longueur: it.longueur,
+        poids: it.poids,
+        manualPrice: it.pricingMethod === 'CUSTOM' ? it.prixFinal : undefined,
+        notes: it.notes,
+        couleur: it.couleur,
+        remiseMontant: it.remiseMontant,
+        remiseRaison: it.remiseRaison,
+        // Include existing remote image URLs so the backend reattaches them when
+        // it deletes and recreates the item rows on update. New local URIs are
+        // excluded here — they are queued via uploadManager below.
+        imageUrls: (it.imageUrls ?? []).filter(u => !u.startsWith('file://') && !u.startsWith('content://')),
+      }));
+
+      // ── PICKUP FLOW ───────────────────────────────────────────────────────
+      // Atomic: sends items + transitions to PICKED_UP in one backend transaction.
+      if (pickupOrderId) {
+        await ordersApi.confirmPickup(pickupOrderId, tapisPayload);
+
+        // Queue order-level images added by the livreur on the detail page
+        const localOrderImages = orderImages.filter(u => u.startsWith('file://') || u.startsWith('content://'));
+        if (localOrderImages.length > 0) {
+          uploadManager.addImages(localOrderImages, pickupOrderId as string, 'reception', 'standard')
+            .catch(e => log.error('Background order-image upload failed', { err: String(e) }));
+        }
+
+        // Queue per-item images
+        items.forEach(item => {
+          const localItemImages = (item.imageUrls ?? []).filter(
+            u => u.startsWith('file://') || u.startsWith('content://'),
+          );
+          if (localItemImages.length > 0) {
+            uploadManager.addImages(localItemImages, pickupOrderId as string, 'item_photo', 'standard')
+              .catch(e => log.error('Background item-image upload failed', { err: String(e) }));
+          }
+        });
+
+        // Invalidate all caches that depend on order status so the dashboard,
+        // orders list, and livreur pickups list all refetch when the user gets back.
+        qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+        qc.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+        qc.invalidateQueries({ queryKey: queryKeys.livreur.all });
+        qc.invalidateQueries({ queryKey: queryKeys.statistics.all });
+
+        clearOrder();
+        router.replace(`/order/${pickupOrderId}`);
+        return;
+      }
+
+      // ── STANDARD EDIT / (legacy create path) ─────────────────────────────
       const orderData = {
         clientId: client?.id,
-        tapis: items.map(it => ({
-          productId: it.productId,
-          quantite: it.quantite,
-          largeur: it.largeur,
-          hauteur: it.hauteur,
-          longueur: it.longueur,
-          poids: it.poids,
-          manualPrice: it.pricingMethod === 'CUSTOM' ? it.prixFinal : undefined,
-          notes: it.notes,
-          couleur: it.couleur,
-          remiseMontant: it.remiseMontant,
-          remiseRaison: it.remiseRaison,
-          // No imageUrls here — uploaded in background after order creation
-        })),
-        imageUrls: [],
+        tapis: tapisPayload,
+        // When editing, omit imageUrls entirely (null) so the backend skips its
+        // image-replace block and keeps all existing images untouched.
+        // New local images added this session are queued via uploadManager below.
+        // On create, send an empty array so the backend initialises the image list.
+        imageUrls: editingOrderId ? null : [],
         mode: mode?.toUpperCase(),
         deliveryType,
         pickupDriverId: livreurId,
@@ -104,11 +153,6 @@ export default function OrderSummaryScreen() {
         throw new Error('Server did not return an order ID');
       }
 
-      // ── Fire-and-forget image uploads ────────────────────────────────────
-      // The order already exists. Images are queued now and upload in the
-      // background — the user sees the confirmation screen immediately.
-      // uploadManager handles compression, retry, and offline queuing.
-
       const localOrderImages = orderImages.filter(u => u.startsWith('file://') || u.startsWith('content://'));
       if (localOrderImages.length > 0) {
         uploadManager.addImages(localOrderImages, orderId, 'order_general', 'standard')
@@ -125,18 +169,14 @@ export default function OrderSummaryScreen() {
         }
       });
 
-      // Navigate immediately — uploads continue in background
       router.push({
         pathname: '/(admin)/order-confirmation',
-        params: {
-          orderId,
-          orderNumber: savedOrder?.numeroCommande,
-        },
+        params: { orderId, orderNumber: savedOrder?.numeroCommande },
       });
 
     } catch (error: any) {
       const parsed = parseError(error);
-      log.error('Order creation failed', { type: parsed.type, status: parsed.status });
+      log.error('Order submit failed', { type: parsed.type, status: parsed.status });
       Alert.alert(t('common.error'), getFriendlyMessage(parsed) || t('common.error_msg'));
     } finally {
       setLoading(false);
@@ -227,9 +267,12 @@ export default function OrderSummaryScreen() {
           {mode === 'immediate' ? (
             <View style={[{ marginTop: 4 }, isArabic && { alignItems: 'flex-end' }]}>
               <Text style={styles.clientInfo}>{t('admin.orders.create.mode_immediate')}</Text>
-              <Text style={styles.clientInfo}>
-                {t('financial.paid')}: {paidAmount.toFixed(2)} {t('common.dh')}
-              </Text>
+              {/* Don't show paid amount in the pickup flow — it's always 0 and misleading */}
+              {!pickupOrderId && (
+                <Text style={styles.clientInfo}>
+                  {t('financial.paid')}: {paidAmount.toFixed(2)} {t('common.dh')}
+                </Text>
+              )}
             </View>
           ) : (
             <View style={[{ marginTop: 4 }, isArabic && { alignItems: 'flex-end' }]}>
@@ -280,9 +323,11 @@ export default function OrderSummaryScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <Text style={styles.submitBtnText}>
-              {editingOrderId
-                ? t('common.save')
-                : t('admin.orders.create.summary.create_btn')}
+              {pickupOrderId
+                ? t('admin.orders.actions.confirm_received')
+                : editingOrderId
+                  ? t('common.save')
+                  : t('admin.orders.create.summary.create_btn')}
             </Text>
           )}
         </TouchableOpacity>

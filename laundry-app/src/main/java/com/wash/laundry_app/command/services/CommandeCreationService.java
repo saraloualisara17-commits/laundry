@@ -79,11 +79,13 @@ public class CommandeCreationService {
         commande.setPickupDriver(pickupDriver);
         commande.setMode(mode);
 
-        // Initial status based on mode
+        // IMMEDIATE (walk-in): carpets are already at the shop — start PICKED_UP so the
+        // employee can go straight to IN_PROCESS without a pickup step.
+        // SCHEDULED: driver must collect from the client — start PENDING_PICKUP.
         if (isScheduled) {
             commande.setStatus(CommandeStatus.PENDING_PICKUP);
         } else {
-            commande.setStatus(CommandeStatus.PICKED_UP); // For IMMEDIATE/Walk-in, carpets are already received
+            commande.setStatus(CommandeStatus.PICKED_UP);
         }
 
         if (request.getPaymentMethod() != null) {

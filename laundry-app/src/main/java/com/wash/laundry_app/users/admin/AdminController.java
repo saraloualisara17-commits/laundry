@@ -137,6 +137,15 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
+    @PatchMapping("/commandes/{id}/pickup-driver")
+    public ResponseEntity<Void> assignPickupDriver(@PathVariable Long id,
+            @RequestBody AssignPickupDriverRequest request) {
+        commandeService.updateCommande(id, UpdateCommandeRequest.builder()
+                .livreurId(request.getLivreurId())
+                .build());
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/commandes/{id}")
     public ResponseEntity<Void> deleteCommande(@PathVariable Long id) {
         commandeService.deleteCommande(id);

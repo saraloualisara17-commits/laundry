@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Truck, Users, Package, Wrench, XCircle, Shield, RefreshCw, ClipboardList, Layers } from 'lucide-react';
+import { Home, Truck, Users, Package, Wrench, XCircle, Shield, RefreshCw, ClipboardList, Map, AlertCircle, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const BottomNav = ({ user }) => {
@@ -11,22 +11,24 @@ const BottomNav = ({ user }) => {
 
   const adminLinks = [
     { name: t('nav.dashboard'), path: '/admin/dashboard', icon: Home },
-    { name: t('nav.users'), path: '/admin/users-management', icon: Shield },
     { name: t('nav.orders'), path: '/admin/commandes', icon: ClipboardList },
     { name: t('nav.clients'), path: '/admin/clients', icon: Users },
-    { name: t('nav.carpet_types'), path: '/admin/carpet-types', icon: Layers },
+    { name: 'Impayés', path: '/admin/unpaid', icon: AlertCircle },
+    { name: 'Réglages', path: '/admin/settings', icon: Settings },
   ];
 
   const livreurLinks = [
     { name: t('nav.dashboard'), path: '/livreur', icon: Home },
     { name: t('nav.deliveries'), path: '/livreur/delivery', icon: Truck },
     { name: t('nav.orders'), path: '/livreur/orders', icon: Package },
-    { name: t('nav.clients'), path: '/livreur/clients', icon: Users },
+    { name: 'Carte', path: '/livreur/map', icon: Map },
     { name: t('nav.canceled'), path: '/livreur/canceled', icon: XCircle },
   ];
 
   const employeLinks = [
     { name: t('nav.workshop'), path: '/employe/dashboard', icon: Wrench },
+    { name: 'Commandes', path: '/employe/commandes', icon: ClipboardList },
+    { name: 'Clients', path: '/employe/clients', icon: Users },
     { name: t('nav.returns'), path: '/employe/retours', icon: RefreshCw },
   ];
 

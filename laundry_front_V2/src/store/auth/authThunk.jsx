@@ -9,18 +9,20 @@ export const login = createAsyncThunk(
     try {
       const res = await loginRequest(credentials)
 
-      const accessToken = res.data.token;
+      const accessToken = res.data.accessToken || res.data.token
+      const refreshToken = res.data.refreshToken
 
       const decoded = jwtDecode(accessToken)
 
       dispatch(setCredentials({
         user: {
-          id:decoded.sub,
-          name:decoded.name,
-          email:decoded.email,
-          role:decoded.role
+          id: decoded.sub,
+          name: decoded.name,
+          email: decoded.email,
+          role: decoded.role
         },
-        token: accessToken
+        token: accessToken,
+        refreshToken,
       }))
     } catch (error) {
       if (error.response?.data?.error === "ACCOUNT_DISABLED") {

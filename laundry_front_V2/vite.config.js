@@ -5,10 +5,6 @@ export default defineConfig({
   plugins: [
     react(),
   ],
-  define: {
-    global: 'window',
-  },
-
   build: {
     outDir: 'dist',
     sourcemap: false,

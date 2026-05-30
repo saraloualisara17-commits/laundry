@@ -84,7 +84,8 @@ function parseStats(data: any): StatData {
   const revenue = Number(
     data?.totalRevenue ?? data?.totalRevenues ?? data?.revenuesToday ?? 0
   );
-  const totalOrders  = Number(data?.totalCommandes ?? data?.totalCommandesToday ?? 0);
+  // Prefer the period-scoped count (totalCommandesToday for today, totalCommandes for date-range)
+  const totalOrders  = Number(data?.totalCommandesToday ?? data?.totalCommandes ?? 0);
   const totalClients = Number(data?.totalClients ?? 0);
 
   const unpaidRaw    = data?.unpaid ?? {};

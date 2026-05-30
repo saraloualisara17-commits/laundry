@@ -7,9 +7,11 @@ import { RootState } from '../../store/store';
 import { useAppMutation } from '../../lib/query/mutationFactory';
 import { invalidateAfterLivreurAction } from '../../lib/query/invalidationHelpers';
 
-const useIsLivreur = () => {
+// Both LIVREUR and ADMIN use the mission screens — admin can do their own
+// pickups/deliveries. Queries must be enabled for both roles.
+const useIsLivreurOrAdmin = () => {
   const role = useSelector((state: RootState) => state.auth.user?.role);
-  return role === 'LIVREUR';
+  return role === 'LIVREUR' || role === 'ADMIN';
 };
 
 // 30 seconds — delivery and pickup lists are time-sensitive; drivers act on
@@ -19,43 +21,43 @@ const MISSION_STALE_TIME = 1000 * 30;
 // ─── QUERIES ─────────────────────────────────────────────────────────────────
 
 export const useLivreurStats = () => {
-  const isLivreur = useIsLivreur();
+  const isLivreurOrAdmin = useIsLivreurOrAdmin();
   return useQuery({
     queryKey: queryKeys.livreur.stats(),
     queryFn: () => statisticsApi.getLivreurDashboardStats().then(res => res.data),
-    enabled: isLivreur,
+    enabled: isLivreurOrAdmin,
   });
 };
 
 export const useReadyDeliveries = () => {
-  const isLivreur = useIsLivreur();
+  const isLivreurOrAdmin = useIsLivreurOrAdmin();
   return useQuery({
     queryKey: queryKeys.livreur.deliveries(),
     queryFn: () =>
       ordersApi.getReadyDeliveries().then(res => res.data.data ?? res.data ?? []),
     staleTime: MISSION_STALE_TIME,
-    enabled: isLivreur,
+    enabled: isLivreurOrAdmin,
   });
 };
 
 export const usePendingPickups = () => {
-  const isLivreur = useIsLivreur();
+  const isLivreurOrAdmin = useIsLivreurOrAdmin();
   return useQuery({
     queryKey: queryKeys.livreur.pickups(),
     queryFn: () =>
       ordersApi.getPendingPickups().then(res => res.data.data ?? res.data ?? []),
     staleTime: MISSION_STALE_TIME,
-    enabled: isLivreur,
+    enabled: isLivreurOrAdmin,
   });
 };
 
 export const useCancelledDeliveries = () => {
-  const isLivreur = useIsLivreur();
+  const isLivreurOrAdmin = useIsLivreurOrAdmin();
   return useQuery({
     queryKey: queryKeys.livreur.cancelled(),
     queryFn: () =>
       ordersApi.getPastDeliveries().then(res => res.data.data ?? res.data ?? []),
-    enabled: isLivreur,
+    enabled: isLivreurOrAdmin,
   });
 };
 
@@ -142,6 +144,37 @@ export const useUpdateOrderStatusMission = () => {
     mutationFn: ({ orderId, status, amount, notesPaiement, paymentIdempotencyKey }) =>
       ordersApi.updateStatus(orderId, { status, amount, notesPaiement, paymentIdempotencyKey }),
     dedupKey: (vars) => `missionStatus:${vars.orderId}`,
+    optimistic: {
+      // Cancel any in-flight refetches for the affected list so they don't
+      // overwrite the optimistic removal before the server confirms.
+      cancelKeys: (vars) => [
+        vars.status === 'DELIVERED'
+          ? queryKeys.livreur.deliveries()
+          : queryKeys.livreur.pickups(),
+      ],
+      snapshot: (vars) => {
+        const key = vars.status === 'DELIVERED'
+          ? queryKeys.livreur.deliveries()
+          : queryKeys.livreur.pickups();
+        return qc.getQueryData<any[]>(key) ?? [];
+      },
+      // Remove the completed order from the list immediately — no waiting for
+      // server round-trip. Admin sees the card gone the instant they tap.
+      apply: (vars) => {
+        const key = vars.status === 'DELIVERED'
+          ? queryKeys.livreur.deliveries()
+          : queryKeys.livreur.pickups();
+        qc.setQueryData<any[]>(key, (old = []) =>
+          old.filter((o) => String(o.id) !== String(vars.orderId))
+        );
+      },
+      restore: (snap, vars) => {
+        const key = vars.status === 'DELIVERED'
+          ? queryKeys.livreur.deliveries()
+          : queryKeys.livreur.pickups();
+        qc.setQueryData(key, snap);
+      },
+    },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.orders.details(vars.orderId) });
       invalidateAfterLivreurAction(qc);

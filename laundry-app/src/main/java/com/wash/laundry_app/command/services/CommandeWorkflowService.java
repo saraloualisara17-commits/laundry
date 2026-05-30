@@ -93,6 +93,10 @@ public class CommandeWorkflowService {
         User currentUser = authService.currentUser();
         Commande commande = commandeRepository.findById(id).orElseThrow(CommandeNotFoundException::new);
 
+        if (request.getVersion() != null && !request.getVersion().equals(commande.getVersion())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Commande.class, id);
+        }
+
         if (request.getLivreurId() != null) {
             userRepository.findById(request.getLivreurId())
                     .ifPresent(commande::setPickupDriver);
@@ -215,6 +219,51 @@ public class CommandeWorkflowService {
         auditService.log("ORDER_ITEMS_UPDATED_BY_DRIVER", "COMMANDE", commande.getId(),
                          null, "Items updated by pickup driver", null);
         eventPublisher.publishEvent(OrderSideEffectEvent.updated(commande.getId()));
+        return commandeMapper.toDto(commande);
+    }
+
+    @Transactional
+    public CommandeDTO confirmPickup(Long id, java.util.List<CreateCommandeRequest.TapisItem> items) {
+        User currentUser = authService.currentUser();
+        Commande commande = commandeRepository.findById(id).orElseThrow(CommandeNotFoundException::new);
+
+        if (commande.getStatus() != CommandeStatus.PENDING_PICKUP) {
+            throw new IllegalStateException("Order must be in PENDING_PICKUP status to confirm pickup");
+        }
+
+        boolean isLivreur = currentUser.getRole() == com.wash.laundry_app.users.Role.LIVREUR;
+        if (isLivreur && (commande.getLivreur() == null || !commande.getLivreur().getId().equals(currentUser.getId()))) {
+            throw new org.springframework.security.access.AccessDeniedException("You are not the pickup driver for this order");
+        }
+
+        if (items != null && !items.isEmpty()) {
+            for (CommandeTapis existing : commande.getCommandeTapis()) {
+                commandeImageRepository.archiveByCommandeTapisId(existing.getId());
+            }
+            commandeTapisRepository.deleteAll(commande.getCommandeTapis());
+            commande.getCommandeTapis().clear();
+
+            java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+            int tagIndex = 1;
+            for (CreateCommandeRequest.TapisItem itemReq : items) {
+                CommandeTapis item = helperService.buildTapisItem(commande, itemReq, tagIndex++);
+                item = commandeTapisRepository.save(item);
+                helperService.attachItemImages(item, itemReq.getImageUrls());
+                total = total.add(item.getPrixFinal() != null ? item.getPrixFinal() : java.math.BigDecimal.ZERO);
+                commande.getCommandeTapis().add(item);
+            }
+            commande.setMontantTotal(total);
+        }
+
+        String oldStatus = commande.getStatus().name();
+        workflowValidator.validate(commande, CommandeStatus.PICKED_UP, currentUser);
+        commande.setStatus(CommandeStatus.PICKED_UP);
+
+        commande = commandeRepository.save(commande);
+        helperService.recordAudit(commande, oldStatus, CommandeStatus.PICKED_UP.name(), currentUser, "Pickup confirmé");
+        auditService.log("ORDER_PICKUP_CONFIRMED", "COMMANDE", commande.getId(),
+                         oldStatus, CommandeStatus.PICKED_UP.name(), "Pickup confirmé");
+        eventPublisher.publishEvent(OrderSideEffectEvent.statusChanged(commande.getId(), commande.getStatus()));
         return commandeMapper.toDto(commande);
     }
 

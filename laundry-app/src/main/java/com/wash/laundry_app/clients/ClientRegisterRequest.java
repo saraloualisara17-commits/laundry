@@ -12,7 +12,7 @@ public class ClientRegisterRequest {
 
     @NotBlank(message = "Le nom est obligatoire")
     @Size(max = 255, message = "Le nom ne doit pas dépasser 255 caractères")
-    @jakarta.validation.constraints.Pattern(regexp = "^[a-zA-ZÀ-ÿ0-9\\s\\-'.]+$", message = "Name contains invalid characters")
+    @jakarta.validation.constraints.Pattern(regexp = "^[a-zA-ZÀ-ÿ\\u0600-\\u06FF0-9\\s\\-'.]+$", message = "Name contains invalid characters")
     private String name;
 
     @jakarta.validation.constraints.Email(message = "Entrez un email valide")

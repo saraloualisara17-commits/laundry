@@ -123,10 +123,16 @@ export default function EmployeUnpaidScreen() {
       <View style={[styles.orderHeader, row(isArabic)]}>
         <View>
           <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference}</Text>
-          <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
+          <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.clientName}</Text>
         </View>
         <StatusBadge status={item.status} />
       </View>
+      {!!item.itemCount && (
+        <View style={[styles.infoRow, row(isArabic)]}>
+          <Ionicons name="cube-outline" size={13} color={AdminColors.textMuted} />
+          <Text style={styles.infoText}>{item.itemCount} {t('stats.total_items')}</Text>
+        </View>
+      )}
       <View style={[styles.financials, row(isArabic)]}>
         <View style={styles.finCol}>
           <Text style={[styles.finLabel, f.chipLabel]}>{t('common.total')}</Text>
@@ -174,7 +180,7 @@ export default function EmployeUnpaidScreen() {
       <FlatList
         data={activeTab === 'client' ? clients : orders}
         renderItem={activeTab === 'client' ? renderClient : renderOrder}
-        keyExtractor={(item, i) => activeTab === 'client' ? item.clientId?.toString() || i.toString() : item.id?.toString() || i.toString()}
+        keyExtractor={(item, i) => activeTab === 'client' ? item.clientId?.toString() || i.toString() : item.orderId?.toString() || i.toString()}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
         ListEmptyComponent={
@@ -233,6 +239,8 @@ const styles = StyleSheet.create({
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   orderRef: { fontSize: 13, fontWeight: '700', color: AdminColors.textPrimary },
   orderClient: { fontSize: 12, color: AdminColors.textMuted, marginTop: 2 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+  infoText: { fontSize: 12, color: AdminColors.textMuted },
   financials: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, gap: 10 },
   finCol: { flex: 1 },
   finLabel: { fontSize: 9, color: AdminColors.textMuted, fontWeight: '600', marginBottom: 3 },

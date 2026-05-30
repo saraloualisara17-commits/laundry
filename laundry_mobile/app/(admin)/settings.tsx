@@ -26,10 +26,10 @@ export default function SettingsScreen() {
   const isArabic = f.isArabic;
 
   const { data: settingsData } = useSettings();
-  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null, businessPhone: null };
   const updateSettings = useUpdateSettings();
 
-  const [appName, setAppName] = useState(settings?.appName ?? 'PureClean');
+  const [appName, setAppName] = useState(settings?.appName ?? 'ASTRA PROPRE');
   const [businessPhone, setBusinessPhone] = useState(settings?.businessPhone ?? '');
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
 

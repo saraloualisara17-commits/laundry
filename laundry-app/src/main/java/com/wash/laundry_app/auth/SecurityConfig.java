@@ -72,7 +72,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/orders/{id}/payments").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 
                         // Clients Domain (/api/clients)
-                        .requestMatchers(HttpMethod.POST, "/api/clients").hasAnyRole("ADMIN", "EMPLOYE")
+                        .requestMatchers(HttpMethod.POST, "/api/clients").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers(HttpMethod.PUT, "/api/clients/{id}").hasAnyRole("ADMIN", "EMPLOYE")
                         .requestMatchers(HttpMethod.DELETE, "/api/clients/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
@@ -106,7 +106,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/admin/commandes/{id}", "/api/admin/commandes/{id}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/admin/client/{id}", "/api/admin/client/{id}").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers(HttpMethod.GET, "/admin/clients/{id}", "/api/admin/clients/{id}").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
-                        .requestMatchers("/api/admin/stats/**").hasAnyRole("ADMIN", "EMPLOYE")
+                        .requestMatchers("/api/admin/stats/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+                        .requestMatchers("/api/admin/unpaid/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 
                         .requestMatchers(HttpMethod.GET, "/api/admin/catalog/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers(HttpMethod.POST, "/api/admin/catalog/**").hasRole("ADMIN")
@@ -116,13 +117,22 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, "/admin/create-user").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/admin/update-user/**").hasRole("ADMIN")
-                        .requestMatchers("/admin/active-users", "/api/admin/active-users").hasAnyRole("ADMIN", "EMPLOYE")
+                        .requestMatchers("/admin/active-users", "/api/admin/active-users").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers("/admin/active-user/**", "/admin/inactive-user/**", "/admin/inactive-users", "/api/admin/inactive-users").hasRole("ADMIN")
                         .requestMatchers("/admin/change-user-password/**").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/admin/clients").hasAnyRole("ADMIN", "EMPLOYE")
                         .requestMatchers(HttpMethod.PUT, "/admin/clients/**").hasAnyRole("ADMIN", "EMPLOYE")
                         .requestMatchers(HttpMethod.DELETE, "/admin/clients/**").hasRole("ADMIN")
+
+                        // Livreur needs the orders list and create order endpoints
+                        .requestMatchers(HttpMethod.GET, "/admin/commandes", "/api/admin/commandes").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+                        .requestMatchers(HttpMethod.POST, "/admin/commandes", "/api/admin/commandes").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+
+                        // Livreur can assign pickup/delivery drivers and update order items
+                        .requestMatchers(HttpMethod.PATCH, "/admin/commandes/{id}/pickup-driver", "/api/admin/commandes/{id}/pickup-driver").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+                        .requestMatchers(HttpMethod.PATCH, "/admin/commandes/{id}/delivery-driver", "/api/admin/commandes/{id}/delivery-driver").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+                        .requestMatchers(HttpMethod.PUT, "/admin/commandes/{id}", "/api/admin/commandes/{id}").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 
                         .requestMatchers("/admin/**", "/api/admin/**").hasAnyRole("ADMIN", "EMPLOYE")
 

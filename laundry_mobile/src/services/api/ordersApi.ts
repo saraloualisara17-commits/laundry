@@ -112,10 +112,13 @@ export const ordersApi = {
     }),
 
   assignPickupDriver: (id: number | string, livreurId: string | number) =>
-    client.put(`/api/admin/commandes/${id}`, { livreurId }),
+    client.patch(`/api/admin/commandes/${id}/pickup-driver`, { livreurId }),
 
   updateOrderItemsByDriver: (id: number | string, tapis: any[]) =>
     client.patch(`/api/livreur/commandes/${id}/items`, tapis),
+
+  confirmPickup: (id: number | string, tapis: any[]) =>
+    client.post(`/api/orders/${id}/confirm-pickup`, tapis),
 
   reportFailedAttempt: (
     orderId: number | string,

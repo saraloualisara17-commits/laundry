@@ -111,6 +111,11 @@ export const getCarpetTypes = async () => {
   return await api.get('/livreur/carpet-types/active')
 }
 
+// Get pending pickup orders (for map view)
+export const getPendingPickup = async () => {
+  return await api.get('/api/livreur/commandes/pending-pickup')
+}
+
 // Upload tapis images (plural)
 export const uploadFiles = async (files) => {
   const formData = new FormData();

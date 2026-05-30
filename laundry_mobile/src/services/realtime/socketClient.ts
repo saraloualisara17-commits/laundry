@@ -8,7 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 // - http:// → ws://  (local dev)
 // - https:// → wss:// (production)
 const _apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
-const WS_URL = _apiBase.replace(/^https?/, (m) => (m === 'https' ? 'wss' : 'ws')) + '/ws/websocket';
+const WS_URL = _apiBase.replace(/^https?/, (m) => (m === 'https' ? 'wss' : 'ws')) + '/ws';
 
 const RECONNECT_BASE_MS = 2000;
 const RECONNECT_MAX_MS = 60000;

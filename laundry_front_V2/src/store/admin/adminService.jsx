@@ -82,3 +82,61 @@ export const adminDeleteCarpetType = async (id) => {
 export const adminChangePassword = async (id, password) => {
     return await api.put(`/admin/change-user-password/${id}`, password)
 }
+
+// ========== UNPAID ENDPOINTS ==========
+
+export const getUnpaidOverview = async () => {
+    return await api.get('/api/admin/unpaid/overview')
+}
+
+export const getUnpaidClients = async () => {
+    return await api.get('/api/admin/unpaid/clients')
+}
+
+export const getUnpaidClientDetail = async (clientId) => {
+    return await api.get(`/api/admin/unpaid/clients/${clientId}`)
+}
+
+// ========== SETTINGS ENDPOINTS ==========
+
+export const getSettings = async () => {
+    return await api.get('/api/admin/settings')
+}
+
+export const updateSettings = async (data) => {
+    return await api.put('/api/admin/settings', data)
+}
+
+// ========== ORDER ACTIONS ==========
+
+export const updateOrderStatus = async (id, data) => {
+    return await api.patch(`/api/commandes/${id}/status`, data)
+}
+
+export const deleteOrder = async (id) => {
+    return await api.delete(`/api/commandes/${id}`)
+}
+
+export const addPayment = async (id, data) => {
+    return await api.post(`/api/commandes/${id}/payments`, data)
+}
+
+export const assignDeliveryDriver = async (id, data) => {
+    return await api.patch(`/api/admin/commandes/${id}/delivery-driver`, data)
+}
+
+export const getOrderHistory = async (id) => {
+    return await api.get(`/api/commandes/${id}/history`)
+}
+
+export const getWhatsappMessage = async (id) => {
+    return await api.get(`/api/commandes/${id}/receipt/order/whatsapp`)
+}
+
+export const uploadFile = async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return await api.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+}

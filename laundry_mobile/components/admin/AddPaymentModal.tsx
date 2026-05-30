@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import { RTLBottomSheet } from '../ui/RTLBottomSheet';
 import { RTLFormRow } from '../ui/RTLFormRow';
 import RTLNumericInput from '../ui/RTLNumericInput';
 import RTLTextarea from '../ui/RTLTextarea';
+
+const generateKey = () =>
+  `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 interface AddPaymentModalProps {
   visible: boolean;
@@ -38,6 +41,7 @@ export default function AddPaymentModal({
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const idempotencyKey = useRef(generateKey());
 
   const amount = parseFloat(paymentAmount);
   const isInvalidAmount = !!paymentAmount && (isNaN(amount) || amount <= 0 || amount > remainingAmount + 0.05);
@@ -47,10 +51,11 @@ export default function AddPaymentModal({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await adminApi.addOrderPayment(orderId.toString(), amount, paymentNote);
+      await adminApi.addOrderPayment(orderId.toString(), amount, paymentNote, undefined, idempotencyKey.current);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPaymentAmount('');
       setPaymentNote('');
+      idempotencyKey.current = generateKey();
       onSuccess();
     } catch {
       Alert.alert(t('common.error'), t('common.error_msg'));

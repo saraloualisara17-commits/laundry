@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const { t, isRTL: isArabic } = useRTL();
 
   const { data: settingsData } = useSettings();
-  const settings = settingsData ?? { appName: 'PureClean', logoUrl: null, businessPhone: null };
+  const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null, businessPhone: null };
 
   const [showScanner, setShowScanner] = useState(false);
   const [showCreateOptions, setShowCreateOptions] = useState(false);

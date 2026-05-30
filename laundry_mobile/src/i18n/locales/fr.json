@@ -104,6 +104,7 @@
     "to_collect": "à encaisser",
     "at_local": "Au Local",
     "paid_debts": "Dettes Payées",
+    "settled_on": "Réglée le",
     "orders_count_completed": "Commandes réglées",
     "self_submitted_orders": "Commandes Clients Web",
     "self_submitted_sub": "Commandes passées par les clients eux-mêmes",
@@ -153,6 +154,7 @@
     "full_sub": "Commande entièrement payée",
     "notes_placeholder": "Chèque n°..., virement, espèces...",
     "notes_label": "Notes de paiement (optionnel)",
+    "photo_label": "Photos (optionnel)",
     "confirm_btn": "Confirmer la livraison",
     "delivery_success": "Livré avec succès ! ✅",
     "send_receipt_prompt": "Voulez-vous envoyer le bon de livraison au client ?",
@@ -458,6 +460,7 @@
       "schedule_pickup": "Planifier un ramassage",
       "empty_title": "Aucun client",
       "empty_subtitle": "Commencez par enregistrer un client",
+      "already_exists": "Ce client existe déjà.",
       "search_placeholder": "Nom ou numéro de téléphone...",
       "total_count": "au total",
       "client_since": "Client depuis",
@@ -576,7 +579,9 @@
     "no_overdue": "Aucune livraison en retard",
     "no_overdue_sub": "Toutes les livraisons sont à jour.",
     "send_receipt_prompt": "Voulez-vous envoyer le reçu au client ?",
-    "driver_fallback": "Livreur"
+    "driver_fallback": "Livreur",
+    "pickup_confirm_title": "Confirmer la collecte",
+    "pickup_confirm_subtitle": "Prenez une photo des articles récupérés (optionnel)."
   },
   "notifications": {
     "empty": "Aucune notification",
@@ -637,6 +642,20 @@
     "reassign_pickup_driver": "Changer le livreur de collecte",
     "edit_items": "Articles",
     "items_updated": "Articles mis à jour avec succès",
-    "not_your_order": "Vous n'êtes pas le livreur de cet ordre"
+    "not_your_order": "Vous n'êtes pas le livreur de cet ordre",
+    "not_pickup_driver": "Seul le livreur de collecte assigné ({{name}}) peut confirmer la collecte. Changez d'abord le livreur si nécessaire.",
+    "not_delivery_driver": "Seul le livreur de livraison assigné ({{name}}) peut confirmer la livraison. Changez d'abord le livreur si nécessaire.",
+    "not_allowed": "Non autorisé",
+    "add_items": "Ajouter / modifier les articles"
+  },
+  "pickup": {
+    "choose_mode_title": "Confirmer la collecte",
+    "choose_mode_subtitle": "Comment souhaitez-vous procéder ?",
+    "option_items": "Ajouter les articles",
+    "option_images": "Photos seulement",
+    "option_nothing": "Confirmer sans ajout",
+    "images_only_title": "Photos de collecte",
+    "images_only_subtitle": "Ajoutez des photos avant de confirmer la collecte.",
+    "confirm_btn": "Confirmer la collecte"
   }
 }

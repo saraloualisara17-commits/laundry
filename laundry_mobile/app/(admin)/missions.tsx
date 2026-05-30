@@ -15,10 +15,12 @@ import * as Haptics from 'expo-haptics';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
+import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import DeliveryConfirmModal from '../../components/orders/modals/DeliveryConfirmModal';
 import ReceiptActionsModal from '../../components/orders/modals/ReceiptActionsModal';
 import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } from '../../src/hooks/queries/useLivreur';
+import { uploadManager } from '../../src/services/uploads';
 
 // --- Constants ---
 const C = {
@@ -48,6 +50,7 @@ export default function AdminMissionsScreen() {
   const isArabic = i18n.language === 'ar';
   
   const { user } = useSelector((state: RootState) => state.auth);
+  const { clearOrder, setPickupOrderId, setOrderNotes, driverLocalImages, clearDriverLocalImages } = useOrderCreation();
 
   const [activeTab, setActiveTab] = useState<'delivery' | 'pickup'>('pickup');
 
@@ -85,6 +88,7 @@ export default function AdminMissionsScreen() {
   );
 
   const handleStatusUpdate = (orderId: number, status: 'PICKED_UP' | 'DELIVERED', extraData?: any) => {
+    const pendingDetailImages = [...(driverLocalImages[String(orderId)] ?? [])];
     updateStatusMutation.mutate(
       {
         orderId,
@@ -97,9 +101,18 @@ export default function AdminMissionsScreen() {
         onSuccess: async (res: any) => {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setShowPaymentModal(false);
-          // Use the server response status — never fall back to stale local state
           const updatedOrder = res?.data ?? selectedOrder;
           setSelectedOrder(updatedOrder);
+
+          // Upload images added on the order detail page before confirming delivery
+          if (status === 'DELIVERED' && pendingDetailImages.length > 0) {
+            clearDriverLocalImages(String(orderId));
+            pendingDetailImages.forEach(uri => {
+              uploadManager.addImage(uri, orderId, 'livraison', 'standard')
+                .catch(() => {});
+            });
+          }
+
           setShowReceiptModal(true);
         },
         onError: () => Alert.alert(t('common.error'), t('livreur.action_failed')),
@@ -179,7 +192,10 @@ export default function AdminMissionsScreen() {
               onPress={() => {
                 setSelectedOrder(item);
                 if (isPickup) {
-                   handleStatusUpdate(item.id, 'PICKED_UP');
+                  clearOrder();
+                  setPickupOrderId(String(item.id));
+                  setOrderNotes(item.notes || '');
+                  router.push('/(admin)/order-items');
                 } else {
                    setCollectedAmount(String(item.montantRestant || 0));
                    setDeliveryNotes('');

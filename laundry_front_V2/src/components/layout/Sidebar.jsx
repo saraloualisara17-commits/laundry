@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Shield, 
-  Truck, 
-  ClipboardList, 
-  Package, 
-  Wrench, 
-  Users, 
+import {
+  Shield,
+  Truck,
+  ClipboardList,
+  Package,
+  Wrench,
+  Users,
   LayoutDashboard,
   LayoutGrid,
-  XCircle, 
+  XCircle,
   RefreshCw,
   HelpCircle,
   ChevronRight,
-  Layers
+  AlertCircle,
+  Settings,
+  Map,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import logo from '../../assets/logo.png';
@@ -29,6 +31,8 @@ const Sidebar = ({ user }) => {
     { name: t('nav.orders'), path: '/admin/commandes', icon: ClipboardList },
     { name: t('nav.clients'), path: '/admin/clients', icon: Users },
     { name: 'Catalogue', path: '/admin/catalog', icon: LayoutGrid },
+    { name: 'Impayés', path: '/admin/unpaid', icon: AlertCircle },
+    { name: 'Paramètres', path: '/admin/settings', icon: Settings },
   ];
 
   const livreurLinks = [
@@ -37,10 +41,13 @@ const Sidebar = ({ user }) => {
     { name: t('nav.orders'), path: '/livreur/orders', icon: Package },
     { name: t('nav.clients'), path: '/livreur/clients', icon: Users },
     { name: t('nav.canceled'), path: '/livreur/canceled', icon: XCircle },
+    { name: 'Carte', path: '/livreur/map', icon: Map },
   ];
 
   const employeLinks = [
     { name: t('nav.workshop'), path: '/employe/dashboard', icon: Wrench },
+    { name: 'Commandes', path: '/employe/commandes', icon: ClipboardList },
+    { name: 'Clients', path: '/employe/clients', icon: Users },
     { name: t('nav.returns'), path: '/employe/retours', icon: RefreshCw },
   ];
 

@@ -7,7 +7,7 @@ WORKDIR /build
 
 # Cache dependency layer separately from source
 COPY pom.xml .
-RUN mvn dependency:go-offline -B --no-transfer-progress
+RUN mvn dependency:resolve -B --no-transfer-progress
 
 # -Dflyway.skip prevents the Flyway Maven plugin from trying to
 # connect to the hardcoded localhost DB during the build phase.

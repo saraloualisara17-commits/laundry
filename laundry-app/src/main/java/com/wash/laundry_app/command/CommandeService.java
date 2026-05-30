@@ -75,6 +75,10 @@ public class CommandeService {
         return workflowService.updateItemsByPickupDriver(id, items);
     }
 
+    public CommandeDTO confirmPickup(Long id, java.util.List<CreateCommandeRequest.TapisItem> items) {
+        return workflowService.confirmPickup(id, items);
+    }
+
     public void deleteCommande(Long id) {
         workflowService.deleteCommande(id);
     }
@@ -146,6 +150,8 @@ public class CommandeService {
     public void addOrderImages(Long id, List<String> imageUrls, String photoType) {
         imageService.addOrderImages(id, imageUrls, photoType);
     }
+
+
 
     public CommandeDTO returnToWorkplace(Long id) {
         return workflowService.returnToWorkplace(id);

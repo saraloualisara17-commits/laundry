@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useOrdersForMap } from '../../src/hooks/query/useOrders';
 
 const { width, height } = Dimensions.get('window');
+const keyById = (item: { id: any }) => String(item.id);
 
 export default function AllOrdersMapScreen() {
   const { t, i18n } = useTranslation();
@@ -161,7 +162,7 @@ export default function AllOrdersMapScreen() {
     if (phone) Linking.openURL(`tel:${phone}`);
   };
 
-  const renderOrderList = ({ item }: { item: any }) => (
+  const renderOrderList = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.listCard}
       onPress={() => {
@@ -178,7 +179,7 @@ export default function AllOrdersMapScreen() {
         <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={20} color={AdminColors.textMuted} />
       </View>
     </TouchableOpacity>
-  );
+  ), [isArabic, t]);
 
   return (
     <View style={styles.container}>
@@ -269,7 +270,7 @@ export default function AllOrdersMapScreen() {
           <FlatList
             data={filteredOrders}
             renderItem={renderOrderList}
-            keyExtractor={item => item.id.toString()}
+            keyExtractor={keyById}
             contentContainerStyle={{ paddingBottom: 40 }}
           />
         </View>

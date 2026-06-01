@@ -17,6 +17,7 @@ import { router } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
 import { adminApi } from '../../src/services/adminApi';
 import { ordersApi } from '../../src/services/api/ordersApi';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,7 +44,7 @@ export default function OrderSummaryScreen() {
 
   const [loading, setLoading] = useState(false);
   const qc = useQueryClient();
-  const currentUser = useSelector((state: any) => state.auth.user);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const isLivreur = currentUser?.role?.toUpperCase() === 'LIVREUR';
 
   const totalDiscount = useMemo(
@@ -57,6 +58,9 @@ export default function OrderSummaryScreen() {
   );
 
   const handleSubmit = async () => {
+    if (!pickupOrderId && !editingOrderId && !client?.id) {
+      return Alert.alert(t('common.error'), t('admin.orders.create.client_required', { defaultValue: 'Veuillez sélectionner un client.' }));
+    }
     if (items.length === 0) {
       return Alert.alert(t('common.error'), t('admin.orders.create.items.bag_empty'));
     }

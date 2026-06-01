@@ -27,6 +27,8 @@ import { logger } from '../../../src/lib/logger';
 
 const log = logger.ns('clients');
 
+const keyById = (item: { id: any }) => String(item.id);
+
 export default function ClientsScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
@@ -101,41 +103,41 @@ export default function ClientsScreen() {
     };
   }, [search, selectedDate]);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(0);
     fetchClients(0, true, search);
-  };
+  }, [fetchClients, search]);
 
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     if (!loadingMore && hasMore && !loading) {
       setLoadingMore(true);
       const nextPage = page + 1;
       setPage(nextPage);
       fetchClients(nextPage, false, search);
     }
-  };
+  }, [loadingMore, hasMore, loading, page, fetchClients, search]);
 
-  const getInitials = (name: string) => {
+  const getInitials = useCallback((name: string) => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
     if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
+  }, []);
 
-  const getClientPhone = (item: any) => {
+  const getClientPhone = useCallback((item: any) => {
     if (item.phone) return item.phone;
     if (item.phones && item.phones.length > 0) return item.phones[0].phoneNumber;
     return t('admin.clients.no_phone');
-  };
+  }, [t]);
 
-  const getClientAddress = (item: any) => {
+  const getClientAddress = useCallback((item: any) => {
     if (item.address) return item.address;
     if (item.addresses && item.addresses.length > 0) return item.addresses[0].address;
     return t('admin.clients.no_address');
-  };
+  }, [t]);
 
-  const renderClientCard = ({ item }: { item: any }) => (
+  const renderClientCard = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.clientCard}
       onPress={() => router.push(`/client/${item.id}`)}
@@ -164,7 +166,7 @@ export default function ClientsScreen() {
 
       <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={18} color={AdminColors.textMuted} />
     </TouchableOpacity>
-  );
+  ), [isArabic, t, getInitials, getClientPhone, getClientAddress]);
 
   return (
     <View style={styles.container}>
@@ -215,7 +217,7 @@ export default function ClientsScreen() {
       <FlatList
         data={clients}
         renderItem={renderClientCard}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={keyById}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
         onEndReached={loadMore}

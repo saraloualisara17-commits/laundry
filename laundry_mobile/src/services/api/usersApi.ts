@@ -44,6 +44,18 @@ export const usersApi = {
    */
   resetPassword: (id: number | string, password: string) =>
     client.put(`/api/admin/change-user-password/${id}`, { password }),
+
+  /**
+   * Get all inactive (disabled) users
+   */
+  getInactiveUsers: () =>
+    client.get('/api/admin/inactive-users'),
+
+  /**
+   * Delete a user account
+   */
+  deleteUser: (id: number | string) =>
+    client.delete(`/admin/delete-user/${id}`),
 };
 
 export default usersApi;

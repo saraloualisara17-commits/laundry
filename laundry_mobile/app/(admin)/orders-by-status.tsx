@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,24 +14,23 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
-import { row, textAlign, font, arabicSafe, textProps } from '../../src/utils/rtl';
+import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { StatusBadge } from '../../components/admin/StatusBadge';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
-import { STATUS_COLORS } from '../../constants/StatusColors';
+import { STATUS_COLORS, StatusColors } from '../../constants/StatusColors';
 import { useDirections } from '../../src/hooks/useDirections';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
-import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 import { useFormStyles } from '../../src/hooks/useFormStyles';
 import { useDriversList } from '../../src/hooks/query/useDrivers';
 import { useOrders } from '../../src/hooks/query/useOrders';
+import OrderCard from '../../components/admin/OrderCard';
 
 export default function OrdersByStatusScreen() {
   const { t, i18n } = useTranslation();
@@ -76,7 +75,7 @@ export default function OrdersByStatusScreen() {
     }
 
     const s = status as string;
-    const colors = require('../../constants/StatusColors').StatusColors[s] || { dot: '#94A3B8', bg: 'rgba(148, 163, 184, 0.1)' };
+    const colors = StatusColors[s] || { dot: '#94A3B8', bg: 'rgba(148, 163, 184, 0.1)' };
     
     const emojiMap: Record<string, string> = {
       PENDING_PICKUP: '⏳',
@@ -152,14 +151,14 @@ export default function OrdersByStatusScreen() {
     [allUsers]
   );
 
-  const onRefresh = () => { refetch(); };
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setDateDebut(null);
     setSelectedStaffId(null);
-  };
+  }, []);
 
-  const centerOnUserLocation = async () => {
+  const centerOnUserLocation = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return;
     const location = await Location.getCurrentPositionAsync({});
@@ -169,9 +168,9 @@ export default function OrdersByStatusScreen() {
       latitudeDelta: 0.05,
       longitudeDelta: 0.05,
     });
-  };
+  }, []);
 
-  const openInExternalMap = (order: any) => {
+  const openInExternalMap = useCallback((order: any) => {
     const lat = parseFloat(order.clientLatitude);
     const lng = parseFloat(order.clientLongitude);
     const label = order.client?.name || order.clientName;
@@ -180,7 +179,7 @@ export default function OrdersByStatusScreen() {
       android: `geo:0,0?q=${lat},${lng}(${label})`
     });
     if (url) Linking.openURL(url);
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedOrder && userLocation) {
@@ -193,71 +192,9 @@ export default function OrdersByStatusScreen() {
     }
   }, [selectedOrder, userLocation]);
 
-  const renderOrderCard = ({ item }: { item: any }) => {
-    const statusCfg = require('../../constants/StatusColors').StatusColors[item.status] || { dot: statusConfig.color };
-    const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
-    const address = item.client?.addresses?.[0]?.address || item.clientAdresse || null;
-
-    return (
-      <TouchableOpacity
-        style={styles.orderCard}
-        onPress={() => router.push(`/order/${item.id}`)}
-        activeOpacity={0.7}
-      >
-        {/* Top row: status badge + order id */}
-        <View style={[styles.cardTop, row(isArabic)]}>
-          <StatusBadge status={item.status} />
-          <Text style={[styles.orderRef, arabicSafe(isArabic), { color: statusCfg.dot, fontSize: 17, fontWeight: '800' }]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.id}</Text>
-        </View>
-
-        {/* Client name */}
-        <Text style={[styles.clientName, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.client?.name || item.clientNom}</Text>
-
-        {/* Address */}
-        {address && (
-          <View style={[styles.addressItem, { marginTop: 4 }, row(isArabic)]}>
-            <Ionicons name="location-outline" size={13} color={AdminColors.textMuted} />
-            <Text style={[styles.addressText, textAlign(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{address}</Text>
-          </View>
-        )}
-
-        {/* Items + date */}
-        <View style={[styles.infoRow, row(isArabic)]}>
-          <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="cube-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{itemsSummary}</Text>
-          </View>
-          <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="calendar-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{new Date(item.dateCreation).toLocaleDateString('fr-FR')}</Text>
-          </View>
-        </View>
-
-        {/* Bottom row: amount + financials */}
-        <View style={[styles.cardBottom, row(isArabic)]}>
-          <View style={isArabic ? { alignItems: 'flex-end' } : {}}>
-            <Text style={[styles.amountText, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.montantTotal} {t('common.dh')}</Text>
-            {(item.montantPaye > 0 || item.resteAPayer > 0) && (
-              <View style={[styles.financialRow, row(isArabic)]}>
-                <Text style={[styles.payeText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
-                {item.resteAPayer > 0 && (
-                  <Text style={[styles.resteText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
-                )}
-              </View>
-            )}
-            {!!item.debtSettledAt && specialFilter === 'PAID_DEBTS' && (
-              <View style={[styles.financialRow, row(isArabic)]}>
-                <Ionicons name="checkmark-circle" size={13} color="#10B981" />
-                <Text style={[styles.settledText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                  {t('dashboard.settled_on')}: {new Date(item.debtSettledAt).toLocaleDateString('fr-FR')}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderOrderCard = useCallback(({ item }: { item: any }) => (
+    <OrderCard item={item} isArabic={isArabic} t={t} showDebtSettled={specialFilter === 'PAID_DEBTS'} />
+  ), [isArabic, t, specialFilter]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -675,93 +612,6 @@ const styles = StyleSheet.create({
   // List
   listContainer: { paddingBottom: 24, paddingTop: 4 },
 
-  orderCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    ...AdminShadows.shadowSmall,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  orderRef: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  clientName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
-    marginTop: 2,
-  },
-  addressItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addressText: {
-    fontSize: 12,
-    color: AdminColors.textMuted,
-    fontWeight: '500',
-    flex: 1,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginTop: 10,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  infoText: {
-    fontSize: 13,
-    color: AdminColors.textSecondary,
-    fontWeight: '500',
-  },
-  cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: AdminColors.primary,
-  },
-  financialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  payeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  resteText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  settledText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10B981',
-  },
   // Modal
   modalOverlay: {
     flex: 1,

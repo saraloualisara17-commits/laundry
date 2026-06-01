@@ -21,7 +21,7 @@ interface AssignPickupDriverModalProps {
   confirming: boolean;
 }
 
-export default function AssignPickupDriverModal({
+export default React.memo(function AssignPickupDriverModal({
   visible, onClose, onConfirm, numeroCommande, isArabic, t,
   drivers, driversLoading,
   selectedDriverId, setSelectedDriverId,
@@ -103,7 +103,7 @@ export default function AssignPickupDriverModal({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

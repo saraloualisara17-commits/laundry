@@ -69,6 +69,8 @@ export const adminApi = {
   activateUser: (id: number | string) => usersApi.activateUser(id),
   deactivateUser: (id: number | string) => usersApi.deactivateUser(id),
   resetPassword: (id: number | string, password: string) => usersApi.resetPassword(id, password),
+  getInactiveUsers: () => usersApi.getInactiveUsers(),
+  deleteUser: (id: number | string) => usersApi.deleteUser(id),
 
   // Receipts & PDFs
   getOrderPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') => ordersApi.getOrderPdfUrl(id, lang),

@@ -25,7 +25,7 @@ interface EditAddressModalProps {
   saving: boolean;
 }
 
-export default function EditAddressModal({
+export default React.memo(function EditAddressModal({
   visible, onClose, onSave, onOpenMapPicker, onCaptureGps,
   clientName, isArabic, t,
   addressText, setAddressText,
@@ -135,7 +135,7 @@ export default function EditAddressModal({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

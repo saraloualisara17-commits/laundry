@@ -34,6 +34,8 @@ const STATUS_TABS = [
   'DELIVERY_FAILED',
 ];
 
+const keyByOrderId = (item: { orderId: any }) => String(item.orderId);
+
 export default function GalleryScreen() {
   const { t } = useTranslation();
   const f = useFormStyles();
@@ -191,7 +193,7 @@ export default function GalleryScreen() {
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={item => String(item.orderId)}
+          keyExtractor={keyByOrderId}
           renderItem={renderOrderCard}
           contentContainerStyle={styles.listContent}
           refreshControl={

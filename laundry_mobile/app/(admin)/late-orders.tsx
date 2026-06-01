@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -72,7 +72,7 @@ export default function LateOrdersScreen() {
 
   const icon = orderType === 'delivery' ? 'car-outline' : 'time-outline';
 
-  const renderCard = ({ item }: { item: any }) => {
+  const renderCard = useCallback(({ item }: { item: any }) => {
     const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
     const address = item.client?.addresses?.[0]?.address || item.clientAdresse || null;
     const scheduledDate = orderType === 'delivery'
@@ -156,7 +156,7 @@ export default function LateOrdersScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [t, isArabic, colors, orderType]);
 
   return (
     <SafeAreaView style={styles.safe}>

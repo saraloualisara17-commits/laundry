@@ -5,7 +5,7 @@ export interface AppNotification {
   title: string;
   message: string;
   type: string;
-  isRead: boolean;
+  read: boolean;
   referenceId?: number;
   createdAt: string;
 }

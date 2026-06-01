@@ -12,7 +12,7 @@ interface OrderAddressMapProps {
   t: (key: string, options?: any) => string;
 }
 
-export default function OrderAddressMap({ address, lat, lng, isArabic, t }: OrderAddressMapProps) {
+export default React.memo(function OrderAddressMap({ address, lat, lng, isArabic, t }: OrderAddressMapProps) {
   if (!address && !(lat && lng)) return null;
 
   return (
@@ -49,7 +49,7 @@ export default function OrderAddressMap({ address, lat, lng, isArabic, t }: Orde
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   addressText: { fontSize: 14, color: Colors.textSecondary, paddingHorizontal: 20, marginBottom: 12 },

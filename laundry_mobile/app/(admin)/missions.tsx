@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import { randomUUID } from '../../src/utils/uuid';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -30,6 +30,8 @@ const C = {
   danger: '#EF4444',
   primary: '#0D7377',
 };
+
+const keyById = (item: { id: any }) => String(item.id);
 
 export default function AdminMissionsScreen() {
   const { t, i18n } = useTranslation();
@@ -108,7 +110,7 @@ export default function AdminMissionsScreen() {
 
   const updating = updateStatusMutation.isPending;
 
-  const renderMissionCard = ({ item }: { item: any }) => {
+  const renderMissionCard = useCallback(({ item }: { item: any }) => {
     const addr = item.clientAddress || item.client?.addresses?.[0]?.address;
     const phone = item.clientPhone || item.client?.phones?.[0]?.phoneNumber;
     const isPickup = item.status === 'PENDING_PICKUP';
@@ -202,7 +204,7 @@ export default function AdminMissionsScreen() {
         </View>
       </View>
     );
-  };
+  }, [t, isArabic, updating, updateStatusMutation]);
 
   return (
     <View style={styles.container}>
@@ -252,7 +254,7 @@ export default function AdminMissionsScreen() {
       <FlatList
         data={filteredMissions}
         renderItem={renderMissionCard}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={keyById}
         contentContainerStyle={{ paddingVertical: 16 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { refetchPickups(); refetchDeliveries(); }} tintColor={AdminColors.primary} />

@@ -25,7 +25,7 @@ interface PickupConfirmModalProps {
   t: (key: string, options?: any) => string;
 }
 
-export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
+export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = React.memo(({
   visible,
   onClose,
   onConfirm,
@@ -86,7 +86,7 @@ export const PickupConfirmModal: React.FC<PickupConfirmModalProps> = ({
       </View>
     </RTLBottomSheet>
   );
-};
+});
 
 export default PickupConfirmModal;
 

@@ -111,6 +111,10 @@ export const handleRealtimeEvent = (event: RealtimeEvent) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all });
       break;
 
+    case RealtimeEventType.NOTIFICATION_RECEIVED:
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      break;
+
     default:
       if (typeof event.type === 'string' && event.type.includes('ORDER')) {
         queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });

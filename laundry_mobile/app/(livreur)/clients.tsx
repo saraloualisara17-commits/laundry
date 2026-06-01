@@ -22,6 +22,8 @@ import { logger } from '../../src/lib/logger';
 
 const log = logger.ns('livreur-clients');
 
+const keyById = (item: { id: any }) => String(item.id);
+
 export default function LivreurClientsScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
@@ -36,7 +38,7 @@ export default function LivreurClientsScreen() {
   const [totalCount, setTotalCount] = useState(0);
   const searchTimeout = React.useRef<any>(null);
 
-  const fetchClients = async (pageNum: number, isRefresh: boolean = false, currentSearch?: string) => {
+  const fetchClients = useCallback(async (pageNum: number, isRefresh: boolean = false, currentSearch?: string) => {
     try {
       if (pageNum === 0 && !isRefresh) setLoading(true);
       if (pageNum > 0) setLoadingMore(true);
@@ -61,7 +63,7 @@ export default function LivreurClientsScreen() {
       }
 
       setHasMore(clientsArray.length === 20);
-      setTotalCount(res.data.totalElements || (isRefresh || pageNum === 0 ? clientsArray.length : totalCount));
+      setTotalCount(prev => res.data.totalElements || (isRefresh || pageNum === 0 ? clientsArray.length : prev));
     } catch (error) {
       log.error('Fetch clients error', { err: String(error) });
     } finally {
@@ -69,12 +71,12 @@ export default function LivreurClientsScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchClients(0, true, search);
-    }, [])
+    }, [fetchClients])
   );
 
   React.useEffect(() => {
@@ -86,40 +88,40 @@ export default function LivreurClientsScreen() {
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [search]);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(0);
     fetchClients(0, true, search);
-  };
+  }, [fetchClients, search]);
 
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     if (!loadingMore && hasMore && !loading) {
       const nextPage = page + 1;
       setPage(nextPage);
       fetchClients(nextPage, false, search);
     }
-  };
+  }, [loadingMore, hasMore, loading, page, fetchClients, search]);
 
-  const getInitials = (name: string) => {
+  const getInitials = useCallback((name: string) => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
     if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
+  }, []);
 
-  const getClientPhone = (item: any) => {
+  const getClientPhone = useCallback((item: any) => {
     if (item.phone) return item.phone;
     if (item.phones && item.phones.length > 0) return item.phones[0].phoneNumber;
     return t('admin.clients.no_phone');
-  };
+  }, [t]);
 
-  const getClientAddress = (item: any) => {
+  const getClientAddress = useCallback((item: any) => {
     if (item.address) return item.address;
     if (item.addresses && item.addresses.length > 0) return item.addresses[0].address;
     return t('admin.clients.no_address');
-  };
+  }, [t]);
 
-  const renderClientCard = ({ item }: { item: any }) => (
+  const renderClientCard = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.clientCard}
       onPress={() => router.push(`/client/${item.id}`)}
@@ -145,7 +147,7 @@ export default function LivreurClientsScreen() {
 
       <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={AdminColors.textMuted} />
     </TouchableOpacity>
-  );
+  ), [isArabic, t, getInitials, getClientPhone, getClientAddress]);
 
   return (
     <View style={styles.container}>
@@ -172,7 +174,7 @@ export default function LivreurClientsScreen() {
       <FlatList
         data={clients}
         renderItem={renderClientCard}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={keyById}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
         onEndReached={loadMore}

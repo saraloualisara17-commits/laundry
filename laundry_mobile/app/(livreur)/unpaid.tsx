@@ -12,6 +12,7 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
 import { useFormStyles } from '../../src/hooks/useFormStyles';
+import { StatusColors } from '../../constants/StatusColors';
 import { logger } from '../../src/lib/logger';
 
 const log = logger.ns('livreur-unpaid');
@@ -51,7 +52,7 @@ export default function LivreurUnpaidScreen() {
 
   const onRefresh = useCallback(() => { setRefreshing(true); fetchData(); }, [fetchData]);
 
-  const openWhatsApp = async (phone: string, name: string, amount: number, count: number) => {
+  const openWhatsApp = useCallback(async (phone: string, name: string, amount: number, count: number) => {
     if (!phone) return;
     let waPhone = phone.startsWith('0') ? '212' + phone.slice(1).replace(/\D/g, '') : phone.replace(/\D/g, '');
     const text = t('admin.unpaid.whatsapp_msg', { clientName: name, amount, orderCount: count });
@@ -60,15 +61,15 @@ export default function LivreurUnpaidScreen() {
     } catch {
       Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error'));
     }
-  };
+  }, [t]);
 
-  const getDebtColor = (amount: number) => {
+  const getDebtColor = useCallback((amount: number) => {
     if (amount > 1000) return { main: '#EF4444', bg: 'rgba(239,68,68,0.12)' };
     if (amount >= 200) return { main: '#F59E0B', bg: 'rgba(245,158,11,0.12)' };
     return { main: AdminColors.accent, bg: 'rgba(201,168,76,0.12)' };
-  };
+  }, []);
 
-  const renderClient = ({ item }: { item: any }) => {
+  const renderClient = useCallback(({ item }: { item: any }) => {
     const dc = getDebtColor(item.totalRemaining);
     return (
       <TouchableOpacity
@@ -116,10 +117,10 @@ export default function LivreurUnpaidScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [isArabic, t, getDebtColor, openWhatsApp]);
 
-  const renderOrder = ({ item }: { item: any }) => {
-    const statusDot = (require('../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' }).dot;
+  const renderOrder = useCallback(({ item }: { item: any }) => {
+    const statusDot = (StatusColors[item.status] || { dot: '#94A3B8' }).dot;
     return (
     <TouchableOpacity style={styles.orderCard} onPress={() => router.push(`/order/${item.orderId}`)}>
       <View style={[styles.orderHeader, row(isArabic)]}>
@@ -145,7 +146,7 @@ export default function LivreurUnpaidScreen() {
       </View>
     </TouchableOpacity>
   );
-  };
+  }, [isArabic, t, f]);
 
   return (
     <View style={styles.container}>

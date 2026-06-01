@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { ApiError } from './types';
 import { connectivity } from '../offline/connectivity';
 import { logger } from '../../lib/logger';
+import { store } from '../../store/store';
+import { setCredentials, logOut } from '../../store/authSlice';
 
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
 
@@ -40,8 +42,6 @@ const refreshAccessToken = async (): Promise<string> => {
     }
     const newRefreshToken: string = res.data.refreshToken || refreshToken;
 
-    const { store } = require('../../store/store');
-    const { setCredentials } = require('../../store/authSlice');
     await SecureStore.setItemAsync('refreshToken', newRefreshToken);
     store.dispatch(setCredentials({ token: newAccessToken }));
     return newAccessToken;
@@ -72,7 +72,6 @@ export const normalizeError = (error: any): ApiError => {
 
 client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   try {
-    const { store } = require('../../store/store');
     const token = store.getState().auth.token;
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -102,8 +101,6 @@ client.interceptors.response.use(
 
       if (isAccountDisabled) {
         logger.auth.warn('Account disabled — logging out');
-        const { store } = require('../../store/store');
-        const { logOut } = require('../../store/authSlice');
         store.dispatch(logOut());
         await SecureStore.deleteItemAsync('refreshToken');
         await SecureStore.deleteItemAsync('accessToken');
@@ -132,8 +129,6 @@ client.interceptors.response.use(
         return client(originalRequest);
       } catch (err) {
         logger.auth.warn('Token refresh failed — logging out');
-        const { store } = require('../../store/store');
-        const { logOut } = require('../../store/authSlice');
         store.dispatch(logOut());
         await SecureStore.deleteItemAsync('refreshToken');
         await SecureStore.deleteItemAsync('accessToken');

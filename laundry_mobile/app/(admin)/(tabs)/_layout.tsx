@@ -1,17 +1,19 @@
-import { Tabs, router, useSegments } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors } from '../../../constants/AdminColors';
-import { View, Platform, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../src/store/store';
 import { useEffect } from 'react';
 import { useRTL, row } from '../../../src/utils/rtl';
+import { useUnreadCount } from '../../../src/hooks/query/useNotifications';
 
 export default function AdminTabsLayout() {
   const insets = useSafeAreaInsets();
   const { t, isRTL: isArabic } = useRTL();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { data: unreadCount = 0 } = useUnreadCount();
 
   // Guard: employees and livreurs should never be in the admin TABS — redirect to their zone
   useEffect(() => {
@@ -111,6 +113,11 @@ export default function AdminTabsLayout() {
             <View style={styles.iconContainer}>
               {focused && <View style={styles.activeIndicator} />}
               <Ionicons name={focused ? "ellipsis-horizontal" : "ellipsis-horizontal-outline"} size={24} color={color} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </View>
           ),
         }}
@@ -133,5 +140,22 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: AdminColors.primary,
     borderRadius: 999,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: AdminColors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'white',
   },
 });

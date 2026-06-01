@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,24 +17,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
-import { StatusColors } from '../../../constants/StatusColors';
-import { StatusBadge } from '../../../components/admin/StatusBadge';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
-import { router } from 'expo-router';
+import OrderCard from '../../../components/admin/OrderCard';
+import OrderStatsBanner from '../../../components/admin/OrderStatsBanner';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRTL, row, font, arabicSafe, pos, textAlign, textProps } from '../../../src/utils/rtl';
-import { formatOrderItemsSummary } from '../../../src/utils/orderSummary';
-import { useFormStyles } from '../../../src/hooks/useFormStyles';
+import { useRTL, row, font, textAlign, textProps } from '../../../src/utils/rtl';
 import { useInfiniteOrders } from '../../../src/hooks/query/useOrders';
 import { useDriversList } from '../../../src/hooks/query/useDrivers';
 import { useUpdateOrderStatus } from '../../../src/hooks/query/useOrder';
 
 const { width } = Dimensions.get('window');
 
+const keyById = (item: { id: any }) => String(item.id);
+
 export default function OrdersScreen() {
   const { t, isRTL: isArabic } = useRTL();
-  const f = useFormStyles();
 
   const TABS = [
     { id: 'Toutes', label: t('common.all') },
@@ -90,7 +88,7 @@ export default function OrdersScreen() {
   const onRefresh = () => { refetch(); };
   const loadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
 
-  const handleValidateOrder = (id: number) => {
+  const handleValidateOrder = useCallback((id: number) => {
     Alert.alert(
       t('admin.orders.change_status'),
       `${t('admin.orders.change_status_msg')} ${t('status.PICKED_UP')} ?`,
@@ -107,105 +105,55 @@ export default function OrdersScreen() {
         }
       ]
     );
-  };
+  }, [t, updateStatusMutation]);
 
   const filteredOrders = orders;
 
+  const renderOrderCard = useCallback(({ item }: { item: any }) => (
+    <OrderCard item={item} isArabic={isArabic} t={t} onValidate={handleValidateOrder} />
+  ), [isArabic, t, handleValidateOrder]);
 
-  const renderStatsBanner = () => {
-    const totalOrders = filteredOrders.length;
-    const totalAmount = filteredOrders.reduce((sum, o) => sum + (o.montantTotal || 0), 0);
-    const totalPending = filteredOrders.filter(o => o.status === 'PENDING_PICKUP').length;
+  const renderListHeader = useCallback(() => (
+    <>
+      <OrderStatsBanner orders={filteredOrders} isArabic={isArabic} t={t} />
 
-    return (
-      <View style={styles.statsBanner}>
-        <View style={[styles.statsDecoCircle, pos.end(-30, isArabic), { top: -30 }]} />
-        <View style={[styles.statsRow, row(isArabic)]}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalOrders}</Text>
-            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('common.all')}</Text>
+      <View style={[styles.filterRow, row(isArabic)]}>
+        <TouchableOpacity style={[styles.filterBtn, row(isArabic)]} onPress={() => setShowDriverPicker(true)}>
+          <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
+            <Feather name="chevron-down" size={14} color={AdminColors.textMuted} />
+            <Text style={[selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+              {selectedDriver ? selectedDriver.name : t('admin.orders.filter_driver')}
+            </Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalAmount} <Text style={{fontSize: 14}}>{t('common.dh')}</Text></Text>
-            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('common.total')}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{totalPending}</Text>
-            <Text style={[styles.statLabel, f.statLabel, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('status.PENDING_PICKUP')}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderOrderCard = ({ item }: { item: any }) => {
-    const statusCfg = StatusColors[item.status] || StatusColors.PENDING_PICKUP;
-    const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
-    const address = item.client?.addresses?.[0]?.address || item.clientAdresse || null;
-
-    return (
-      <TouchableOpacity
-        style={styles.orderCard}
-        onPress={() => router.push(`/order/${item.id}`)}
-        activeOpacity={0.7}
-      >
-        {/* Top row: status badge + order ref, direction respects RTL */}
-        <View style={[styles.cardTop, row(isArabic)]}>
-          <StatusBadge status={item.status} />
-          <Text style={[styles.orderRef, arabicSafe(isArabic), { color: statusCfg.dot, fontSize: 17 }]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.id}</Text>
-        </View>
-
-        {/* Client name */}
-        <Text style={[styles.clientName, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.client?.name || item.clientNom}</Text>
-
-        {/* Address */}
-        {address && (
-          <View style={[styles.infoItem, { marginTop: 4 }, row(isArabic)]}>
-            <Ionicons name="location-outline" size={13} color={AdminColors.textMuted} />
-            <Text style={[styles.addressText, textAlign(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{address}</Text>
-          </View>
-        )}
-
-        {/* Items + date */}
-        <View style={[styles.infoRow, row(isArabic)]}>
-          <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="cube-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{itemsSummary}</Text>
-          </View>
-          <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="calendar-outline" size={13} color={AdminColors.textSecondary} />
-            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{new Date(item.dateCreation).toLocaleDateString('fr-FR')}</Text>
-          </View>
-        </View>
-
-        {/* Bottom row: amount + financial */}
-        <View style={[styles.cardBottom, row(isArabic)]}>
-          <View style={isArabic ? { alignItems: 'flex-end' } : {}}>
-            <Text style={[styles.amountText, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.montantTotal} {t('common.dh')}</Text>
-            {(item.montantPaye > 0 || item.resteAPayer > 0) && (
-              <View style={[styles.financialRow, row(isArabic)]}>
-                <Text style={[styles.payeText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
-                {item.resteAPayer > 0 && (
-                  <Text style={[styles.resteText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          {item.status === 'PENDING_PICKUP' && (
+          {selectedDriver && (
             <TouchableOpacity
-              style={styles.validateBtnInline}
-              onPress={() => handleValidateOrder(item.id)}
+              onPress={(e) => { e.stopPropagation(); setSelectedDriver(null); }}
+              style={{ padding: 4 }}
             >
-              <Text style={[styles.validateBtnTextInline, font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('admin.orders.validate')}</Text>
+              <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
             </TouchableOpacity>
           )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterBtn, selectedDate && styles.filterBtnActive, row(isArabic)]}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
+            <Ionicons name="calendar-outline" size={14} color={selectedDate ? AdminColors.primary : AdminColors.textMuted} />
+            <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+              {selectedDate ? selectedDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
+            </Text>
+          </View>
+          {selectedDate && (
+            <TouchableOpacity onPress={(e) => { e.stopPropagation(); setSelectedDate(null); }} style={{ padding: 4 }}>
+              <Ionicons name="close-circle" size={16} color={AdminColors.primary} />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      </View>
+    </>
+  ), [filteredOrders, isArabic, t, selectedDriver, selectedDate]);
 
   return (
     <View style={styles.container}>
@@ -256,52 +204,12 @@ export default function OrdersScreen() {
       <FlatList
         data={filteredOrders}
         renderItem={renderOrderCard}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={keyById}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
-        ListHeaderComponent={() => (
-          <>
-            {renderStatsBanner()}
-            
-            <View style={[styles.filterRow, row(isArabic)]}>
-              <TouchableOpacity style={[styles.filterBtn, row(isArabic)]} onPress={() => setShowDriverPicker(true)}>
-                <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
-                  <Feather name="chevron-down" size={14} color={AdminColors.textMuted} />
-                  <Text style={[selectedDriver ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                    {selectedDriver ? selectedDriver.name : t('admin.orders.filter_driver')}
-                  </Text>
-                </View>
-                {selectedDriver && (
-                  <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation(); setSelectedDriver(null); }}
-                    style={{ padding: 4 }}
-                  >
-                    <Ionicons name="close-circle" size={16} color={AdminColors.textMuted} />
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.filterBtn, selectedDate && styles.filterBtnActive, row(isArabic)]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <View style={[{ alignItems: 'center', gap: 6, flex: 1 }, row(isArabic)]}>
-                  <Ionicons name="calendar-outline" size={14} color={selectedDate ? AdminColors.primary : AdminColors.textMuted} />
-                  <Text style={[selectedDate ? styles.filterSelectedText : styles.filterPlaceholderText, textAlign(isArabic), font.regular(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                    {selectedDate ? selectedDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : t('common.all_dates')}
-                  </Text>
-                </View>
-                {selectedDate && (
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); setSelectedDate(null); }} style={{ padding: 4 }}>
-                    <Ionicons name="close-circle" size={16} color={AdminColors.primary} />
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+        ListHeaderComponent={renderListHeader}
         ListEmptyComponent={
           loading ? (
             <View style={{ padding: 16 }}>
@@ -481,47 +389,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 40,
   },
-  statsBanner: {
-    backgroundColor: '#0D7377',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 16,
-    ...AdminShadows.shadowMedium,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  statsDecoCircle: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: 'white',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
   filterRow: {
     flexDirection: 'row',
     gap: 10,
@@ -555,97 +422,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: AdminColors.textPrimary,
     fontWeight: '600',
-  },
-  orderCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    ...AdminShadows.shadowSmall,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  orderRef: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  clientName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: AdminColors.textPrimary,
-    marginTop: 2,
-  },
-  addressText: {
-    fontSize: 12,
-    color: AdminColors.textMuted,
-    fontWeight: '500',
-    flex: 1,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginTop: 10,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: AdminColors.textSecondary,
-    fontWeight: '500',
-  },
-  areaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  areaText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0284C7',
-  },
-  cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: AdminColors.primary,
-  },
-  financialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  payeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669', // Success green
-  },
-  resteText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#DC2626', // Error red
   },
   validateBtnInline: {
     backgroundColor: AdminColors.primary,

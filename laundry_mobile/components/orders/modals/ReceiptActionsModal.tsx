@@ -36,7 +36,7 @@ const C = {
   arColor: '#C2410C',
 };
 
-const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
+const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = React.memo(({
   visible,
   onClose,
   confirmedStatus,
@@ -147,7 +147,7 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
       </KeyboardAvoidingView>
     </Modal>
   );
-};
+});
 
 export default ReceiptActionsModal;
 

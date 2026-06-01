@@ -19,6 +19,7 @@ import { useStatusOverview, useUnpaidOverview } from '../../src/hooks/query/useD
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useOrders } from '../../src/hooks/query/useOrders';
 import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
+import { StatusColors } from '../../constants/StatusColors';
 
 function changeLanguage(lang: string) {
   i18n.changeLanguage(lang);
@@ -326,7 +327,7 @@ export default function LivreurDashboard() {
               activeOpacity={0.7}
             >
               <View style={{ flex: 1 }}>
-                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: (require('../../constants/StatusColors').StatusColors[order.status] || { dot: '#94A3B8' }).dot, fontSize: 17, fontWeight: '800' }]}>
+                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: (StatusColors[order.status] || { dot: '#94A3B8' }).dot, fontSize: 17, fontWeight: '800' }]}>
                   #{order.id}
                 </Text>
                 <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>

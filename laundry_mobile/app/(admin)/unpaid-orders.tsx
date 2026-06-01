@@ -19,6 +19,7 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
+import { StatusColors } from '../../constants/StatusColors';
 import { logger } from '../../src/lib/logger';
 
 const log = logger.ns('unpaid-orders');
@@ -64,32 +65,27 @@ export default function UnpaidOrdersScreen() {
     fetchData();
   }, [activeTab]);
 
-  const openWhatsApp = async (phone: string, clientName: string, amount: number, orderCount: number) => {
+  const openWhatsApp = useCallback(async (phone: string, clientName: string, amount: number, orderCount: number) => {
     if (!phone) return;
-    
-    // Format phone for WhatsApp wa.me (digits only)
     let waPhone = phone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       waPhone = '212' + phone.slice(1).replace(/\D/g, '');
     }
-    
     const text = t('admin.unpaid.whatsapp_msg', { clientName, amount, orderCount });
-    const encodedText = encodeURIComponent(text);
-    
     try {
-      await Linking.openURL(`https://wa.me/${waPhone}?text=${encodedText}`);
+      await Linking.openURL(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`);
     } catch (e) {
       Alert.alert(t('common.error'), t('admin.unpaid.whatsapp_error'));
     }
-  };
+  }, [t]);
 
-  const getDebtColorLevel = (amount: number) => {
+  const getDebtColorLevel = useCallback((amount: number) => {
     if (amount > 1000) return { main: '#EF4444', bg: 'rgba(239,68,68,0.15)' };
     if (amount >= 200) return { main: '#F59E0B', bg: 'rgba(245,158,11,0.15)' };
     return { main: '#C9A84C', bg: 'rgba(201,168,76,0.15)' };
-  };
+  }, []);
 
-  const renderClientCard = ({ item }: { item: any }) => {
+  const renderClientCard = useCallback(({ item }: { item: any }) => {
     const debtColor = getDebtColorLevel(item.totalRemaining);
     
     return (
@@ -144,11 +140,11 @@ export default function UnpaidOrdersScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [isArabic, t, getDebtColorLevel, openWhatsApp]);
 
-  const renderOrderCard = ({ item }: { item: any }) => {
+  const renderOrderCard = useCallback(({ item }: { item: any }) => {
     const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
-    const statusDot = (require('../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' }).dot;
+    const statusDot = (StatusColors[item.status] || { dot: '#94A3B8' }).dot;
 
     return (
       <TouchableOpacity
@@ -188,7 +184,7 @@ export default function UnpaidOrdersScreen() {
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [isArabic, t]);
 
   return (
     <View style={styles.container}>

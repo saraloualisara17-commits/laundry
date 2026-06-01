@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, RefreshControl
@@ -13,6 +13,9 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
 import { formatOrderItemsSummary } from '../../src/utils/orderSummary';
 import { useInfiniteOrders } from '../../src/hooks/query/useOrders';
+import { StatusColors } from '../../constants/StatusColors';
+
+const keyById = (item: { id: any }) => String(item.id);
 
 export default function LivreurOrdersScreen() {
   const { t, i18n } = useTranslation();
@@ -56,11 +59,11 @@ export default function LivreurOrdersScreen() {
   const totalCount = orders.length;
   const refreshing = isFetching && !loading && !loadingMore;
 
-  const onRefresh = () => { refetch(); };
-  const loadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
+  const loadMore = useCallback(() => { if (hasNextPage && !loadingMore) fetchNextPage(); }, [hasNextPage, loadingMore, fetchNextPage]);
 
-  const renderCard = ({ item }: { item: any }) => {
-    const statusCfg = require('../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' };
+  const renderCard = useCallback(({ item }: { item: any }) => {
+    const statusCfg = StatusColors[item.status] || { dot: '#94A3B8' };
     const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
 
     return (
@@ -100,7 +103,7 @@ export default function LivreurOrdersScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [t]);
 
   return (
     <View style={styles.container}>
@@ -142,7 +145,7 @@ export default function LivreurOrdersScreen() {
       <FlatList
         data={orders}
         renderItem={renderCard}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={keyById}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
         onEndReached={loadMore}

@@ -29,7 +29,7 @@ interface PaymentModalProps {
   t: (key: string, options?: any) => string;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({
+export const PaymentModal: React.FC<PaymentModalProps> = React.memo(({
   visible,
   onClose,
   onSubmit,
@@ -121,7 +121,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       </View>
     </RTLBottomSheet>
   );
-};
+});
 
 export default PaymentModal;
 

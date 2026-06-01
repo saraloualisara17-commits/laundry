@@ -55,7 +55,7 @@ function NotificationRow({
 
   return (
     <TouchableOpacity
-      style={[styles.row, !item.isRead && styles.rowUnread]}
+      style={[styles.row, !item.read && styles.rowUnread]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -66,13 +66,13 @@ function NotificationRow({
       <View style={{ flex: 1 }}>
         <View style={[styles.rowTop, row(isRTL)]}>
           <Text
-            style={[styles.title, font.semibold(isRTL), !item.isRead && styles.titleUnread]}
+            style={[styles.title, font.semibold(isRTL), !item.read && styles.titleUnread]}
             maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
             numberOfLines={1}
           >
             {item.title}
           </Text>
-          {!item.isRead && <View style={styles.unreadDot} />}
+          {!item.read && <View style={styles.unreadDot} />}
         </View>
 
         <Text
@@ -97,10 +97,10 @@ export default function NotificationsScreen() {
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handlePress = useCallback((item: AppNotification) => {
-    if (!item.isRead) {
+    if (!item.read) {
       markAsRead.mutate(item.id);
     }
     if (item.referenceId) {

@@ -14,7 +14,7 @@ interface OrderWorkflowAreaProps {
   permissions: any;
 }
 
-export default function OrderWorkflowArea({
+export default React.memo(function OrderWorkflowArea({
   order, isArabic, t, fullyPaid, totalAmount, permissions,
 }: OrderWorkflowAreaProps) {
   const isReadyNoDriver = order.status === 'READY_FOR_DELIVERY' && !order.deliveryDriver;
@@ -69,7 +69,7 @@ export default function OrderWorkflowArea({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 16, marginTop: 12, gap: 10 },

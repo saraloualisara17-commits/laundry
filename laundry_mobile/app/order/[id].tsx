@@ -6,6 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
+import { RootState } from '../../src/store/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { Colors, Shadows, StatusColors } from '../../constants/theme';
@@ -45,7 +46,7 @@ import HistoriqueTab from '../../components/orders/tabs/HistoriqueTab';
 // ─── Entry point ─────────────────────────────────────────────────────────────
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
-  const currentUser = useSelector((state: any) => state.auth.user);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const { order, loading } = useOrder(id as string);
 
   if (loading || !order) {
@@ -70,8 +71,6 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const { payments, refetch, isRefreshing } = useOrder(id as string);
-  const { data: drivers = [], isLoading: driversLoading, isError: driversError } = useDriversList();
-  const { data: pickupDrivers = [], isLoading: pickupDriversLoading } = usePickupDriversList();
 
   // ── Permissions ───────────────────────────────────────────────────────────────
   const permissions = useOrderPermissions(currentUser, order);
@@ -92,23 +91,33 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
   // ── All handlers + modal state ────────────────────────────────────────────────
   const h = useOrderDetailHandlers({ id, order, currentUser, remaining, t });
 
+  // Driver lists are lazy — only fetched when the respective modal opens (React Query caches the result)
+  const { data: drivers = [], isLoading: driversLoading, isError: driversError } = useDriversList(h.showDriverModal);
+  const { data: pickupDrivers = [], isLoading: pickupDriversLoading } = usePickupDriversList(h.showPickupDriverModal);
+
   // ── Derived display values ────────────────────────────────────────────────────
-  const lat = order.deliveryLatitude ? parseFloat(order.deliveryLatitude)
-    : order.client?.addresses?.[0]?.latitude ? parseFloat(order.client.addresses[0].latitude) : null;
-  const lng = order.deliveryLongitude ? parseFloat(order.deliveryLongitude)
-    : order.client?.addresses?.[0]?.longitude ? parseFloat(order.client.addresses[0].longitude) : null;
-  const displayAddress = order.deliveryAddress || order.client?.addresses?.[0]?.address || '';
-
-  const canAct = permissions.isAdmin || permissions.isEmploye || permissions.isLivreur;
-  const isReadyForDelivery = order.status === 'READY_FOR_DELIVERY';
-  const isLocked = order.status !== 'PENDING_PICKUP' && !isReadyForDelivery;
-
-  const dateLabel = isReadyForDelivery
-    ? t('orders.edit_delivery_date', { defaultValue: 'تعديل تاريخ التوصيل' })
-    : t('orders.edit_pickup_date', { defaultValue: 'تعديل تاريخ الاستلام' });
-  const timeLabel = isReadyForDelivery
-    ? t('orders.edit_delivery_time', { defaultValue: 'تعديل وقت التوصيل' })
-    : t('orders.edit_pickup_time', { defaultValue: 'تعديل وقت الاستلام' });
+  const { lat, lng, displayAddress, canAct, isReadyForDelivery, isLocked, dateLabel, timeLabel } = useMemo(() => {
+    const _lat = order.deliveryLatitude ? parseFloat(order.deliveryLatitude)
+      : order.client?.addresses?.[0]?.latitude ? parseFloat(order.client.addresses[0].latitude) : null;
+    const _lng = order.deliveryLongitude ? parseFloat(order.deliveryLongitude)
+      : order.client?.addresses?.[0]?.longitude ? parseFloat(order.client.addresses[0].longitude) : null;
+    const _isReadyForDelivery = order.status === 'READY_FOR_DELIVERY';
+    return {
+      lat: _lat,
+      lng: _lng,
+      displayAddress: order.deliveryAddress || order.client?.addresses?.[0]?.address || '',
+      canAct: permissions.isAdmin || permissions.isEmploye || permissions.isLivreur,
+      isReadyForDelivery: _isReadyForDelivery,
+      isLocked: order.status !== 'PENDING_PICKUP' && !_isReadyForDelivery,
+      dateLabel: _isReadyForDelivery
+        ? t('orders.edit_delivery_date', { defaultValue: 'تعديل تاريخ التوصيل' })
+        : t('orders.edit_pickup_date', { defaultValue: 'تعديل تاريخ الاستلام' }),
+      timeLabel: _isReadyForDelivery
+        ? t('orders.edit_delivery_time', { defaultValue: 'تعديل وقت التوصيل' })
+        : t('orders.edit_pickup_time', { defaultValue: 'تعديل وقت الاستلام' }),
+    };
+  }, [order.deliveryLatitude, order.deliveryLongitude, order.deliveryAddress, order.status,
+      order.client, permissions.isAdmin, permissions.isEmploye, permissions.isLivreur, t]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (

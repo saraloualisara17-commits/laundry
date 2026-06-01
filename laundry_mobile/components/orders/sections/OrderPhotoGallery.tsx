@@ -25,7 +25,7 @@ const STATUS_MAP: Record<string, string> = {
   cancelled:            'status.CANCELLED',
 };
 
-export default function OrderPhotoGallery({ images, isArabic, t, onImagePress }: OrderPhotoGalleryProps) {
+export default React.memo(function OrderPhotoGallery({ images, isArabic, t, onImagePress }: OrderPhotoGalleryProps) {
   if (!images || images.length === 0) return null;
 
   return (
@@ -53,7 +53,7 @@ export default function OrderPhotoGallery({ images, isArabic, t, onImagePress }:
       ))}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   img: { width: 100, height: 100, borderRadius: 12 },

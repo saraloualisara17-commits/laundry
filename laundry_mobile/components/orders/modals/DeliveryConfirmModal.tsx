@@ -30,7 +30,7 @@ interface DeliveryConfirmModalProps {
   t: (key: string, options?: any) => string;
 }
 
-export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
+export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = React.memo(({
   visible,
   onClose,
   onConfirm,
@@ -178,7 +178,7 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
       </View>
     </RTLBottomSheet>
   );
-};
+});
 
 export default DeliveryConfirmModal;
 

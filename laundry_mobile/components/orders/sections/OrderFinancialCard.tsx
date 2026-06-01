@@ -14,7 +14,7 @@ interface OrderFinancialCardProps {
   fullyPaid: boolean;
 }
 
-export default function OrderFinancialCard({
+export default React.memo(function OrderFinancialCard({
   order, isArabic, t,
   totalAmount, paidAmount, remaining, progressPercentage, fullyPaid,
 }: OrderFinancialCardProps) {
@@ -43,7 +43,7 @@ export default function OrderFinancialCard({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: { backgroundColor: 'white', marginHorizontal: 16, marginTop: 12, borderRadius: 20, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, ...Shadows.sm },

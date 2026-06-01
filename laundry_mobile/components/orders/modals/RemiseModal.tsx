@@ -20,7 +20,7 @@ interface RemiseModalProps {
   saving: boolean;
 }
 
-export default function RemiseModal({
+export default React.memo(function RemiseModal({
   visible, onClose, onSave, numeroCommande, isArabic, t,
   items, remiseForms, setRemiseForms, saving,
 }: RemiseModalProps) {
@@ -108,7 +108,7 @@ export default function RemiseModal({
       </KeyboardAvoidingView>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,18,25,0.6)', justifyContent: 'center', paddingHorizontal: 20 },

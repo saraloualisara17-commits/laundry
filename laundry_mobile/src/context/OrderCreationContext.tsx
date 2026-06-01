@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useState, useMemo } from 'react';
+import React, { createContext, useContext, useRef, useState, useMemo, useCallback } from 'react';
 import { randomUUID } from '../utils/uuid';
 
 export type OrderMode = 'immediate' | 'scheduled';
@@ -141,12 +141,12 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const remainingAmount = useMemo(() => Math.max(0, totalAmount - paidAmount), [totalAmount, paidAmount]);
 
-  const addItem = (item: OrderItem) => setItems(prev => [...prev, item]);
-  const removeItem = (cartId: string) => setItems(prev => prev.filter(i => i.cartId !== cartId));
-  const updateItem = (cartId: string, updatedItem: OrderItem) => 
-    setItems(prev => prev.map(item => item.cartId === cartId ? updatedItem : item));
+  const addItem = useCallback((item: OrderItem) => setItems(prev => [...prev, item]), []);
+  const removeItem = useCallback((cartId: string) => setItems(prev => prev.filter(i => i.cartId !== cartId)), []);
+  const updateItem = useCallback((cartId: string, updatedItem: OrderItem) =>
+    setItems(prev => prev.map(item => item.cartId === cartId ? updatedItem : item)), []);
 
-  const loadOrderForEditing = (order: any) => {
+  const loadOrderForEditing = useCallback((order: any) => {
     setEditingOrderId(order.id);
     setMode(order.mode || 'immediate');
     setClient({
@@ -189,28 +189,28 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
         imageUrls: (t.images || []).map((img: any) => img.imageUrl) // Remote URLs will be kept as strings
     }));
     setItems(mappedItems);
-  };
+  }, []);
 
-  const addDriverLocalImage = (orderId: string, uri: string) =>
+  const addDriverLocalImage = useCallback((orderId: string, uri: string) =>
     setDriverLocalImagesState(prev => ({
       ...prev,
       [orderId]: [...(prev[orderId] ?? []), uri],
-    }));
+    })), []);
 
-  const removeDriverLocalImage = (orderId: string, index: number) =>
+  const removeDriverLocalImage = useCallback((orderId: string, index: number) =>
     setDriverLocalImagesState(prev => ({
       ...prev,
       [orderId]: (prev[orderId] ?? []).filter((_, i) => i !== index),
-    }));
+    })), []);
 
-  const clearDriverLocalImages = (orderId: string) =>
+  const clearDriverLocalImages = useCallback((orderId: string) =>
     setDriverLocalImagesState(prev => {
       const next = { ...prev };
       delete next[orderId];
       return next;
-    });
+    }), []);
 
-  const clearOrder = () => {
+  const clearOrder = useCallback(() => {
     setMode(null);
     setClient(null);
     setDeliveryType(null);
@@ -227,17 +227,22 @@ export const OrderCreationProvider: React.FC<{ children: React.ReactNode }> = ({
     setPickupImagesOnly(false);
     // Rotate the key so the next creation flow starts fresh
     creationIdempotencyKeyRef.current = randomUUID();
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId, pickupOrderId, pickupImagesOnly,
     creationIdempotencyKey: creationIdempotencyKeyRef.current,
     setMode, setClient, setDeliveryType, setLivreur, setScheduledDate,
     addItem, removeItem, updateItem, setOrderNotes, setOrderImages, setPaymentMethod, setPaidAmount, setPendingLocation, setEditingOrderId, setPickupOrderId, setPickupImagesOnly,
     loadOrderForEditing, clearOrder,
     driverLocalImages, addDriverLocalImage, removeDriverLocalImage, clearDriverLocalImages,
-    totalAmount, itemCount, totalArea, totalCarpets, remainingAmount
-  };
+    totalAmount, itemCount, totalArea, totalCarpets, remainingAmount,
+  }), [
+    mode, client, deliveryType, livreurId, scheduledDate, items, orderNotes, orderImages, paymentMethod, paidAmount, pendingLocation, editingOrderId, pickupOrderId, pickupImagesOnly,
+    addItem, removeItem, updateItem, loadOrderForEditing, clearOrder,
+    driverLocalImages, addDriverLocalImage, removeDriverLocalImage, clearDriverLocalImages,
+    totalAmount, itemCount, totalArea, totalCarpets, remainingAmount,
+  ]);
 
   return <OrderCreationContext.Provider value={value}>{children}</OrderCreationContext.Provider>;
 };

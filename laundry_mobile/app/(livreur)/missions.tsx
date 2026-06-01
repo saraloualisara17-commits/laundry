@@ -347,6 +347,28 @@ export default function LivreurMissionsScreen() {
     ? (deliverySubTab === 'today' ? t('livreur.no_delivery_sub') : t('livreur.no_overdue_sub'))
     : t('livreur.no_pickup_sub');
 
+  const renderDeliveryItem = useCallback(({ item }: { item: any }) => (
+    <DeliveryCard
+      order={item}
+      onDeliver={(o: any) => {
+        setSelOrder(o);
+        setCollectedAmount(String(o.montantRestant || 0));
+        setDeliveryNotes('');
+        setDeliveryPhotoUris([]);
+        setShowPaymentModal(true);
+      }}
+      onReportProblem={(o: any) => { setSelOrder(o); setProbType('DELIVERY'); setShowProb(true); }}
+    />
+  ), []);
+
+  const renderPickupItem = useCallback(({ item }: { item: any }) => (
+    <PickupCard
+      order={item}
+      onCollect={handleCollect}
+      onReportProblem={(o: any) => { setSelOrder(o); setProbType('PICKUP'); setShowProb(true); }}
+    />
+  ), [handleCollect]);
+
   return (
     <View style={{ flex: 1, backgroundColor: Colors.bg }}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: 'white' }}>
@@ -407,19 +429,7 @@ export default function LivreurMissionsScreen() {
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={{ paddingVertical: 16 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-            renderItem={({ item }) => (
-              <DeliveryCard
-                order={item}
-                onDeliver={(o: any) => {
-                  setSelOrder(o);
-                  setCollectedAmount(String(o.montantRestant || 0));
-                  setDeliveryNotes('');
-                  setDeliveryPhotoUris([]);
-                  setShowPaymentModal(true);
-                }}
-                onReportProblem={(o: any) => { setSelOrder(o); setProbType('DELIVERY'); setShowProb(true); }}
-              />
-            )}
+            renderItem={renderDeliveryItem}
             ListEmptyComponent={
               loading
                 ? <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
@@ -443,13 +453,7 @@ export default function LivreurMissionsScreen() {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ paddingVertical: 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-          renderItem={({ item }) => (
-            <PickupCard
-              order={item}
-              onCollect={handleCollect}
-              onReportProblem={(o: any) => { setSelOrder(o); setProbType('PICKUP'); setShowProb(true); }}
-            />
-          )}
+          renderItem={renderPickupItem}
           ListEmptyComponent={
             loading
               ? <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />

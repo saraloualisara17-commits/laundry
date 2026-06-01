@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, TextInput,
@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusColors } from '../../constants/StatusColors';
 import { useInfiniteOrders } from '../../src/hooks/query/useOrders';
+
+const keyById = (item: { id: any }) => String(item.id);
 
 export default function SelfSubmittedOrdersScreen() {
   const { t, i18n } = useTranslation();
@@ -44,8 +46,8 @@ export default function SelfSubmittedOrdersScreen() {
   }, [ordersPages]);
 
   const refreshing = isFetching && !loading && !loadingMore;
-  const onRefresh = () => { refetch(); };
-  const onLoadMore = () => { if (hasNextPage && !loadingMore) fetchNextPage(); };
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
+  const onLoadMore = useCallback(() => { if (hasNextPage && !loadingMore) fetchNextPage(); }, [hasNextPage, loadingMore, fetchNextPage]);
 
   const onSearch = (text: string) => {
     setSearchText(text);
@@ -55,7 +57,7 @@ export default function SelfSubmittedOrdersScreen() {
   const statusColor = (status: string) => (StatusColors as any)[status]?.bg || '#94A3B8';
   const statusLabel = (status: string) => t(`status.${status}`, { defaultValue: status });
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = useCallback(({ item }: { item: any }) => {
     const client = item.client || {};
     const clientName = client.name || item.clientName || '—';
     const phone = client.phones?.[0]?.phoneNumber || item.clientPhone || '';
@@ -122,7 +124,7 @@ export default function SelfSubmittedOrdersScreen() {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [isArabic, t]);
 
   return (
     <View style={styles.container}>
@@ -167,7 +169,7 @@ export default function SelfSubmittedOrdersScreen() {
       ) : (
         <FlatList
           data={orders}
-          keyExtractor={item => item.id.toString()}
+          keyExtractor={keyById}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}

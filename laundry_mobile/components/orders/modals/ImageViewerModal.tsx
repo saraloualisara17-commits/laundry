@@ -8,7 +8,7 @@ interface ImageViewerModalProps {
   onClose: () => void;
 }
 
-export default function ImageViewerModal({ uri, onClose }: ImageViewerModalProps) {
+export default React.memo(function ImageViewerModal({ uri, onClose }: ImageViewerModalProps) {
   return (
     <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -26,7 +26,7 @@ export default function ImageViewerModal({ uri, onClose }: ImageViewerModalProps
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },

@@ -28,7 +28,7 @@ interface OrderActionGridProps {
   onEditResponsible: () => void;
 }
 
-export default function OrderActionGrid({
+export default React.memo(function OrderActionGrid({
   order, t, permissions,
   canAddPayment, canChangeStatus, canAssignDriver,
   statusAction, statusUpdating, sharingAction, clientPhone,
@@ -132,7 +132,7 @@ export default function OrderActionGrid({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 16, gap: 10 },

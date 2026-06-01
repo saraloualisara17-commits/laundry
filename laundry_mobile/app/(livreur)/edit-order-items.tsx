@@ -51,6 +51,8 @@ function calculatePrice(prod: any, form: any): number {
   return Math.max(0, v);
 }
 
+const keyById = (item: { id: any }) => String(item.id);
+
 export default function LivreurEditOrderItemsScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
@@ -208,7 +210,7 @@ export default function LivreurEditOrderItemsScreen() {
       ) : (
         <FlatList
           data={products}
-          keyExtractor={item => String(item.id)}
+          keyExtractor={keyById}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 100 }}
           ListHeaderComponent={
             cart.length > 0 ? (

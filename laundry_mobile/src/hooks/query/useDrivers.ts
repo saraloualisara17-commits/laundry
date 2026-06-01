@@ -5,23 +5,25 @@ import { queryKeys } from '../../services/query/queryKeys';
 import { useAppMutation } from '../../lib/query/mutationFactory';
 import { invalidateAfterDriverAssign } from '../../lib/query/invalidationHelpers';
 
-export const useDriversList = () => {
+export const useDriversList = (enabled = true) => {
   return useQuery({
     queryKey: queryKeys.users.drivers(),
     queryFn: () => adminApi.getUsers().then(res => res.data.filter((u: any) => {
       const r = u.role?.toLowerCase();
       return r === 'livreur' || r === 'admin';
     })),
+    enabled,
   });
 };
 
-export const usePickupDriversList = () => {
+export const usePickupDriversList = (enabled = true) => {
   return useQuery({
     queryKey: queryKeys.users.pickup(),
     queryFn: () => adminApi.getUsers().then(res => res.data.filter((u: any) => {
       const r = u.role?.toLowerCase();
       return r === 'livreur' || r === 'admin';
     })),
+    enabled,
   });
 };
 

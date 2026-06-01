@@ -28,7 +28,7 @@ const VARIANT_COLORS = {
   delivery: { icon: '#059669', bg: '#D1FAE5' },
 };
 
-export default function EditDateModal({
+export default React.memo(function EditDateModal({
   visible, onClose, onSave, numeroCommande, isArabic, t,
   mode, variant, dateValue, setDateValue, saving,
 }: EditDateModalProps) {
@@ -96,7 +96,7 @@ export default function EditDateModal({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

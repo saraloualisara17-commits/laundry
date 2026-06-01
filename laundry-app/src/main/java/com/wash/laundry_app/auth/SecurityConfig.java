@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 
                         // Users Domain (/api/users)
+                        .requestMatchers(HttpMethod.POST, "/api/users/*/push-token").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/users/**").hasRole("ADMIN")

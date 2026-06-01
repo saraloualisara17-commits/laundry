@@ -29,7 +29,7 @@ interface AssignDriverModalProps {
   confirming: boolean;
 }
 
-export default function AssignDriverModal({
+export default React.memo(function AssignDriverModal({
   visible, onClose, onConfirm, numeroCommande, isArabic, t,
   drivers, driversLoading, driversError,
   selectedDriverId, setSelectedDriverId,
@@ -143,7 +143,7 @@ export default function AssignDriverModal({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

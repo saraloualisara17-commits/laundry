@@ -2,7 +2,7 @@
 import { randomUUID } from '../../src/utils/uuid';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, Linking, Platform,
+  RefreshControl, ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import ReceiptActionsModal from '../../components/orders/modals/ReceiptActionsMo
 import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } from '../../src/hooks/queries/useLivreur';
 import { uploadManager } from '../../src/services/uploads';
+import { openMapsNavigation } from '../../src/utils/mapsNavigation';
 
 // --- Constants ---
 const C = {
@@ -29,21 +30,6 @@ const C = {
   danger: '#EF4444',
   primary: '#0D7377',
 };
-
-// --- Helpers ---
-function openMapsNavigation(lat?: any, lng?: any, address?: string) {
-  const url = Platform.select({
-    ios: lat && lng
-      ? `maps://?daddr=${lat},${lng}`
-      : `maps://?daddr=${encodeURIComponent(address || '')}`,
-    android: lat && lng
-      ? `geo:${lat},${lng}?q=${lat},${lng}`
-      : `geo:0,0?q=${encodeURIComponent(address || '')}`,
-  });
-  Linking.openURL(url || '').catch(() =>
-    Linking.openURL(`https://maps.google.com/?daddr=${lat},${lng}`)
-  );
-}
 
 export default function AdminMissionsScreen() {
   const { t, i18n } = useTranslation();

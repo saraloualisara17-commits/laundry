@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { randomUUID } from '../../src/utils/uuid';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, Linking, Platform, Modal,
+  RefreshControl, ActivityIndicator, Alert, Linking, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,23 +20,9 @@ import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } fr
 import { ordersApi } from '../../src/services/api';
 import { uploadManager } from '../../src/services/uploads';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { openMapsNavigation } from '../../src/utils/mapsNavigation';
 
 const C = Colors; // alias — all values sourced from AdminColors design tokens
-
-// --- Helpers ---
-function openMapsNavigation(lat?: any, lng?: any, address?: string) {
-  const url = Platform.select({
-    ios: lat && lng
-      ? `maps://?daddr=${lat},${lng}`
-      : `maps://?daddr=${encodeURIComponent(address || '')}`,
-    android: lat && lng
-      ? `geo:${lat},${lng}?q=${lat},${lng}`
-      : `geo:0,0?q=${encodeURIComponent(address || '')}`,
-  });
-  Linking.openURL(url || '').catch(() =>
-    Linking.openURL(`https://maps.google.com/?daddr=${lat},${lng}`)
-  );
-}
 
 // ─── FailedAttemptModal ───────────────────────────────────────────────────────
 function FailedAttemptModal({ visible, order, attemptType, onClose, onSuccess }: any) {

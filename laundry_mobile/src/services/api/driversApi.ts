@@ -8,12 +8,6 @@ export const driversApi = {
     client.get('/api/admin/active-users'),
 
   /**
-   * Get dashboard statistics for the current livreur
-   */
-  getLivreurDashboardStats: () =>
-    client.get('/api/livreur/dashboard/stats'),
-
-  /**
    * Get available payment types for livreurs
    */
   getPaymentTypes: () =>

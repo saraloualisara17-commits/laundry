@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Colors, Shadows } from '../../../constants/theme';
-import Timeline from '../timeline/Timeline';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
 import { row, textAlign } from '../../../src/utils/rtl';
 
@@ -15,7 +14,6 @@ interface SuiviTabProps {
   paidAmount: number;
   remaining: number;
   payments: any[];
-  history: any[];
   canAddPayment: boolean;
   setShowPaymentModal: (val: boolean) => void;
 }
@@ -28,7 +26,6 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
   paidAmount,
   remaining,
   payments,
-  history,
   canAddPayment,
   setShowPaymentModal,
 }) => {
@@ -114,10 +111,6 @@ const SuiviTab: React.FC<SuiviTabProps> = ({
         )}
       </View>
 
-      <View style={[styles.sectionHeader, row(isArabic)]}>
-        <Text style={[styles.sectionTitle, f.sectionLabel]}>{t('admin.orders.history')}</Text>
-      </View>
-      <Timeline items={history} isArabic={isArabic} t={t} />
     </View>
   );
 };

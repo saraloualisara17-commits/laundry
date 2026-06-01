@@ -51,7 +51,7 @@ export const adminApi = {
   createClient: (data: any) => clientsApi.createClient(data),
   updateClient: (id: number | string, data: any) => clientsApi.updateClient(id, data),
   getClientCommandes: (id: number | string) => clientsApi.getClientCommandes(id),
-  getClientDebtDetail: (clientId: number | string) => clientsApi.getClientDebtDetail(clientId),
+  getClientDebtDetail: (clientId: number | string) => paymentsApi.getClientDebtDetail(clientId),
 
   // Catalog
   getCategories: () => catalogApi.getCategories(),

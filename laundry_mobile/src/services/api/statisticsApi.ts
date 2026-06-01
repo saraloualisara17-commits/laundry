@@ -20,6 +20,12 @@ export const statisticsApi = {
     client.get('/api/livreur/dashboard/stats'),
 
   /**
+   * Get statistics for a specific date range
+   */
+  getStatsByDateRange: (startDate: string, endDate: string) =>
+    client.get('/api/statistics/date-range', { params: { startDate, endDate } }),
+
+  /**
    * Get count of overdue pickups and deliveries (admin use)
    */
   getOverdueStats: () =>

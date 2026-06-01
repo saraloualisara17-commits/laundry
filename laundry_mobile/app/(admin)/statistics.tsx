@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Modal } from 'react-native';
-import statisticsApi from '../../src/services/statistics/statisticsApi';
+import { statisticsApi } from '../../src/services/api/statisticsApi';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useTranslation } from 'react-i18next';
 import { logger } from '../../src/lib/logger';

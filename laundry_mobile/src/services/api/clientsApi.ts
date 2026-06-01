@@ -31,22 +31,10 @@ export const clientsApi = {
     client.put(`/api/clients/${id}`, data),
 
   /**
-   * Search clients by name or phone
-   */
-  searchClients: (query: string) =>
-    client.get('/api/clients/search', { params: { query } }),
-
-  /**
    * Get all orders for a specific client
    */
   getClientCommandes: (id: number | string) =>
     client.get<any[]>(`/api/clients/${id}/commandes`),
-
-  /**
-   * Get unpaid debts for a specific client
-   */
-  getClientDebtDetail: (clientId: number | string) =>
-    client.get(`/api/admin/unpaid/clients/${clientId}`),
 };
 
 export default clientsApi;

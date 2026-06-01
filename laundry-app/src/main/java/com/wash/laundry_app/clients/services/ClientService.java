@@ -77,12 +77,10 @@ public class ClientService {
     public List<ClientDto> getClientsFiltered(String search) {
         List<Client> list = clientRepository.findAll();
         if (search != null && !search.trim().isEmpty()) {
-            String lowerSearch = search.toLowerCase();
+            String lowerSearch = search.toLowerCase().trim();
             list = list.stream()
                     .filter(c -> (c.getName() != null && c.getName().toLowerCase().contains(lowerSearch)) ||
-                            (c.getEmail() != null && c.getEmail().toLowerCase().contains(lowerSearch)) ||
-                            (c.getPhones() != null && c.getPhones().stream().anyMatch(
-                                    p -> p.getPhoneNumber() != null && p.getPhoneNumber().contains(lowerSearch))))
+                            (c.getId() != null && c.getId().toString().contains(lowerSearch)))
                     .toList();
         }
         Map<Long, Object[]> statsMap = buildClientStatsMap(list);

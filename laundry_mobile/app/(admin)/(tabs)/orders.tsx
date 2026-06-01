@@ -55,10 +55,11 @@ export default function OrdersScreen() {
 
   const filters = useMemo(() => ({
     status: activeTab === 'Toutes' ? undefined : activeTab,
-    search: search.length > 2 ? search : undefined,
+    search: search.length >= 1 ? search : undefined,
     dateDebut: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
     dateFin: selectedDate ? selectedDate.toISOString().split('T')[0] : undefined,
-  }), [activeTab, search, selectedDate]);
+    livreurId: selectedDriver ? selectedDriver.id : undefined,
+  }), [activeTab, search, selectedDate, selectedDriver]);
 
   const {
     data: ordersPages,
@@ -108,12 +109,7 @@ export default function OrdersScreen() {
     );
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!selectedDriver) return orders;
-    return orders.filter(o =>
-      o.livreur?.id === selectedDriver.id || o.deliveryDriver?.id === selectedDriver.id
-    );
-  }, [orders, selectedDriver]);
+  const filteredOrders = orders;
 
 
   const renderStatsBanner = () => {
@@ -158,7 +154,7 @@ export default function OrdersScreen() {
         {/* Top row: status badge + order ref, direction respects RTL */}
         <View style={[styles.cardTop, row(isArabic)]}>
           <StatusBadge status={item.status} />
-          <Text style={[styles.orderRef, arabicSafe(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.numeroCommande}</Text>
+          <Text style={[styles.orderRef, arabicSafe(isArabic), { color: statusCfg.dot, fontSize: 17 }]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.id}</Text>
         </View>
 
         {/* Client name */}
@@ -575,9 +571,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   orderRef: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: AdminColors.textMuted,
+    fontSize: 17,
+    fontWeight: '800',
   },
   clientName: {
     fontSize: 17,

@@ -19,7 +19,6 @@ import { useStatusOverview, useUnpaidOverview } from '../../src/hooks/query/useD
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
 import { useOrders } from '../../src/hooks/query/useOrders';
 import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
-import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
 
 function changeLanguage(lang: string) {
   i18n.changeLanguage(lang);
@@ -56,16 +55,9 @@ export default function LivreurDashboard() {
   const { data: settingsData } = useSettings();
   const settings = settingsData ?? { appName: 'ASTRA PROPRE', logoUrl: null };
 
-  const readyAnim = useRef(new Animated.Value(0.4)).current;
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(readyAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(readyAnim, { toValue: 0.4, duration: 900, useNativeDriver: true }),
-      ])
-    ).start();
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
@@ -87,8 +79,7 @@ export default function LivreurDashboard() {
     return (Array.isArray(raw) ? raw : []).filter((o: any) => o.status !== 'DELIVERED').slice(0, 5);
   }, [recentOrdersData]);
 
-  const visibleDeliveries = readyDeliveries.filter((o: any) => isVisibleToday(o.scheduledDeliveryDate));
-  const deliveryCount = visibleDeliveries.length;
+  const deliveryCount = readyDeliveries.length;
   const pickupCount = readyOrders.length;
 
   const refreshing = (fetchingOverview || fetchingOrders) && !loading;
@@ -115,8 +106,6 @@ export default function LivreurDashboard() {
       </View>
     );
   }
-
-  const readyCount = overview?.READY_FOR_DELIVERY?.count ?? 0;
 
   return (
     <View style={styles.container}>
@@ -150,7 +139,7 @@ export default function LivreurDashboard() {
         <View style={styles.missionChipsRow}>
           <TouchableOpacity
             style={styles.missionChip}
-            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'delivery' } })}
+            onPress={() => router.push({ pathname: '/(livreur)/map-view', params: { filter: 'delivery' } })}
             activeOpacity={0.8}
           >
             <Animated.View style={[styles.chipDot, { backgroundColor: C.success, opacity: pulseAnim }]} />
@@ -159,7 +148,7 @@ export default function LivreurDashboard() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.missionChip}
-            onPress={() => router.push({ pathname: '/(livreur)/missions', params: { tab: 'pickup' } })}
+            onPress={() => router.push({ pathname: '/(livreur)/map-view', params: { filter: 'pickup' } })}
             activeOpacity={0.8}
           >
             <Animated.View style={[styles.chipDot, { backgroundColor: C.warning, opacity: pulseAnim }]} />
@@ -176,16 +165,6 @@ export default function LivreurDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />
         }
       >
-        {/* Ready notification banner */}
-        {readyCount > 0 && (
-          <View style={[styles.readyBanner, row(isArabic)]}>
-            <Animated.View style={[styles.readyDot, { opacity: readyAnim }]} />
-            <Text style={styles.readyText}>
-              {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready')}
-            </Text>
-          </View>
-        )}
-
         {/* Create Order */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -221,30 +200,8 @@ export default function LivreurDashboard() {
           )}
         </View>
 
-        {/* Status Cards */}
+        {/* Mission Quick Actions — tasks of the day first */}
         <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-          {t('dashboard.overview')}
-        </Text>
-        <View style={[styles.statusRow, row(isArabic)]}>
-          {STATUS_CARDS.map(({ key, color, bg }) => (
-            <TouchableOpacity
-              key={key}
-              style={[styles.statusCard, { borderTopColor: color, backgroundColor: bg }]}
-              onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { status: key } })}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.statusCount, { color }]}>
-                {overview?.[key]?.count ?? 0}
-              </Text>
-              <Text style={styles.statusLabel} numberOfLines={2}>
-                {t(`status.${key}`)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Mission Quick Actions */}
-        <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
           {t('livreur.missions_today')}
         </Text>
         <View style={[styles.missionActions, row(isArabic)]}>
@@ -280,6 +237,45 @@ export default function LivreurDashboard() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Status Cards */}
+        <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
+          {t('dashboard.overview')}
+        </Text>
+        <View style={[styles.statusRow, row(isArabic)]}>
+          {STATUS_CARDS.map(({ key, color, bg }) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.statusCard, { borderTopColor: color, backgroundColor: bg }]}
+              onPress={() => router.push({ pathname: '/(admin)/orders-by-status', params: { status: key } })}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.statusCount, { color }]}>
+                {overview?.[key]?.count ?? 0}
+              </Text>
+              <Text style={styles.statusLabel} numberOfLines={2}>
+                {t(`status.${key}`)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Gallery Quick Action */}
+        <TouchableOpacity
+          style={styles.galleryCard}
+          onPress={() => router.push('/(livreur)/gallery' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.galleryRow, row(isArabic)]}>
+            <View style={styles.galleryIcon}>
+              <Text style={{ fontSize: 22 }}>📷</Text>
+            </View>
+            <Text style={[styles.galleryTitle, isArabic && { textAlign: 'right' }]}>
+              {t('admin.gallery.title', { defaultValue: 'Galerie Photos' })}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={AdminColors.textMuted} />
+          </View>
+        </TouchableOpacity>
 
         {/* Unpaid Card */}
         {unpaid && (
@@ -330,8 +326,8 @@ export default function LivreurDashboard() {
               activeOpacity={0.7}
             >
               <View style={{ flex: 1 }}>
-                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>
-                  #{order.numeroCommande}
+                <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: (require('../../constants/StatusColors').StatusColors[order.status] || { dot: '#94A3B8' }).dot, fontSize: 17, fontWeight: '800' }]}>
+                  #{order.id}
                 </Text>
                 <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>
                   {order.client?.name || order.clientNom}
@@ -366,14 +362,6 @@ const styles = StyleSheet.create({
   chipNumber: { fontSize: 20, fontWeight: '800', color: 'white' },
   chipLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', fontWeight: '600', flex: 1 },
   scroll: { flex: 1, marginTop: -20 },
-  readyBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(16,185,129,0.1)', borderLeftWidth: 3,
-    borderLeftColor: AdminColors.success, marginHorizontal: 16, marginTop: 14,
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, gap: 10,
-  },
-  readyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: AdminColors.success },
-  readyText: { fontSize: 13, color: AdminColors.success, fontWeight: '600', flex: 1 },
   section: { marginHorizontal: 16, marginTop: 16 },
   createBtn: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
@@ -416,6 +404,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
   quickBadgeText: { fontSize: 10, fontWeight: '800', color: 'white' },
+  galleryCard: {
+    backgroundColor: 'white', borderRadius: 14, marginHorizontal: 16, marginTop: 12, padding: 16,
+    ...AdminShadows.shadowSmall,
+  },
+  galleryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  galleryIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF3E0', alignItems: 'center', justifyContent: 'center' },
+  galleryTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: AdminColors.textPrimary },
   unpaidCard: {
     backgroundColor: 'white', borderRadius: 14, marginHorizontal: 16, marginTop: 12, padding: 16,
     ...AdminShadows.shadowSmall,

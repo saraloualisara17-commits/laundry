@@ -118,11 +118,13 @@ export default function LivreurUnpaidScreen() {
     );
   };
 
-  const renderOrder = ({ item }: { item: any }) => (
+  const renderOrder = ({ item }: { item: any }) => {
+    const statusDot = (require('../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' }).dot;
+    return (
     <TouchableOpacity style={styles.orderCard} onPress={() => router.push(`/order/${item.orderId}`)}>
       <View style={[styles.orderHeader, row(isArabic)]}>
         <View>
-          <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference}</Text>
+          <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: statusDot, fontSize: 17, fontWeight: '800' }]}>#{item.orderId}</Text>
           <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.clientName}</Text>
         </View>
         <StatusBadge status={item.status} />
@@ -143,6 +145,7 @@ export default function LivreurUnpaidScreen() {
       </View>
     </TouchableOpacity>
   );
+  };
 
   return (
     <View style={styles.container}>

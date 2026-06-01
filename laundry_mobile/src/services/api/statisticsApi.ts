@@ -18,6 +18,19 @@ export const statisticsApi = {
    */
   getLivreurDashboardStats: () =>
     client.get('/api/livreur/dashboard/stats'),
+
+  /**
+   * Get count of overdue pickups and deliveries (admin use)
+   */
+  getOverdueStats: () =>
+    client.get<{ overduePickups: number; overdueDeliveries: number }>('/api/admin/stats/overdue'),
+
+  /**
+   * Get full list of overdue orders (admin use)
+   * @param type 'pickup' | 'delivery'
+   */
+  getOverdueOrders: (type: 'pickup' | 'delivery') =>
+    client.get<any[]>(`/api/admin/stats/overdue-orders?type=${type}`),
 };
 
 export default statisticsApi;

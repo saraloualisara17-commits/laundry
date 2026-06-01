@@ -76,6 +76,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       onClose={onClose}
       title={t('admin.unpaid.add_payment')}
       footer={footer}
+      centered
     >
       <View style={styles.body}>
         {/* Remaining amount info pill */}

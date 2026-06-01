@@ -23,6 +23,9 @@ public class UpdateCommandeRequest {
     private CommandeStatus status;
     private java.util.List<CreateCommandeRequest.TapisItem> tapis;
     private java.util.List<String> imageUrls;
+    private String deliveryAddress;
+    private java.math.BigDecimal deliveryLatitude;
+    private java.math.BigDecimal deliveryLongitude;
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
@@ -44,4 +47,10 @@ public class UpdateCommandeRequest {
     public void setTapis(java.util.List<CreateCommandeRequest.TapisItem> tapis) { this.tapis = tapis; }
     public java.util.List<String> getImageUrls() { return imageUrls; }
     public void setImageUrls(java.util.List<String> imageUrls) { this.imageUrls = imageUrls; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+    public java.math.BigDecimal getDeliveryLatitude() { return deliveryLatitude; }
+    public void setDeliveryLatitude(java.math.BigDecimal deliveryLatitude) { this.deliveryLatitude = deliveryLatitude; }
+    public java.math.BigDecimal getDeliveryLongitude() { return deliveryLongitude; }
+    public void setDeliveryLongitude(java.math.BigDecimal deliveryLongitude) { this.deliveryLongitude = deliveryLongitude; }
 }

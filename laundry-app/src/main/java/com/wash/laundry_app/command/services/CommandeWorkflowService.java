@@ -64,7 +64,7 @@ public class CommandeWorkflowService {
                             .commande(commande)
                             .montant(montantCollecte)
                             .datePaiement(LocalDateTime.now())
-                            .note(request.getNotesPaiement() != null ? request.getNotesPaiement() : "Paiement à la livraison")
+                            .note(request.getNotesPaiement() != null ? request.getNotesPaiement() : null)
                             .recordedBy(currentUser)
                             .idempotencyKey(request.getPaymentIdempotencyKey())
                             .build();
@@ -106,7 +106,7 @@ public class CommandeWorkflowService {
             User newDriver = userRepository.findById(request.getDeliveryDriverId()).orElse(null);
             commande.setDeliveryDriver(newDriver);
             auditService.log("ORDER_DRIVER_ASSIGNED", "COMMANDE", commande.getId(),
-                             oldDriver, newDriver != null ? newDriver.getName() : "None", "Delivery Driver Updated");
+                             oldDriver, newDriver != null ? newDriver.getName() : "None", null);
 
             // Notification sent AFTER_COMMIT so the driver only receives it if the
             // assignment actually persisted. orderId not yet set on commande here,
@@ -120,14 +120,17 @@ public class CommandeWorkflowService {
         if (request.getScheduledPickupDate() != null) commande.setScheduledPickupDate(request.getScheduledPickupDate());
         if (request.getScheduledDeliveryDate() != null) commande.setScheduledDeliveryDate(request.getScheduledDeliveryDate());
         if (request.getNotes() != null) commande.setNotes(request.getNotes());
+        if (request.getDeliveryAddress() != null) commande.setDeliveryAddress(request.getDeliveryAddress());
+        if (request.getDeliveryLatitude() != null) commande.setDeliveryLatitude(request.getDeliveryLatitude());
+        if (request.getDeliveryLongitude() != null) commande.setDeliveryLongitude(request.getDeliveryLongitude());
 
         if (request.getStatus() != null) {
             String oldStatus = commande.getStatus().name();
             workflowValidator.validate(commande, request.getStatus(), currentUser);
             commande.setStatus(request.getStatus());
-            helperService.recordAudit(commande, oldStatus, request.getStatus().name(), currentUser, "Mise à jour via admin");
-            auditService.log("ORDER_STATUS_CHANGED", "COMMANDE", commande.getId(), 
-                             oldStatus, request.getStatus().name(), "Mise à jour via admin");
+            helperService.recordAudit(commande, oldStatus, request.getStatus().name(), currentUser, null);
+            auditService.log("ORDER_STATUS_CHANGED", "COMMANDE", commande.getId(),
+                             oldStatus, request.getStatus().name(), null);
         }
 
         if (request.getTapis() != null) {
@@ -179,9 +182,9 @@ public class CommandeWorkflowService {
         commande.setStatus(CommandeStatus.PICKED_UP);
         
         commande = commandeRepository.save(commande);
-        helperService.recordAudit(commande, oldStatus, CommandeStatus.PICKED_UP.name(), currentUser, "Retournée à l'atelier");
+        helperService.recordAudit(commande, oldStatus, CommandeStatus.PICKED_UP.name(), currentUser, null);
         auditService.log("ORDER_STATUS_CHANGED", "COMMANDE", commande.getId(),
-                         oldStatus, CommandeStatus.PICKED_UP.name(), "Retournée à l'atelier");
+                         oldStatus, CommandeStatus.PICKED_UP.name(), null);
         eventPublisher.publishEvent(OrderSideEffectEvent.statusChanged(commande.getId(), commande.getStatus()));
         return commandeMapper.toDto(commande);
     }
@@ -217,7 +220,7 @@ public class CommandeWorkflowService {
 
         commande = commandeRepository.save(commande);
         auditService.log("ORDER_ITEMS_UPDATED_BY_DRIVER", "COMMANDE", commande.getId(),
-                         null, "Items updated by pickup driver", null);
+                         null, null, null);
         eventPublisher.publishEvent(OrderSideEffectEvent.updated(commande.getId()));
         return commandeMapper.toDto(commande);
     }
@@ -260,9 +263,9 @@ public class CommandeWorkflowService {
         commande.setStatus(CommandeStatus.PICKED_UP);
 
         commande = commandeRepository.save(commande);
-        helperService.recordAudit(commande, oldStatus, CommandeStatus.PICKED_UP.name(), currentUser, "Pickup confirmé");
+        helperService.recordAudit(commande, oldStatus, CommandeStatus.PICKED_UP.name(), currentUser, null);
         auditService.log("ORDER_PICKUP_CONFIRMED", "COMMANDE", commande.getId(),
-                         oldStatus, CommandeStatus.PICKED_UP.name(), "Pickup confirmé");
+                         oldStatus, CommandeStatus.PICKED_UP.name(), null);
         eventPublisher.publishEvent(OrderSideEffectEvent.statusChanged(commande.getId(), commande.getStatus()));
         return commandeMapper.toDto(commande);
     }

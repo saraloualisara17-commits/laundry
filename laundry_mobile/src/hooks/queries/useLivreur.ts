@@ -2,8 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { ordersApi } from '../../services/api/ordersApi';
 import { statisticsApi } from '../../services/api/statisticsApi';
-import { queryKeys } from '../../services/query/queryKeys';
 import { RootState } from '../../store/store';
+import { queryKeys } from '../../services/query/queryKeys';
 import { useAppMutation } from '../../lib/query/mutationFactory';
 import { invalidateAfterLivreurAction } from '../../lib/query/invalidationHelpers';
 
@@ -48,6 +48,27 @@ export const usePendingPickups = () => {
       ordersApi.getPendingPickups().then(res => res.data.data ?? res.data ?? []),
     staleTime: MISSION_STALE_TIME,
     enabled: isLivreurOrAdmin,
+  });
+};
+
+export const useOverdueStats = () => {
+  const role = useSelector((state: RootState) => state.auth.user?.role);
+  return useQuery({
+    queryKey: queryKeys.livreur.overdueStats(),
+    queryFn: () =>
+      statisticsApi.getOverdueStats().then(res => res.data),
+    enabled: role === 'ADMIN',
+    staleTime: 1000 * 60,
+  });
+};
+
+export const useOverdueOrders = (type: 'pickup' | 'delivery') => {
+  const role = useSelector((state: RootState) => state.auth.user?.role);
+  return useQuery({
+    queryKey: [...queryKeys.livreur.all, 'overdue-orders', type],
+    queryFn: () => statisticsApi.getOverdueOrders(type).then(res => res.data),
+    enabled: role === 'ADMIN',
+    staleTime: 1000 * 60,
   });
 };
 

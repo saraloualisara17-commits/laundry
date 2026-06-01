@@ -8,16 +8,13 @@ import {
   ScrollView,
   Modal,
   TextInput,
-  Switch,
   ActivityIndicator,
   Alert,
   Dimensions,
   Platform,
-  Image,
-  Share,
-  Linking,
   KeyboardAvoidingView,
 } from 'react-native';
+import { Image } from 'react-native';
 import { row, textAlign } from '../../src/utils/rtl';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -27,12 +24,9 @@ import { adminApi } from '../../src/services/adminApi';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { SkeletonCard } from '../../components/admin/SkeletonCard';
 import * as ImagePicker from 'expo-image-picker';
-import { compressImage, compressImages } from '../../src/services/uploads/imageCompression';
-import * as WebBrowser from 'expo-web-browser';
-import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { compressImage } from '../../src/services/uploads/imageCompression';
 import * as Haptics from 'expo-haptics';
+import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { useTranslation } from 'react-i18next';
 import { BASE_URL } from '../../src/services/api/client';
 import { logger } from '../../src/lib/logger';
@@ -74,6 +68,45 @@ export default function OrderItemsScreen() {
   } = useOrderCreation();
   
   const qc = useQueryClient();
+
+  // Get the cached order object when editing — used for frontend receipt generation
+  const editingOrder = editingOrderId
+    ? qc.getQueryData<any>(queryKeys.orders.details(String(editingOrderId)))
+    : null;
+
+  const { sharingAction, handleShareWhatsApp, handlePrint } = useReceiptActions(
+    editingOrderId ?? undefined,
+    editingOrder?.status,
+    editingOrder?.numeroCommande,
+    t,
+    editingOrder?.client?.phones?.[0]?.phoneNumber || editingOrder?.client?.phone || null,
+    editingOrder ?? null,
+  );
+
+  const handleShare = () => {
+    if (!editingOrderId || !editingOrder) {
+      Alert.alert(t('common.info'), t('admin.orders.create.items.save_first_to_print'));
+      return;
+    }
+    Alert.alert(t('receipt.choose_language', { defaultValue: 'Langue du reçu' }), '', [
+      { text: '🇫🇷 Français', onPress: () => handleShareWhatsApp('fr') },
+      { text: '🇲🇦 العربية', onPress: () => handleShareWhatsApp('ar') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const handlePrintReceipt = () => {
+    if (!editingOrderId || !editingOrder) {
+      Alert.alert(t('common.info'), t('admin.orders.create.items.save_first_to_print'));
+      return;
+    }
+    Alert.alert(t('receipt.choose_language', { defaultValue: 'Langue du reçu' }), '', [
+      { text: '🇫🇷 Français', onPress: () => handlePrint('fr') },
+      { text: '🇲🇦 العربية', onPress: () => handlePrint('ar') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingPickup, setConfirmingPickup] = useState(false);
@@ -112,10 +145,8 @@ export default function OrderItemsScreen() {
   const [tempPaid, setTempPaid] = useState('');
 
   const [configForm, setConfigForm] = useState({
-    qty: 1, largura: '', hauteur: '', longueur: '', poids: '', 
-    customPrice: '', noteAtelier: '', couleur: '', 
-    hasRemise: false, remiseMontant: '', remiseRaison: '',
-    images: [] as string[]
+    qty: 1, largura: '', hauteur: '', longueur: '', poids: '',
+    customPrice: '', noteAtelier: '',
   });
 
   const loadCatalog = async () => {
@@ -207,13 +238,9 @@ export default function OrderItemsScreen() {
       poids: parseFloat(configForm.poids) || undefined,
       prixUnitaire: product.prixUnitaire,
       prixFinal: finalPrice,
-      remiseMontant: configForm.hasRemise ? (parseFloat(configForm.remiseMontant) || 0) : undefined,
-      remiseRaison: configForm.hasRemise ? configForm.remiseRaison : undefined,
-      couleur: configForm.couleur,
       notes: configForm.noteAtelier,
       pricingMethod: product.pricingMethod,
       uniteLabel: product.uniteLabel,
-      imageUrls: configForm.images.length > 0 ? configForm.images : undefined,
     };
 
     if (editCartId) {
@@ -249,34 +276,6 @@ export default function OrderItemsScreen() {
     }
   };
 
-  // Item-level photo picker: compress picked images immediately so the
-  // in-memory URI is already the final compressed version. Compression
-  // happens here once — not again at submit time.
-  const pickItemImage = async (source: 'camera' | 'gallery') => {
-    try {
-      const result = await launchPicker(source, source === 'gallery');
-      if (!result || result.canceled || result.assets.length === 0) return;
-
-      const rawUris = result.assets.map(a => a.uri);
-      // Compress all picked images in parallel
-      const compressed = await compressImages(rawUris, 'standard');
-
-      setConfigForm(prev => ({
-        ...prev,
-        images: [...prev.images, ...compressed].slice(0, 5),
-      }));
-    } catch (e) {
-      log.error('Item image picker error', { err: String(e) });
-    }
-  };
-
-  const removeItemImage = (uri: string) => {
-    setConfigForm(prev => ({
-      ...prev,
-      images: prev.images.filter(i => i !== uri),
-    }));
-  };
-
   // Order-level photo picker: camera only (these are reception/handoff shots).
   // Also compresses immediately on pick.
   const pickImage = async (source: 'camera' | 'gallery' = 'camera') => {
@@ -296,87 +295,47 @@ export default function OrderItemsScreen() {
     setOrderImages(orderImages.filter(i => i !== uri));
   };
 
-  const handleShare = async () => {
-    if (!editingOrderId) {
-      try {
-        await Share.share({
-          message: `${t('admin.orders.create.items.summary_for')} ${client?.name}\nTotal: ${totalAmount.toFixed(2)} ${t('common.dh')}\n${t('dashboard.orders_count')}: ${itemCount}`,
-        });
-      } catch (error) {
-        log.error('Failed to share order summary', { err: String(error) });
-      }
-      return;
-    }
-
-    try {
-      const pdfUrl = adminApi.getOrderPdfUrl(editingOrderId);
-      const fileName = `recu_commande_${editingOrderId}.pdf`;
-      const localUri = `${FileSystem.cacheDirectory}${fileName}`;
-
-      const { store } = require('../../src/store/store');
-      const token = store.getState().auth.token;
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-
-      if (download.status !== 200) {
-        throw new Error('Download failed');
-      }
-
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert(t('common.error'), t('admin.orders.create.confirmation.sharing_not_available'));
-        return;
-      }
-
-      await Sharing.shareAsync(download.uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: t('admin.orders.create.confirmation.send_receipt'),
-        UTI: 'com.adobe.pdf',
-      });
-    } catch (e) {
-      Alert.alert(t('common.error'), t('admin.orders.create.confirmation.share_pdf_error'));
-    }
-  };
-
-  const handlePrint = async () => {
-    if (!editingOrderId) {
-      return Alert.alert(t('common.info'), t('admin.orders.create.items.save_first_to_print'));
-    }
-    const pdfUrl = adminApi.getOrderPdfUrl(editingOrderId);
-    const localUri = `${FileSystem.cacheDirectory}receipt_${editingOrderId}.pdf`;
-
-    try {
-      const { store } = require('../../src/store/store');
-      const token = store.getState().auth.token;
-      const download = await FileSystem.downloadAsync(pdfUrl, localUri,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-      if (download.status !== 200) throw new Error('Download failed');
-      await Print.printAsync({ uri: download.uri });
-    } catch (e) {
-      WebBrowser.openBrowserAsync(pdfUrl);
-    }
-  };
 
   const renderActionBar = () => (
     <View style={[styles.actionBar, row(isArabic)]}>
-      <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+      <TouchableOpacity
+        style={[styles.actionBtn, (!editingOrderId || !editingOrder) && { opacity: 0.4 }]}
+        onPress={handleShare}
+        disabled={!!sharingAction}
+      >
         <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
-          <Ionicons name="share-social" size={20} color="#1976D2" />
+          {sharingAction === 'whatsapp'
+            ? <ActivityIndicator size="small" color="#1976D2" />
+            : <Ionicons name="share-social" size={20} color="#1976D2" />}
         </View>
         <Text style={styles.actionText}>{t('admin.orders.create.items.share')}</Text>
       </TouchableOpacity>
-      
-      <TouchableOpacity style={styles.actionBtn} onPress={handlePrint}>
+
+      <TouchableOpacity
+        style={[styles.actionBtn, (!editingOrderId || !editingOrder) && { opacity: 0.4 }]}
+        onPress={handlePrintReceipt}
+        disabled={!!sharingAction}
+      >
         <View style={[styles.actionIcon, { backgroundColor: '#F3E5F5' }]}>
-          <Ionicons name="print" size={20} color="#7B1FA2" />
+          {sharingAction === 'print'
+            ? <ActivityIndicator size="small" color="#7B1FA2" />
+            : <Ionicons name="print" size={20} color="#7B1FA2" />}
         </View>
         <Text style={styles.actionText}>{t('admin.orders.create.items.print')}</Text>
       </TouchableOpacity>
       
-      <TouchableOpacity style={styles.actionBtn} onPress={pickImage}>
+      <TouchableOpacity style={styles.actionBtn} onPress={() => pickImage('gallery')}>
         <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
-          <Ionicons name="camera" size={20} color="#388E3C" />
+          <Ionicons name="images-outline" size={20} color="#388E3C" />
         </View>
-        <Text style={styles.actionText}>{t('admin.orders.create.items.photos')}</Text>
+        <Text style={styles.actionText}>{t('common.gallery', { defaultValue: 'Galerie' })}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.actionBtn} onPress={() => pickImage('camera')}>
+        <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
+          <Ionicons name="camera-outline" size={20} color="#E65100" />
+        </View>
+        <Text style={styles.actionText}>{t('common.camera', { defaultValue: 'Caméra' })}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -482,10 +441,8 @@ export default function OrderItemsScreen() {
 
   const openAdd = (product: any) => {
     setConfigForm({
-      qty: 1, largura: '', hauteur: '', longueur: '', poids: '', 
-      customPrice: '', noteAtelier: '', couleur: '', 
-      hasRemise: false, remiseMontant: '', remiseRaison: '',
-      images: []
+      qty: 1, largura: '', hauteur: '', longueur: '', poids: '',
+      customPrice: '', noteAtelier: '',
     });
     setConfigModal({ open: true, product, editCartId: null });
   };
@@ -500,11 +457,6 @@ export default function OrderItemsScreen() {
       poids: item.poids?.toString() || '',
       customPrice: item.pricingMethod === 'CUSTOM' ? item.prixFinal.toString() : '',
       noteAtelier: item.notes || '',
-      couleur: item.couleur || '',
-      hasRemise: !!item.remiseMontant,
-      remiseMontant: item.remiseMontant?.toString() || '',
-      remiseRaison: item.remiseRaison || '',
-      images: item.imageUrls || []
     });
     setConfigModal({ open: true, product, editCartId: item.cartId });
   };
@@ -512,9 +464,8 @@ export default function OrderItemsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <SafeAreaView edges={['top']}>
-          <View style={[styles.headerContent, row(isArabic)]}>
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <View style={[styles.headerContent, row(isArabic)]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name={isArabic ? "arrow-forward" : "arrow-back"} size={24} color={AdminColors.textPrimary} />
             </TouchableOpacity>
@@ -525,8 +476,7 @@ export default function OrderItemsScreen() {
             </View>
             <View style={{ width: 40 }} />
           </View>
-        </SafeAreaView>
-      </View>
+      </SafeAreaView>
 
       <FlatList
         data={pickupImagesOnly ? [] : products}
@@ -568,24 +518,31 @@ export default function OrderItemsScreen() {
               </View>
             )}
 
-            {orderImages.length > 0 && (
+            {orderImages.filter(uri => uri.startsWith('file://') || uri.startsWith('content://')).length > 0 && (
               <View style={styles.orderPhotosContainer}>
-                <Text style={[styles.sectionTitle, { marginLeft: 16, marginBottom: 8, marginTop: 16 }, isArabic && { textAlign: 'right', marginRight: 16 }]}>
-                  {t('admin.orders.create.items.photos')} ({orderImages.length})
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                  {orderImages.map((uri, idx) => (
-                    <View key={idx} style={styles.orderPhotoThumbWrap}>
-                      <Image source={{ uri }} style={styles.orderPhotoThumb} />
-                      <TouchableOpacity 
-                        style={styles.photoRemoveBtn} 
-                        onPress={() => removeOrderImage(uri)}
-                      >
-                        <Ionicons name="close" size={12} color="white" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
+                {(() => {
+                  const newImages = orderImages.filter(uri => uri.startsWith('file://') || uri.startsWith('content://'));
+                  return (
+                    <>
+                      <Text style={[styles.sectionTitle, { marginLeft: 16, marginBottom: 8, marginTop: 16 }, isArabic && { textAlign: 'right', marginRight: 16 }]}>
+                        {t('admin.orders.create.items.photos')} ({newImages.length})
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                        {newImages.map((uri, idx) => (
+                          <View key={idx} style={styles.orderPhotoThumbWrap}>
+                            <Image source={{ uri }} style={styles.orderPhotoThumb} />
+                            <TouchableOpacity
+                              style={styles.photoRemoveBtn}
+                              onPress={() => removeOrderImage(uri)}
+                            >
+                              <Ionicons name="close" size={12} color="white" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </>
+                  );
+                })()}
               </View>
             )}
 
@@ -657,15 +614,18 @@ export default function OrderItemsScreen() {
       {/* Config Modal */}
       <Modal
         visible={configModal.open}
-        animationType="slide"
+        animationType="fade"
         transparent
         statusBarTranslucent
+        onRequestClose={() => setConfigModal({ open: false, product: null, editCartId: null })}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setConfigModal({ open: false, product: null, editCartId: null })} />
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setConfigModal({ open: false, product: null, editCartId: null })} />
           <View style={styles.modalSheet}>
-            <View style={styles.dragHandle} />
-            
             <View style={[styles.modalHeaderRow, row(isArabic)]}>
               <View style={styles.modalHeaderImgBox}>
                 {configModal.product?.imageUrl ? (
@@ -686,7 +646,7 @@ export default function OrderItemsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.width')}</Text>
                     <TextInput
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      style={styles.dimInput}
                       keyboardType="decimal-pad"
                       value={configForm.largura}
                       onChangeText={v => setConfigForm({...configForm, largura: v})}
@@ -697,7 +657,7 @@ export default function OrderItemsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.height')}</Text>
                     <TextInput
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      style={styles.dimInput}
                       keyboardType="decimal-pad"
                       value={configForm.hauteur}
                       onChangeText={v => setConfigForm({...configForm, hauteur: v})}
@@ -731,7 +691,7 @@ export default function OrderItemsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_kg')} (kg)</Text>
                     <TextInput
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      style={styles.dimInput}
                       keyboardType="decimal-pad"
                       value={configForm.poids}
                       onChangeText={v => setConfigForm({...configForm, poids: v})}
@@ -746,7 +706,7 @@ export default function OrderItemsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.catalog.pricing.per_linear_m')} (m)</Text>
                     <TextInput
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      style={styles.dimInput}
                       keyboardType="decimal-pad"
                       value={configForm.longueur}
                       onChangeText={v => setConfigForm({...configForm, longueur: v})}
@@ -761,7 +721,7 @@ export default function OrderItemsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('financial.amount')} ({t('common.dh')})</Text>
                     <TextInput
-                      style={[styles.dimInput, isArabic && { textAlign: 'right' }]}
+                      style={styles.dimInput}
                       keyboardType="numeric"
                       value={configForm.customPrice}
                       onChangeText={v => setConfigForm({...configForm, customPrice: v})}
@@ -781,107 +741,14 @@ export default function OrderItemsScreen() {
                   <Text style={styles.calcResult}>= {calculateItemPrice(configModal.product, configForm).toFixed(2)} {t('common.dh')}</Text>
               </View>
 
-              <Text style={[styles.inputLabel, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.color_desc')}</Text>
-              <TextInput 
-                style={[styles.formInput, isArabic && { textAlign: 'right' }]} 
-                placeholder={t('admin.orders.create.items.color_desc_placeholder')} 
-                value={configForm.couleur}
-                onChangeText={t => setConfigForm({...configForm, couleur: t})}
-              />
-
-              <Text style={[styles.inputLabel, { marginTop: 16 }, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.workshop_notes')}</Text>
-              <TextInput 
-                style={[styles.formInput, { height: 80, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]} 
-                multiline 
+              <Text style={[styles.inputLabel, { marginTop: 12 }, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.workshop_notes')}</Text>
+              <TextInput
+                style={[styles.formInput, { height: 64, textAlignVertical: 'top', marginBottom: 8 }, isArabic && { textAlign: 'right', writingDirection: 'rtl' }]}
+                multiline
                 placeholder={t('admin.orders.create.items.workshop_notes_placeholder')}
                 value={configForm.noteAtelier}
-                onChangeText={t => setConfigForm({...configForm, noteAtelier: t})}
+                onChangeText={v => setConfigForm({...configForm, noteAtelier: v})}
               />
-
-              {/* PHOTOS SECTION */}
-              <View style={styles.remiseSection}>
-                <View style={[styles.remiseHeader, row(isArabic)]}>
-                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
-                    <Ionicons name="camera-outline" size={18} color={AdminColors.primary} />
-                    <Text style={styles.remiseTitle}>{t('admin.orders.create.items.item_photos')}</Text>
-                    {configForm.images.length > 0 && (
-                      <View style={styles.pillBadge}>
-                        <Text style={styles.pillText}>{configForm.images.length}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity
-                      style={[styles.photoBtn, { backgroundColor: '#E8F5E9' }]}
-                      onPress={() => pickItemImage('gallery')}
-                    >
-                      <Ionicons name="images-outline" size={16} color="#388E3C" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.photoBtn, { backgroundColor: '#E3F2FD' }]}
-                      onPress={() => pickItemImage('camera')}
-                    >
-                      <Ionicons name="camera" size={16} color="#1976D2" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {configForm.images.length > 0 && (
-                  <View style={[styles.photoPreviewRow, row(isArabic)]}>
-                    {configForm.images.map((uri, idx) => (
-                      <View key={idx} style={styles.photoThumbWrap}>
-                        <Image source={{ uri }} style={styles.photoThumb} />
-                        <TouchableOpacity
-                          style={styles.photoRemoveBtn}
-                          onPress={() => removeItemImage(uri)}
-                        >
-                          <Ionicons name="close" size={10} color="white" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* REMISE SECTION */}
-              <View style={styles.remiseSection}>
-                <View style={[styles.remiseHeader, row(isArabic)]}>
-                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, row(isArabic)]}>
-                    <Ionicons name="pricetag-outline" size={18} color={AdminColors.primary} />
-                    <Text style={styles.remiseTitle}>{t('admin.orders.create.items.apply_remise')}</Text>
-                  </View>
-                  <Switch 
-                    value={configForm.hasRemise} 
-                    onValueChange={v => setConfigForm({...configForm, hasRemise: v})}
-                    trackColor={{ false: '#E2E8F0', true: AdminColors.primary }}
-                    thumbColor="white"
-                  />
-                </View>
-
-                {configForm.hasRemise && (
-                  <View style={styles.remiseInputs}>
-                    <View style={styles.dimRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.remise_amount')} ({t('common.dh')})</Text>
-                        <TextInput 
-                          style={[styles.dimInput, isArabic && { textAlign: 'right' }]} 
-                          keyboardType="decimal-pad" 
-                          placeholder="0.00"
-                          value={configForm.remiseMontant}
-                          onChangeText={t => setConfigForm({...configForm, remiseMontant: t})}
-                        />
-                      </View>
-                    </View>
-                    <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.remise_reason')}</Text>
-                    <TextInput 
-                      style={[styles.formInput, isArabic && { textAlign: 'right' }]} 
-                      placeholder={t('admin.orders.create.items.remise_reason_placeholder')} 
-                      value={configForm.remiseRaison}
-                      onChangeText={t => setConfigForm({...configForm, remiseRaison: t})}
-                    />
-                  </View>
-                )}
-              </View>
             </ScrollView>
 
             <View style={styles.sheetFooter}>
@@ -890,13 +757,22 @@ export default function OrderItemsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Payment Modal */}
-      <Modal visible={paymentModal} transparent animationType="fade">
-        <View style={styles.overlayCenter}>
-          <View style={styles.dialogBox}>
+      <Modal
+        visible={paymentModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.overlayCenter}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.dialogBox, { marginBottom: insets.bottom }]}>
             <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.paid_amount')}</Text>
             <TextInput
               style={[styles.dialogInput, isArabic && { textAlign: 'right' }]}
@@ -914,13 +790,22 @@ export default function OrderItemsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Notes Modal */}
-      <Modal visible={notesModal} transparent animationType="fade">
-        <View style={styles.overlayCenter}>
-          <View style={styles.dialogBox}>
+      <Modal
+        visible={notesModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowNotesModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.overlayCenter}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.dialogBox, { marginBottom: insets.bottom }]}>
             <Text style={[styles.dialogTitle, isArabic && { textAlign: 'right' }]}>{t('admin.orders.create.items.order_note')}</Text>
             <TextInput
               style={[styles.dialogInput, { height: 100, textAlignVertical: 'top' }, isArabic && { textAlign: 'right' }]}
@@ -938,7 +823,7 @@ export default function OrderItemsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1001,50 +886,47 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   modalSheet: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: SCREEN_HEIGHT * 0.85,
+    borderRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.72,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
-  dragHandle: { 
-    width: 40, 
-    height: 4, 
-    borderRadius: 2, 
-    backgroundColor: '#E2E8F0', 
-    alignSelf: 'center', 
-    marginBottom: 20 
+  modalHeaderRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  modalHeaderRow: { 
-    flexDirection: 'row', 
-    gap: 14, 
-    alignItems: 'center', 
-    marginBottom: 20 
+  modalHeaderImgBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalHeaderImgBox: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 12, 
-    backgroundColor: '#F1F5F9', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  modalProductName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: AdminColors.textPrimary,
   },
-  modalProductName: { 
-    fontSize: 18, 
-    fontWeight: '700', 
-    color: AdminColors.textPrimary 
-  },
-  modalProductPrice: { 
-    fontSize: 14, 
-    color: AdminColors.primary, 
-    fontWeight: '600', 
-    marginTop: 2 
+  modalProductPrice: {
+    fontSize: 13,
+    color: AdminColors.primary,
+    fontWeight: '600',
+    marginTop: 2,
   },
   modalBody: { 
     // Removed paddingHorizontal here since it's on modalSheet
@@ -1130,11 +1012,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     color: '#1E293B',
   },
-  sheetFooter: { 
-    paddingVertical: 16, 
-    borderTopWidth: 1, 
-    borderTopColor: '#F1F5F9',
-    marginTop: 12,
+  sheetFooter: {
+    paddingTop: 14,
   },
   saveBtn: { 
     backgroundColor: AdminColors.primary, 
@@ -1148,29 +1027,6 @@ const styles = StyleSheet.create({
     color: 'white', 
     fontSize: 16, 
     fontWeight: '700' 
-  },
-
-  remiseSection: { 
-    marginTop: 16, 
-    padding: 12, 
-    backgroundColor: '#F8FAFC', 
-    borderRadius: 16, 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0' 
-  },
-  remiseHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
-  remiseTitle: { 
-    fontSize: 15, 
-    fontWeight: '600', 
-    color: AdminColors.textPrimary 
-  },
-  remiseInputs: { 
-    marginTop: 16, 
-    gap: 12 
   },
 
   overlayCenter: { 
@@ -1225,10 +1081,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  photoBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  photoPreviewRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  photoThumbWrap: { width: 60, height: 60, borderRadius: 10, overflow: 'hidden', position: 'relative' },
-  photoThumb: { width: '100%', height: '100%' },
   photoRemoveBtn: { position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.5)', width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   
   orderPhotosContainer: { marginBottom: 16 },

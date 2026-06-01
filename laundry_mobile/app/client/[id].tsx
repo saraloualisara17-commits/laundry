@@ -24,6 +24,7 @@ export default function ClientDetailsScreen() {
   const { clearOrder, setMode, setClient } = useOrderCreation();
   const { user } = useSelector((state: RootState) => state.auth);
   const isLivreur = user?.role === 'LIVREUR';
+  const isEmploye = user?.role === 'EMPLOYE';
 
   const clientId = id as string;
   const { data: selectedClient, isLoading: loadingClient, refetch: refetchClient } = useClient(clientId);
@@ -68,7 +69,7 @@ export default function ClientDetailsScreen() {
 
   const visibleCommandes = useMemo(() => {
     if (!Array.isArray(clientCommandes)) return [];
-    return isLivreur ? clientCommandes.filter((c) => c.status !== 'DELIVERED') : clientCommandes;
+    return (isLivreur || isEmploye) ? clientCommandes.filter((c) => c.status !== 'DELIVERED') : clientCommandes;
   }, [clientCommandes, isLivreur]);
 
   const stats = useMemo(() => {
@@ -137,12 +138,12 @@ export default function ClientDetailsScreen() {
             <Feather name={isArabic ? 'arrow-right' : 'arrow-left'} size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('admin.clients.details_title')}</Text>
-          {!isLivreur && (
+          {!isLivreur && !isEmploye && (
             <TouchableOpacity style={styles.headerBtn} onPress={() => setShowEditModal(true)}>
               <Feather name="edit-2" size={20} color={Colors.primary} />
             </TouchableOpacity>
           )}
-          {isLivreur && <View style={styles.headerBtn} />}
+          {(isLivreur || isEmploye) && <View style={styles.headerBtn} />}
         </View>
       </SafeAreaView>
 
@@ -206,8 +207,8 @@ export default function ClientDetailsScreen() {
             <Text style={styles.statVal}>{stats.articles}</Text>
             <Text style={styles.statLbl}>{t('admin.catalog.products_count')}</Text>
           </View>
-          {/* Total amount hidden for livreur */}
-          {!isLivreur && (
+          {/* Total amount hidden for livreur and employe */}
+          {!isLivreur && !isEmploye && (
             <View style={[styles.statBox, { backgroundColor: Colors.primary }]}>
               <Text style={[styles.statVal, { color: 'white' }]}>{stats.total.toFixed(0)}</Text>
               <Text style={[styles.statLbl, { color: 'rgba(255,255,255,0.8)' }]}>{t('common.total')} {t('common.dh')}</Text>
@@ -238,7 +239,7 @@ export default function ClientDetailsScreen() {
             >
               <View style={[styles.orderTop, row(isArabic)]}>
                 <View>
-                  <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{commande.numeroCommande}</Text>
+                  <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: (StatusColors[commande.status] || { dot: '#94A3B8' }).dot, fontSize: 17, fontWeight: '800' }]}>#{commande.id}</Text>
                   <Text style={[styles.orderDate, isArabic && { textAlign: 'right' }]}>
                     {new Date(commande.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}
                   </Text>

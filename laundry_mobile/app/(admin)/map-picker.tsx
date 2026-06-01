@@ -12,9 +12,10 @@ import {
 import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { useOrderCreation } from '../../src/context/OrderCreationContext';
+import { pendingMapResult } from '../../src/utils/pendingMapResult';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { logger } from '../../src/lib/logger';
@@ -24,6 +25,7 @@ const log = logger.ns('map-picker');
 export default function MapPickerScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ returnTo?: string }>();
   const { setPendingLocation } = useOrderCreation();
   const mapRef = useRef<MapView>(null);
 
@@ -104,13 +106,22 @@ export default function MapPickerScreen() {
 
   const handleConfirm = () => {
     if (!markerCoords) return;
-    
-    setPendingLocation({
-      address: resolvedAddress,
-      region: resolvedRegion,
-      lat: markerCoords.latitude,
-      lng: markerCoords.longitude
-    });
+
+    if (params.returnTo === 'order-address') {
+      pendingMapResult.set({
+        address: resolvedAddress,
+        region: resolvedRegion,
+        lat: markerCoords.latitude,
+        lng: markerCoords.longitude,
+      });
+    } else {
+      setPendingLocation({
+        address: resolvedAddress,
+        region: resolvedRegion,
+        lat: markerCoords.latitude,
+        lng: markerCoords.longitude,
+      });
+    }
     router.back();
   };
 

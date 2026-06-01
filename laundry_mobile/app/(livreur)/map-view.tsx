@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Platform, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { STATUS_COLORS } from '../../constants/StatusColors';
 import { useTranslation } from 'react-i18next';
@@ -35,12 +35,17 @@ function openNav(lat?: any, lng?: any, address?: string) {
 
 export default function MapViewScreen() {
   const { t } = useTranslation();
+  const params = useLocalSearchParams<{ filter?: string }>();
 
   const { data: readyDeliveries = [], isLoading: loadingDeliveries } = useReadyDeliveries();
   const { data: readyOrders = [], isLoading: loadingPickups } = usePendingPickups();
   const loading = loadingDeliveries || loadingPickups;
 
-  const [filter, setFilter] = useState<Filter>('all');
+  const initialFilter: Filter =
+    params.filter === 'delivery' ? 'delivery' :
+    params.filter === 'pickup'   ? 'pickup'   : 'all';
+
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [selected, setSelected] = useState<any>(null);
   const mapRef = useRef<MapView>(null);
 

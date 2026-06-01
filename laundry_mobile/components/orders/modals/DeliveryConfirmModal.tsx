@@ -5,12 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  Image,
-  ScrollView,
-  Alert,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../../constants/theme';
 import { RTLBottomSheet } from '../../ui/RTLBottomSheet';
 import { RTLFormRow } from '../../ui/RTLFormRow';
@@ -23,6 +18,7 @@ interface DeliveryConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void;
   totalAmount: number;
+  remainingAmount: number;
   collectedAmount: string;
   setCollectedAmount: (amount: string) => void;
   deliveryNotes: string;
@@ -30,7 +26,6 @@ interface DeliveryConfirmModalProps {
   confirmingDelivery: boolean;
   photoUris?: string[];
   setPhotoUris?: (uris: string[]) => void;
-  /** Kept for backward compat — direction is read from app language */
   isArabic?: boolean;
   t: (key: string, options?: any) => string;
 }
@@ -40,58 +35,15 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
   onClose,
   onConfirm,
   totalAmount,
+  remainingAmount,
   collectedAmount,
   setCollectedAmount,
   deliveryNotes,
   setDeliveryNotes,
   confirmingDelivery,
-  photoUris = [],
-  setPhotoUris,
   t,
 }) => {
   const { isRTL } = useRTL();
-
-  const requestAndLaunchCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('common.camera_permission_denied', { defaultValue: 'Accès à la caméra refusé' }));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      setPhotoUris?.([...photoUris, result.assets[0].uri]);
-    }
-  };
-
-  const requestAndLaunchGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('common.gallery_permission_denied', { defaultValue: 'Accès à la galerie refusé' }));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-      allowsMultipleSelection: true,
-    });
-    if (!result.canceled && result.assets?.length) {
-      setPhotoUris?.([...photoUris, ...result.assets.map(a => a.uri)]);
-    }
-  };
-
-  const removePhoto = (uri: string) => {
-    setPhotoUris?.(photoUris.filter(u => u !== uri));
-  };
-
-  const handleClose = () => {
-    setPhotoUris?.([]);
-    onClose();
-  };
 
   const amountValue = parseFloat(collectedAmount) || 0;
 
@@ -101,14 +53,14 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
       border: 'rgba(239,68,68,0.2)',
       color: Colors.danger,
       label: t('delivery.unpaid_warning'),
-      sub: `${t('delivery.unpaid_sub')} (${totalAmount.toFixed(2)} ${t('common.dh')})`,
+      sub: `${t('delivery.unpaid_sub')} (${remainingAmount.toFixed(2)} ${t('common.dh')})`,
     };
-    if (amountValue < totalAmount - 0.05) return {
+    if (amountValue < remainingAmount - 0.05) return {
       bg: '#FFF7ED',
       border: 'rgba(245,158,11,0.2)',
       color: '#D97706',
       label: t('delivery.partial_payment'),
-      sub: `${t('delivery.partial_sub')}: ${(totalAmount - amountValue).toFixed(2)} ${t('common.dh')}`,
+      sub: `${t('delivery.partial_sub')}: ${(remainingAmount - amountValue).toFixed(2)} ${t('common.dh')}`,
     };
     return {
       bg: Colors.successBg,
@@ -123,14 +75,14 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
 
   const footer = (
     <View style={[styles.actions, row(isRTL)]}>
-      <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
+      <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
         <Text style={[styles.cancelBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
           {t('common.cancel')}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.confirmBtn, confirmingDelivery && { opacity: 0.6 }]}
-        onPress={() => onConfirm()}
+        onPress={onConfirm}
         disabled={confirmingDelivery}
       >
         {confirmingDelivery ? (
@@ -147,12 +99,12 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
   return (
     <RTLBottomSheet
       visible={visible}
-      onClose={handleClose}
+      onClose={onClose}
       title={t('delivery.confirm_title')}
       footer={footer}
+      centered
     >
       <View style={styles.body}>
-        {/* Subtitle */}
         <Text
           style={[styles.subtitle, textAlign(isRTL), font.regular(isRTL)]}
           maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
@@ -160,7 +112,7 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
           {t('delivery.declare_amount')}
         </Text>
 
-        {/* Order total info row */}
+        {/* Order total */}
         <View style={[styles.totalRow, row(isRTL)]}>
           <Text style={[styles.totalLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {t('delivery.order_total')}
@@ -170,6 +122,18 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
           </Text>
         </View>
 
+        {/* Remaining — only when partial payment already made */}
+        {remainingAmount < totalAmount && (
+          <View style={[styles.remainingRow, row(isRTL)]}>
+            <Text style={[styles.totalLabel, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+              {t('delivery.remaining_amount', { defaultValue: 'Reste à payer' })}
+            </Text>
+            <Text style={[styles.remainingValue, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+              {remainingAmount.toFixed(2)} {t('common.dh')}
+            </Text>
+          </View>
+        )}
+
         {/* Amount collected */}
         <RTLFormRow label={t('delivery.collected_amount')}>
           <RTLNumericInput
@@ -178,39 +142,26 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
             unit={t('common.dh')}
             placeholder="0"
           />
-          {/* Quick preset buttons */}
           <View style={[styles.presetRow, row(isRTL)]}>
-            <TouchableOpacity
-              style={styles.presetBtn}
-              onPress={() => setCollectedAmount('0')}
-            >
+            <TouchableOpacity style={styles.presetBtn} onPress={() => setCollectedAmount('0')}>
               <Text style={[styles.presetBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                 0 {t('common.dh')}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.presetBtn}
-              onPress={() => setCollectedAmount(totalAmount.toString())}
-            >
+            <TouchableOpacity style={styles.presetBtn} onPress={() => setCollectedAmount(remainingAmount.toString())}>
               <Text style={[styles.presetBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                {totalAmount.toFixed(0)} {t('common.dh')}
+                {remainingAmount.toFixed(0)} {t('common.dh')}
               </Text>
             </TouchableOpacity>
           </View>
         </RTLFormRow>
 
-        {/* Payment feedback chip */}
+        {/* Payment feedback */}
         <View style={[styles.feedbackBox, { backgroundColor: feedback.bg, borderColor: feedback.border }]}>
-          <Text
-            style={[styles.feedbackLabel, { color: feedback.color }, textAlign(isRTL), font.semibold(isRTL)]}
-            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-          >
+          <Text style={[styles.feedbackLabel, { color: feedback.color }, textAlign(isRTL), font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {feedback.label}
           </Text>
-          <Text
-            style={[styles.feedbackSub, { color: feedback.color }, textAlign(isRTL), font.regular(isRTL)]}
-            maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
-          >
+          <Text style={[styles.feedbackSub, { color: feedback.color }, textAlign(isRTL), font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
             {feedback.sub}
           </Text>
         </View>
@@ -223,36 +174,6 @@ export const DeliveryConfirmModal: React.FC<DeliveryConfirmModalProps> = ({
             placeholder={t('delivery.notes_placeholder')}
             minLines={2}
           />
-        </RTLFormRow>
-
-        {/* Proof of delivery photos */}
-        <RTLFormRow label={t('delivery.photo_label')} style={styles.photoRow}>
-          {photoUris.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbsScroll}>
-              {photoUris.map((uri) => (
-                <View key={uri} style={styles.thumbContainer}>
-                  <Image source={{ uri }} style={styles.thumb} />
-                  <TouchableOpacity style={styles.thumbRemoveBtn} onPress={() => removePhoto(uri)}>
-                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-          <View style={[styles.photoActions, row(isRTL)]}>
-            <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchCamera}>
-              <Ionicons name="camera-outline" size={18} color={Colors.primary} />
-              <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                {t('common.camera')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.photoBtn, row(isRTL)]} onPress={requestAndLaunchGallery}>
-              <Ionicons name="images-outline" size={18} color={Colors.primary} />
-              <Text style={[styles.photoBtnText, font.semibold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                {t('common.gallery')}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </RTLFormRow>
       </View>
     </RTLBottomSheet>
@@ -286,6 +207,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.primary,
   },
+  remainingRow: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 14,
+    padding: 14,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  remainingValue: {
+    fontSize: 18,
+    color: '#D97706',
+  },
   presetRow: {
     gap: 8,
     marginTop: 10,
@@ -318,46 +252,6 @@ const styles = StyleSheet.create({
   },
   notesRow: {
     marginTop: 12,
-  },
-  photoRow: {
-    marginTop: 12,
-  },
-  thumbsScroll: {
-    marginBottom: 10,
-  },
-  thumbContainer: {
-    position: 'relative',
-    marginRight: 10,
-  },
-  thumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-  },
-  thumbRemoveBtn: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: 'white',
-    borderRadius: 10,
-  },
-  photoActions: {
-    gap: 10,
-  },
-  photoBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  photoBtnText: {
-    fontSize: 13,
-    color: Colors.primary,
   },
   actions: {
     gap: 10,

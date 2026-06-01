@@ -95,6 +95,7 @@ public class CommandeCreationService {
         }
         if (request.getNotes() != null) commande.setNotes(request.getNotes());
         if (request.getDeliveryType() != null) commande.setDeliveryType(request.getDeliveryType());
+        if (request.getScheduledPickupDate() != null) commande.setScheduledPickupDate(request.getScheduledPickupDate());
 
         // Snapshot delivery address at order creation time — prevents retroactive changes
         // if the client updates their saved address later.
@@ -158,9 +159,9 @@ public class CommandeCreationService {
         helperService.attachOrderImages(commande, request.getImageUrls());
         commande = commandeRepository.save(commande);
 
-        helperService.recordAudit(commande, null, commande.getStatus().name(), creator, "Commande créée");
+        helperService.recordAudit(commande, null, commande.getStatus().name(), creator, null);
         auditService.log("ORDER_CREATED", "COMMANDE", commande.getId(),
-                         null, "CREATED", "Num: " + commande.getNumeroCommande());
+                         null, commande.getNumeroCommande(), null);
 
         // All broadcasts and notifications fire AFTER_COMMIT via OrderSideEffectListener.
         eventPublisher.publishEvent(OrderSideEffectEvent.created(commande.getId(), commande.getNumeroCommande()));

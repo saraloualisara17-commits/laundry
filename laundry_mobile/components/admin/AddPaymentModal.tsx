@@ -93,6 +93,7 @@ export default function AddPaymentModal({
       onClose={onClose}
       title={t('admin.unpaid.add_payment')}
       footer={footer}
+      centered
     >
       <View style={styles.body}>
         {/* Remaining pill */}

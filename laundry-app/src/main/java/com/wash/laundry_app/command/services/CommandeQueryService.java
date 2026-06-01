@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class CommandeQueryService {
 
     private final CommandeRepository commandeRepository;
+    private final CommandeImageRepository commandeImageRepository;
     private final HistoriqueStatutRepository historiqueStatutRepository;
     private final CommandeMapper commandeMapper;
     private final HistoriqueStatutMapper historiqueStatutMapper;
@@ -32,7 +33,7 @@ public class CommandeQueryService {
     @Transactional(readOnly = true)
     public List<CommandeDTO> getPendingPickupOrdersForPickupDriver() {
         User user = authService.currentUser();
-        return commandeRepository.findByLivreurIdAndStatus(user.getId(), CommandeStatus.PENDING_PICKUP)
+        return commandeRepository.findPendingPickupsDueForDriver(user.getId(), java.time.LocalDate.now().atTime(23, 59, 59))
                 .stream().map(commandeMapper::toDto).toList();
     }
 
@@ -46,7 +47,7 @@ public class CommandeQueryService {
     @Transactional(readOnly = true)
     public List<CommandeDTO> getReadyForDeliveryByDeliveryDriver() {
         User user = authService.currentUser();
-        return commandeRepository.findReadyForDeliveryDueForDriver(user.getId())
+        return commandeRepository.findReadyForDeliveryDueForDriver(user.getId(), java.time.LocalDate.now().atTime(23, 59, 59))
                 .stream().map(commandeMapper::toDto).toList();
     }
 
@@ -106,8 +107,9 @@ public class CommandeQueryService {
     public LivreurDashboardStatsDTO getLivreurDashboardStats() {
         User user = authService.currentUser();
         Long uid = user.getId();
-        long ready = commandeRepository.countByDeliveryDriverIdAndStatus(uid, CommandeStatus.READY_FOR_DELIVERY);
-        long pending = commandeRepository.countByLivreurIdAndStatus(uid, CommandeStatus.PENDING_PICKUP);
+        java.time.LocalDateTime endOfToday = java.time.LocalDate.now().atTime(23, 59, 59);
+        long ready = commandeRepository.findReadyForDeliveryDueForDriver(uid, endOfToday).size();
+        long pending = commandeRepository.findPendingPickupsDueForDriver(uid, endOfToday).size();
         long cancelled = commandeRepository.countByLivreurIdAndStatus(uid, CommandeStatus.CANCELLED);
         return LivreurDashboardStatsDTO.builder()
                 .readyOrdersCount(ready)
@@ -121,6 +123,90 @@ public class CommandeQueryService {
     public List<HistoriqueStatutDTO> getHistory(Long id) {
         return historiqueStatutRepository.findByCommandeIdOrderByCreatedAtDesc(id)
                 .stream().map(historiqueStatutMapper::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getOverdueStats() {
+        // Use start of today so that orders scheduled for today are NOT counted as late.
+        // Only orders whose date is strictly before today (yesterday or earlier) are overdue.
+        java.time.LocalDateTime startOfToday = java.time.LocalDate.now().atStartOfDay();
+        long overduePickups = commandeRepository.countOverduePickups(startOfToday);
+        long overdueDeliveries = commandeRepository.countOverdueDeliveries(startOfToday);
+        Map<String, Long> result = new HashMap<>();
+        result.put("overduePickups", overduePickups);
+        result.put("overdueDeliveries", overdueDeliveries);
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommandeDTO> getOverdueOrders(String type) {
+        java.time.LocalDateTime startOfToday = java.time.LocalDate.now().atStartOfDay();
+        List<Commande> orders = "delivery".equalsIgnoreCase(type)
+                ? commandeRepository.findDelayedDeliveries(startOfToday)
+                : commandeRepository.findOverduePickups(startOfToday);
+        return orders.stream().map(commandeMapper::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderImageDTO> getFilteredImages(
+            String status, String search,
+            java.time.LocalDate dateDebut, java.time.LocalDate dateFin,
+            int page, int size) {
+
+        String statusParam  = (status != null && !status.trim().isEmpty()) ? status.toUpperCase() : null;
+        String searchParam  = (search != null && !search.trim().isEmpty()) ? search : null;
+        java.time.LocalDateTime dateTimeDebut = dateDebut != null ? dateDebut.atStartOfDay() : null;
+        java.time.LocalDateTime dateTimeFin   = dateFin  != null ? dateFin.atTime(23, 59, 59) : null;
+
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Commande> idPage = commandeRepository.findOrdersWithImages(
+                statusParam, searchParam, dateTimeDebut, dateTimeFin, pageable);
+
+        List<Long> ids = idPage.getContent().stream().map(Commande::getId).toList();
+        if (ids.isEmpty()) {
+            return new org.springframework.data.domain.PageImpl<>(
+                    java.util.Collections.emptyList(), pageable, 0);
+        }
+
+        // Two separate queries to avoid Hibernate MultipleBagFetchException:
+        // client+phones is one bag, images is another — cannot JOIN FETCH both in one query.
+        List<Commande> withClient = commandeRepository.findByIdsWithClient(ids);
+        List<Commande> withImages = commandeRepository.findByIdsWithImages(ids);
+
+        Map<Long, Commande> clientById = withClient.stream()
+                .collect(Collectors.toMap(Commande::getId, c -> c));
+        Map<Long, Commande> imagesById = withImages.stream()
+                .collect(Collectors.toMap(Commande::getId, c -> c));
+
+        List<OrderImageDTO> dtos = ids.stream()
+                .filter(id -> clientById.containsKey(id))
+                .map(id -> {
+                    Commande c = clientById.get(id);
+                    String phone = (c.getClient().getPhones() != null && !c.getClient().getPhones().isEmpty())
+                            ? c.getClient().getPhones().get(0).getPhoneNumber() : null;
+                    Commande ci = imagesById.get(id);
+                    List<OrderImageDTO.ImageItem> images = (ci != null && ci.getImages() != null)
+                            ? ci.getImages().stream()
+                                    .filter(img -> !Boolean.TRUE.equals(img.getIsArchived()))
+                                    .map(img -> OrderImageDTO.ImageItem.builder()
+                                            .id(img.getId())
+                                            .imageUrl(img.getImageUrl())
+                                            .photoType(img.getPhotoType() != null ? img.getPhotoType().name() : null)
+                                            .build())
+                                    .toList()
+                            : java.util.Collections.emptyList();
+                    return OrderImageDTO.builder()
+                            .orderId(c.getId())
+                            .orderStatus(c.getStatus() != null ? c.getStatus().name() : null)
+                            .clientName(c.getClient().getName())
+                            .clientPhone(phone)
+                            .dateCreation(c.getDateCreation())
+                            .images(images)
+                            .build();
+                })
+                .toList();
+
+        return new org.springframework.data.domain.PageImpl<>(dtos, pageable, idPage.getTotalElements());
     }
 
     public List<PaymentTypeDTO> getPaymentTypes() {

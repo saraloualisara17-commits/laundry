@@ -134,6 +134,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/admin/commandes/{id}/delivery-driver", "/api/admin/commandes/{id}/delivery-driver").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers(HttpMethod.PUT, "/admin/commandes/{id}", "/api/admin/commandes/{id}").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 
+                        // Gallery images endpoint accessible to all roles
+                        .requestMatchers(HttpMethod.GET, "/api/admin/images").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
+
                         .requestMatchers("/admin/**", "/api/admin/**").hasAnyRole("ADMIN", "EMPLOYE")
 
                         // Legacy Livreur Routes

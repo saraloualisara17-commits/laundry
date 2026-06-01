@@ -7,11 +7,11 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRTL, row, font, textProps } from '../../../src/utils/rtl';
 import { Colors } from '../../../constants/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ReceiptActionsModalProps {
   visible: boolean;
@@ -46,11 +46,9 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
   t,
 }) => {
   const { isRTL } = useRTL();
-  const insets = useSafeAreaInsets();
   const [selectedLang, setSelectedLang] = useState<'fr' | 'ar' | null>(null);
 
   const isPickup = confirmedStatus === 'PICKED_UP';
-  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 12);
 
   const handleClose = () => {
     setSelectedLang(null);
@@ -58,15 +56,16 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={handleClose} />
 
-        <View style={[styles.sheet, { paddingBottom: bottomPad + 12 }]}>
-          <View style={styles.handle} />
-
+        <View style={styles.card}>
           <View style={styles.iconBox}>
-            <Ionicons name="checkmark-circle" size={60} color={C.success} />
+            <Ionicons name="checkmark-circle" size={56} color={C.success} />
           </View>
 
           <Text style={[styles.title, font.bold(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
@@ -79,33 +78,31 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
             {t('livreur.send_receipt_prompt', { defaultValue: 'Voulez-vous envoyer le reçu au client ?' })}
           </Text>
 
-          {/* Step 1 — language picker */}
-          <Text style={styles.stepLabel}>
-            {t('receipt.choose_language')}
-          </Text>
+          {/* Language picker */}
+          <Text style={styles.stepLabel}>{t('receipt.choose_language')}</Text>
           <View style={[styles.langRow, row(isRTL)]}>
             <TouchableOpacity
-              style={[styles.langBtn, selectedLang === 'fr' && styles.langBtnActiveFr]}
+              style={[styles.langBtn, selectedLang === 'fr' ? styles.langBtnActiveFr : null]}
               onPress={() => setSelectedLang('fr')}
             >
-              <Text style={[styles.langBtnText, selectedLang === 'fr' && { color: C.frColor, fontWeight: '800' }]}>
+              <Text style={[styles.langBtnText, selectedLang === 'fr' ? { color: C.frColor, fontWeight: '800' } : null]}>
                 🇫🇷 Français
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.langBtn, selectedLang === 'ar' && styles.langBtnActiveAr]}
+              style={[styles.langBtn, selectedLang === 'ar' ? styles.langBtnActiveAr : null]}
               onPress={() => setSelectedLang('ar')}
             >
-              <Text style={[styles.langBtnText, selectedLang === 'ar' && { color: C.arColor, fontWeight: '800' }]}>
+              <Text style={[styles.langBtnText, selectedLang === 'ar' ? { color: C.arColor, fontWeight: '800' } : null]}>
                 🇲🇦 العربية
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Step 2 — action buttons (enabled only after language chosen) */}
+          {/* Action buttons */}
           <View style={[styles.actions, row(isRTL)]}>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: C.whatsappBg }, !selectedLang && styles.actionBtnDisabled]}
+              style={[styles.actionBtn, { backgroundColor: C.whatsappBg }, !selectedLang ? styles.actionBtnDisabled : null]}
               onPress={() => selectedLang && onWhatsApp(selectedLang)}
               disabled={!!sharingAction || !selectedLang}
             >
@@ -113,7 +110,7 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
                 <ActivityIndicator color={C.whatsappColor} />
               ) : (
                 <>
-                  <Ionicons name="logo-whatsapp" size={24} color={selectedLang ? C.whatsappColor : '#ccc'} />
+                  <Ionicons name="logo-whatsapp" size={22} color={selectedLang ? C.whatsappColor : '#ccc'} />
                   <Text style={[styles.actionText, { color: selectedLang ? C.whatsappColor : '#ccc' }, font.bold(isRTL)]}
                     maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                     {t('common.share', { defaultValue: 'Partager' })}
@@ -123,7 +120,7 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: C.printBg }, !selectedLang && styles.actionBtnDisabled]}
+              style={[styles.actionBtn, { backgroundColor: C.printBg }, !selectedLang ? styles.actionBtnDisabled : null]}
               onPress={() => selectedLang && onPrint(selectedLang)}
               disabled={!!sharingAction || !selectedLang}
             >
@@ -131,7 +128,7 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
                 <ActivityIndicator color={C.printColor} />
               ) : (
                 <>
-                  <Ionicons name="print" size={24} color={selectedLang ? C.printColor : '#ccc'} />
+                  <Ionicons name="print" size={22} color={selectedLang ? C.printColor : '#ccc'} />
                   <Text style={[styles.actionText, { color: selectedLang ? C.printColor : '#ccc' }, font.bold(isRTL)]}
                     maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                     {t('common.print')}
@@ -147,7 +144,7 @@ const ReceiptActionsModal: React.FC<ReceiptActionsModalProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -157,26 +154,24 @@ export default ReceiptActionsModal;
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,18,25,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
   },
-  backdrop: { flex: 1 },
-  sheet: {
+  card: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 12,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
     alignItems: 'center',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 2,
-    marginBottom: 20,
-  },
-  iconBox: { marginBottom: 12 },
+  iconBox: { marginBottom: 10 },
   title: {
     fontSize: 20,
     fontWeight: '800',

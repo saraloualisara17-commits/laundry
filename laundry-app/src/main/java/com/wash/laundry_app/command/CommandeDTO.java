@@ -47,7 +47,9 @@ public class CommandeDTO {
     private java.math.BigDecimal deliveryLongitude;
     private Integer itemCount;
     private ModeCommande mode;
+    private LocalDateTime scheduledPickupDate;
     private LocalDateTime scheduledDeliveryDate;
+    private String notes;
     private boolean selfSubmitted;
     private LocalDateTime debtSettledAt;
 }

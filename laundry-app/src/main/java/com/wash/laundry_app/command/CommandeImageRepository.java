@@ -11,10 +11,6 @@ import org.springframework.data.repository.query.Param;
  */
 public interface CommandeImageRepository extends JpaRepository<CommandeImage, Long> {
 
-    /**
-     * Archives all non-archived images belonging to a CommandeTapis item.
-     * Called before the item is deleted so its photos are not lost.
-     */
     @Modifying
     @Query("UPDATE CommandeImage img SET img.isArchived = true, img.commandeTapis = null " +
            "WHERE img.commandeTapis.id = :tapisId AND img.isArchived = false")

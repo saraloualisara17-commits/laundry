@@ -1,7 +1,7 @@
-﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Animated, Image
+  RefreshControl, ActivityIndicator, Image
 } from 'react-native';
 import { row, textAlign } from '../../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,16 +40,6 @@ export default function EmployeDashboard() {
   const { clearOrder, setMode } = useOrderCreation();
 
   const [showCreate, setShowCreate] = useState(false);
-  const readyAnim = useRef(new Animated.Value(0.4)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(readyAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(readyAnim, { toValue: 0.4, duration: 900, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   const { data: overviewRes, isFetching: fetchingOverview, refetch: refetchOverview } = useStatusOverview();
   const { data: unpaidData, refetch: refetchUnpaid } = useUnpaidOverview();
@@ -87,8 +77,6 @@ export default function EmployeDashboard() {
       </View>
     );
   }
-
-  const readyCount = overview?.READY_FOR_DELIVERY?.count ?? 0;
 
   return (
     <View style={styles.container}>
@@ -133,16 +121,6 @@ export default function EmployeDashboard() {
           />
         }
       >
-        {/* Ready notification banner */}
-        {readyCount > 0 && (
-          <View style={[styles.readyBanner, row(isArabic)]}>
-            <Animated.View style={[styles.readyDot, { opacity: readyAnim }]} />
-            <Text style={styles.readyText}>
-              {readyCount} {t('status.READY_FOR_DELIVERY')} — {t('admin.orders.ready')}
-            </Text>
-          </View>
-        )}
-
         {/* Create Order Button */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -239,6 +217,23 @@ export default function EmployeDashboard() {
           </TouchableOpacity>
         )}
 
+        {/* Gallery */}
+        <TouchableOpacity
+          style={styles.unpaidCard}
+          onPress={() => router.push('/(employe)/gallery' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.unpaidRow, row(isArabic)]}>
+            <View style={[styles.unpaidIcon, { backgroundColor: '#FFF3E0' }]}>
+              <Text style={{ fontSize: 22 }}>📷</Text>
+            </View>
+            <Text style={[styles.unpaidTitle, { flex: 1 }, isArabic && { textAlign: 'right' }]}>
+              {t('admin.gallery.title', { defaultValue: 'Galerie Photos' })}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={AdminColors.textMuted} />
+          </View>
+        </TouchableOpacity>
+
         {/* Recent Orders */}
         <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>
           {t('dashboard.recent_orders')}
@@ -293,24 +288,6 @@ const styles = StyleSheet.create({
   },
   headerBtnText: { color: 'white', fontWeight: '700', fontSize: 12 },
   scroll: { flex: 1, marginTop: -20 },
-  readyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16,185,129,0.1)',
-    borderLeftWidth: 3,
-    borderLeftColor: AdminColors.success,
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  readyDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: AdminColors.success,
-  },
-  readyText: { fontSize: 13, color: AdminColors.success, fontWeight: '600', flex: 1 },
   section: { marginHorizontal: 16, marginTop: 16 },
   createBtn: {
     flexDirection: 'row',

@@ -48,8 +48,9 @@
     "time": "الوقت",
     "new": "جديد",
     "notes": "ملاحظات",
-    "photo_lab": "صورة المخبر",
+    "photo_lab": "صورة المعالجة",
     "photo_reception": "صورة الاستلام",
+    "photo_livraison": "صورة التوصيل",
     "whatsapp": "واتساب",
     "print": "طباعة",
     "done": "تم",
@@ -64,7 +65,11 @@
     "change": "تغيير",
     "deleted": "محذوف",
     "add_photo": "إضافة صورة",
-    "share": "مشاركة"
+    "share": "مشاركة",
+    "camera_permission_denied": "تم رفض الوصول إلى الكاميرا",
+    "gallery_permission_denied": "تم رفض الوصول إلى المعرض",
+    "system": "النظام",
+    "by": "بواسطة"
   },
   "errors": {
     "network": "خطأ في الشبكة. يرجى التحقق من الاتصال.",
@@ -115,7 +120,11 @@
     "retry": "اضغط لإعادة المحاولة",
     "empty_recent": "لا توجد طلبات حديثة",
     "scan_title": "مسح الطلب",
-    "scan_hint": "ضع رمز QR داخل الإطار"
+    "scan_hint": "ضع رمز QR داخل الإطار",
+    "overdue_pickups": "استلامات متأخرة",
+    "overdue_deliveries": "توصيلات متأخرة",
+    "late": "تأخير",
+    "no_driver":" غير مُسند"
   },
   "status": {
     "PENDING_PICKUP": "قيد الاستلام",
@@ -275,6 +284,7 @@
           "self": "استلام شخصي"
         },
         "items": {
+          "dimensions": "الأبعاد",
           "enter_dimensions": "أدخل الأبعاد",
           "enter_price": "أدخل الثمن",
           "photo_captured": "تم التقاط الصورة.",
@@ -502,7 +512,8 @@
     "total_unpaid": "إجمالي المبالغ الغير مدفوعة",
     "total_items": "إجمالي القطع",
     "total_m2": "إجمالي م²",
-    "total_price": "إجمالي الطلبيات"
+    "total_price": "إجمالي الطلبيات",
+    "total_amount": "المبلغ الإجمالي"
   },
   "livreur": {
     "greeting": "مرحباً،",
@@ -594,6 +605,13 @@
     "title": "سجل المراجعة",
     "subtitle": "سجل العمليات",
     "tab": "المراجعة",
+    "type_status": "الحالة",
+    "type_payment": "دفع",
+    "type_attempt": "محاولة",
+    "type_audit": "تدقيق",
+    "payment_label": "دفع",
+    "attempt_failed": "محاولة فاشلة",
+    "order_pickup_confirmed": "تأكيد الاستلام",
     "actions": {
       "order_created": "تم إنشاء طلب",
       "order_status_changed": "تغيير الحالة",
@@ -617,7 +635,10 @@
       "catalog_product_updated": "تم تعديل المنتج",
       "catalog_product_toggled": "تم تفعيل/تعطيل المنتج",
       "catalog_product_deleted": "تم حذف المنتج",
-      "client_updated": "تم تعديل الزبون"
+      "client_updated": "تم تعديل الزبون",
+      "order_attempt_failed": "محاولة فاشلة",
+      "order_cancelled": "تم إلغاء الطلب",
+      "order_pickup_confirmed": "تم تأكيد الاستلام"
     }
   },
   "settings": {
@@ -646,7 +667,36 @@
     "not_pickup_driver": "فقط مندوب الاستلام المعين ({{name}}) يمكنه تأكيد الاستلام. غيّر المندوب أولاً إذا لزم الأمر.",
     "not_delivery_driver": "فقط مندوب التوصيل المعين ({{name}}) يمكنه تأكيد التسليم. غيّر المندوب أولاً إذا لزم الأمر.",
     "not_allowed": "غير مسموح",
-    "add_items": "إضافة / تعديل المنتجات"
+    "add_items": "إضافة / تعديل المنتجات",
+    "edit_order": "تعديل الطلبية",
+    "change_status": "تعديل الحالة",
+    "reactivate": "إعادة تفعيل الطلبية",
+    "retry_pickup": "إعادة محاولة الاستلام",
+    "retry_delivery": "إعادة محاولة التسليم",
+    "confirm_status_change_title": "تأكيد التغيير",
+    "confirm_status_change_body": "تغيير الحالة إلى : {{status}} ؟",
+    "edit_address": "تعديل العنوان",
+    "add_payment": "إضافة دفعة",
+    "send_sms": "إرسال رسالة نصية",
+    "edit_responsible": "تعديل المسؤولين",
+    "edit_pickup_date": "تعديل تاريخ الاستلام",
+    "edit_pickup_time": "تعديل وقت الاستلام",
+    "edit_pickup_datetime": "تاريخ ووقت الاستلام",
+    "edit_delivery_date": "تعديل تاريخ التوصيل",
+    "edit_delivery_time": "تعديل وقت التوصيل",
+    "cannot_edit_date_now": "لا يمكن تعديل التاريخ في هذه المرحلة",
+    "whatsapp_receipt": "واتساب الوصل",
+    "print": "طباعة",
+    "take_photo": "التقاط صورة",
+    "from_gallery": "من المعرض",
+    "total_m2": "المساحة الإجمالية",
+    "payment_value": "قيمة الدفع",
+    "photo_gallery": "معرض الصور",
+    "payments_section": "المدفوعات",
+    "sms_body": "مرحباً، طلبيتك رقم #{{numero}} قيد المعالجة. شكراً لثقتكم — Astra Pro."
+  },
+  "order": {
+    "deleted_notice": "تم حذف هذا الطلب."
   },
   "pickup": {
     "choose_mode_title": "تأكيد الاستلام",

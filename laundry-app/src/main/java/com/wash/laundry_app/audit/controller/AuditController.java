@@ -12,9 +12,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,44 +54,51 @@ public class AuditController {
 
     @GetMapping("/order/{orderId}/timeline")
     @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYE')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Map<String, Object>>> getOrderTimeline(@PathVariable Long orderId) {
         List<Map<String, Object>> timeline = new ArrayList<>();
 
-        historiqueRepository.findByCommandeIdOrderByCreatedAtDesc(orderId).forEach(h -> timeline.add(Map.of(
-                "type", "STATUS_CHANGE",
-                "timestamp", h.getCreatedAt() != null ? h.getCreatedAt().toString() : "",
-                "actor", h.getUser() != null ? h.getUser().getName() : "Système",
-                "description", (h.getAncienStatut() != null ? h.getAncienStatut() + " → " : "") + h.getNouveauStatut(),
-                "commentaire", h.getCommentaire() != null ? h.getCommentaire() : ""
-        )));
+        historiqueRepository.findByCommandeIdOrderByCreatedAtDesc(orderId).forEach(h -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("type", "STATUS_CHANGE");
+            entry.put("timestamp", h.getCreatedAt() != null ? h.getCreatedAt().toString() : "");
+            entry.put("actor", h.getUser() != null ? h.getUser().getName() : "Système");
+            entry.put("description", (h.getAncienStatut() != null ? h.getAncienStatut() + " → " : "") + (h.getNouveauStatut() != null ? h.getNouveauStatut() : ""));
+            entry.put("commentaire", h.getCommentaire() != null ? h.getCommentaire() : "");
+            timeline.add(entry);
+        });
 
-        paiementRepository.findByCommandeIdOrderByDatePaiementDesc(orderId).forEach(p -> timeline.add(Map.of(
-                "type", "PAYMENT",
-                "timestamp", p.getDatePaiement() != null ? p.getDatePaiement().toString() : "",
-                "actor", p.getRecordedBy() != null ? p.getRecordedBy().getName() : "Système",
-                "description", "Paiement: " + p.getMontant() + " MAD" + (p.getModePaiement() != null ? " (" + p.getModePaiement().name() + ")" : ""),
-                "note", p.getNote() != null ? p.getNote() : ""
-        )));
+        paiementRepository.findByCommandeIdOrderByDatePaiementDesc(orderId).forEach(p -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("type", "PAYMENT");
+            entry.put("timestamp", p.getDatePaiement() != null ? p.getDatePaiement().toString() : "");
+            entry.put("actor", p.getRecordedBy() != null ? p.getRecordedBy().getName() : "Système");
+            entry.put("description", "Paiement: " + p.getMontant() + " MAD" + (p.getModePaiement() != null ? " (" + p.getModePaiement().name() + ")" : ""));
+            entry.put("note", p.getNote() != null ? p.getNote() : "");
+            timeline.add(entry);
+        });
 
-        attemptRepository.findByCommandeIdOrderByAttemptedAtDesc(orderId).forEach(a -> timeline.add(Map.of(
-                "type", "ATTEMPT_FAILED",
-                "timestamp", a.getAttemptedAt() != null ? a.getAttemptedAt().toString() : "",
-                "actor", a.getDriver() != null ? a.getDriver().getName() : "Inconnu",
-                "description", (a.getAttemptType() != null ? a.getAttemptType().name() : "") + " — " + a.getReason(),
-                "notes", a.getNotes() != null ? a.getNotes() : ""
-        )));
+        attemptRepository.findByCommandeIdOrderByAttemptedAtDesc(orderId).forEach(a -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("type", "ATTEMPT_FAILED");
+            entry.put("timestamp", a.getAttemptedAt() != null ? a.getAttemptedAt().toString() : "");
+            entry.put("actor", a.getDriver() != null ? a.getDriver().getName() : "Inconnu");
+            entry.put("description", (a.getAttemptType() != null ? a.getAttemptType().name() : "") + " — " + (a.getReason() != null ? a.getReason() : ""));
+            entry.put("notes", a.getNotes() != null ? a.getNotes() : "");
+            timeline.add(entry);
+        });
 
         auditLogRepository.findByEntityTypeAndEntityIdOrderByTimestampDesc("COMMANDE", orderId).forEach(al -> {
             if ("ORDER_STATUS_CHANGED".equals(al.getActionType())) return;
-            timeline.add(Map.of(
-                    "type", "AUDIT",
-                    "timestamp", al.getTimestamp() != null ? al.getTimestamp().toString() : "",
-                    "actor", al.getUser() != null ? al.getUser().getName() : "Système",
-                    "description", al.getActionType(),
-                    "previousValue", al.getPreviousValue() != null ? al.getPreviousValue() : "",
-                    "newValue", al.getNewValue() != null ? al.getNewValue() : "",
-                    "metadata", al.getMetadata() != null ? al.getMetadata() : ""
-            ));
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("type", "AUDIT");
+            entry.put("timestamp", al.getTimestamp() != null ? al.getTimestamp().toString() : "");
+            entry.put("actor", al.getUser() != null ? al.getUser().getName() : "Système");
+            entry.put("description", al.getActionType() != null ? al.getActionType() : "");
+            entry.put("previousValue", al.getPreviousValue() != null ? al.getPreviousValue() : "");
+            entry.put("newValue", al.getNewValue() != null ? al.getNewValue() : "");
+            entry.put("metadata", al.getMetadata() != null ? al.getMetadata() : "");
+            timeline.add(entry);
         });
 
         timeline.sort((a, b) -> {

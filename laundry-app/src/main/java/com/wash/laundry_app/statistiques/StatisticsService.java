@@ -3,6 +3,7 @@ package com.wash.laundry_app.statistiques;
 import com.wash.laundry_app.command.Commande;
 import com.wash.laundry_app.command.CommandeRepository;
 import com.wash.laundry_app.command.CommandeStatus;
+import com.wash.laundry_app.command.HistoriqueStatutRepository;
 import com.wash.laundry_app.command.PaiementRepository;
 import com.wash.laundry_app.clients.ClientRepository;
 import com.wash.laundry_app.unpaid.UnpaidService;
@@ -28,19 +29,22 @@ public class StatisticsService {
     private final PaiementRepository paiementRepository;
     private final ClientRepository clientRepository;
     private final UnpaidService unpaidService;
+    private final HistoriqueStatutRepository historiqueStatutRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
-    // HELPER — order-creation-date-based breakdown for a date window
+    // HELPER — event-based breakdown anchored on when the status transition
+    // actually occurred (historique_statuts.created_at), not order creation date.
     //
-    // We anchor on commande.date_creation (not historique_statuts.created_at)
-    // so that manually editing date_creation in the DB is immediately reflected.
+    // "Reçues"  = orders whose PICKED_UP transition happened within [start, end].
+    //             Using the status history ensures we count when the driver
+    //             physically collected the items, not when the order was placed.
     //
-    // "Reçues"  = orders created in the window whose current or past status
-    //             ever reached PICKED_UP (i.e. not PENDING_PICKUP / CANCELLED only).
-    //             Since PICKED_UP is always set before any later status, we simply
-    //             check that the order is NOT stuck at PENDING_PICKUP or CANCELLED.
+    // "Livrées" = orders whose DELIVERED transition happened within [start, end].
+    //             Same anchor — when the driver physically delivered the items.
     //
-    // "Livrées" = orders created in the window that are currently DELIVERED.
+    // "Revenue" = payments recorded in the paiements table within [start, end].
+    //             This captures all cash collected in the period regardless of
+    //             which order it belongs to or when that order was created.
     // ─────────────────────────────────────────────────────────────────────────
 
     private StatisticsDTO.StatisticsDTOBuilder applyEventBreakdown(
@@ -48,22 +52,18 @@ public class StatisticsService {
             List<Commande> period,
             LocalDateTime start, LocalDateTime end) {
 
-        // ── Reçues: anchored on date_creation (already filtered by caller) ──────
-        // An order is "received" once it moves past PENDING_PICKUP.
-        List<Long> recuesIds = period.stream()
-                .filter(c -> c.getStatus() != CommandeStatus.PENDING_PICKUP
-                          && c.getStatus() != CommandeStatus.CANCELLED)
-                .map(Commande::getId)
-                .toList();
+        // ── Reçues: orders that transitioned to PICKED_UP in the window ─────────
+        List<Long> recuesIds = historiqueStatutRepository
+                .findDistinctCommandeIdsByStatusBetween("PICKED_UP", start, end);
 
         long recuesCount       = recuesIds.size();
         long recuesItems       = recuesIds.isEmpty() ? 0 : commandeRepository.sumItemsByCommandeIds(recuesIds);
         BigDecimal recuesM2    = recuesIds.isEmpty() ? BigDecimal.ZERO : commandeRepository.sumM2ByCommandeIds(recuesIds);
         BigDecimal recuesTotal = recuesIds.isEmpty() ? BigDecimal.ZERO : commandeRepository.sumMontantTotalByIds(recuesIds);
 
-        // ── Livrées: anchored on date_livraison ───────────────────────────────
-        List<Commande> livreesOrders = commandeRepository.findDeliveredByDateLivraisonBetween(start, end);
-        List<Long> livreesIds = livreesOrders.stream().map(Commande::getId).toList();
+        // ── Livrées: orders that transitioned to DELIVERED in the window ─────────
+        List<Long> livreesIds = historiqueStatutRepository
+                .findDistinctCommandeIdsByStatusBetween("DELIVERED", start, end);
 
         long livreesCount        = livreesIds.size();
         long livreesItems        = livreesIds.isEmpty() ? 0 : commandeRepository.sumItemsByCommandeIds(livreesIds);
@@ -72,12 +72,8 @@ public class StatisticsService {
         BigDecimal livreesPaid   = livreesIds.isEmpty() ? BigDecimal.ZERO : commandeRepository.sumMontantPayeByIds(livreesIds);
         BigDecimal livreesUnpaid = livreesTotal.subtract(livreesPaid).max(BigDecimal.ZERO);
 
-        // ── Revenue: sum of montant_paye on orders delivered in the period ────
-        // This is the cash actually collected for work completed in the window,
-        // regardless of when the original payment was recorded.
-        BigDecimal revenue = livreesOrders.stream()
-                .map(c -> c.getMontantPaye() != null ? c.getMontantPaye() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // ── Revenue: payments actually collected in the window ────────────────────
+        BigDecimal revenue = paiementRepository.sumCollectedBetween(start, end);
 
         return builder
                 .totalRevenue(revenue)
@@ -134,6 +130,7 @@ public class StatisticsService {
         unpaidData.put("amount",       unpaid.getTotalRemaining() != null ? unpaid.getTotalRemaining() : BigDecimal.ZERO);
 
         long todayClients = todayCommandes.stream()
+                .filter(c -> c.getClient() != null)
                 .map(c -> c.getClient().getId())
                 .distinct()
                 .count();
@@ -188,6 +185,7 @@ public class StatisticsService {
                 .count();
 
         long periodClients = period.stream()
+                .filter(c -> c.getClient() != null)
                 .map(c -> c.getClient().getId())
                 .distinct()
                 .count();

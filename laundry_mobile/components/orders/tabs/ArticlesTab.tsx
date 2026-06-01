@@ -29,6 +29,11 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
           ? (parseFloat(item.largeur) * parseFloat(item.hauteur || item.longueur)).toFixed(2)
           : null;
 
+        const hasRemise = !!(item.remiseMontant && parseFloat(item.remiseMontant) > 0);
+        const originalPrice = hasRemise
+          ? parseFloat(item.prixFinal || 0) + parseFloat(item.remiseMontant)
+          : null;
+
         return (
           <View key={item.id} style={styles.itemCard}>
             <View style={[styles.itemHeader, row(isArabic)]}>
@@ -46,10 +51,29 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                   {isArabic && item.productNomAr ? item.productNomAr : item.productNom || t('admin.items.default_item_name')}
                 </Text>
               </View>
-              <Text style={styles.itemPrice}>
-                {parseFloat(item.prixFinal || 0).toFixed(2)} {t('common.dh')}
-              </Text>
+              <View style={{ alignItems: isArabic ? 'flex-start' : 'flex-end' }}>
+                {!!hasRemise && (
+                  <Text style={styles.itemPriceStrikethrough}>
+                    {originalPrice!.toFixed(2)} {t('common.dh')}
+                  </Text>
+                )}
+                <Text style={styles.itemPrice}>
+                  {parseFloat(item.prixFinal || 0).toFixed(2)} {t('common.dh')}
+                </Text>
+              </View>
             </View>
+
+            {hasRemise && (
+              <View style={[styles.remiseBadge, row(isArabic)]}>
+                <Feather name="tag" size={12} color="#D97706" />
+                <Text style={styles.remiseBadgeText}>
+                  {t('orders.remise', { defaultValue: 'Remise' })} -{parseFloat(item.remiseMontant).toFixed(2)} {t('common.dh')}
+                </Text>
+                {!!item.remiseRaison && (
+                  <Text style={styles.remiseBadgeText}>{' · '}{item.remiseRaison}</Text>
+                )}
+              </View>
+            )}
 
             {item.images && item.images.length > 0 && (
               <ScrollView
@@ -78,7 +102,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
 
             {item.modeTarification === 'PER_M2' && (
               <View style={[styles.chipsRow, row(isArabic)]}>
-                <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
+                <View style={[styles.dimensionChip, isArabic ? { alignItems: 'flex-end' } : null]}>
                   <Text style={[styles.chipLabel, f.chipLabel]}>
                     {t('admin.orders.create.items.dimensions')}
                   </Text>
@@ -86,7 +110,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                     {item.largeur || '—'} × {item.hauteur || item.longueur || '—'} m
                   </Text>
                 </View>
-                <View style={[styles.dimensionChip, isArabic && { alignItems: 'flex-end' }]}>
+                <View style={[styles.dimensionChip, isArabic ? { alignItems: 'flex-end' } : null]}>
                   <Text style={[styles.chipLabel, f.chipLabel]}>
                     {t('admin.orders.create.items.area')}
                   </Text>
@@ -100,7 +124,7 @@ const ArticlesTab: React.FC<ArticlesTabProps> = ({
                 style={[
                   styles.dimensionChip,
                   { marginTop: 12, alignSelf: isArabic ? 'flex-end' : 'flex-start' },
-                  isArabic && { alignItems: 'flex-end' },
+                  isArabic ? { alignItems: 'flex-end' } : null,
                 ]}
               >
                 <Text style={[styles.chipLabel, f.chipLabel]}>
@@ -184,6 +208,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: Colors.primary,
+  },
+  itemPriceStrikethrough: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  remiseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  remiseBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
   },
   itemGalleryImg: {
     width: 60,

@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
   FlatList,
   ActivityIndicator,
   RefreshControl,
@@ -13,7 +14,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
-import { row, textAlign } from '../../src/utils/rtl';
+import { row, textAlign, font, arabicSafe, textProps } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -50,6 +51,7 @@ export default function OrdersByStatusScreen() {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStaffModal, setShowStaffModal] = useState(false);
+  const [search, setSearch] = useState('');
 
   const mapRef = useRef<MapView>(null);
   const { route, calculateRoute, clearRoute, loading: routeLoading } = useDirections();
@@ -99,6 +101,7 @@ export default function OrdersByStatusScreen() {
     const base: any = {
       page: 0,
       size: 50,
+      search: search.length >= 1 ? search : undefined,
       dateDebut: dateDebut ? dateDebut.toISOString().split('T')[0] : undefined,
       livreurId: selectedStaffId || undefined,
     };
@@ -109,7 +112,7 @@ export default function OrdersByStatusScreen() {
       mode: mode as string,
       activeOnly: mode === 'IMMEDIATE' ? true : undefined,
     };
-  }, [status, mode, specialFilter, dateDebut, selectedStaffId]);
+  }, [status, mode, specialFilter, search, dateDebut, selectedStaffId]);
 
   const { data: ordersData, isLoading: loading, isFetching, refetch } = useOrders(orderFilters);
   const refreshing = isFetching && !loading;
@@ -191,10 +194,9 @@ export default function OrdersByStatusScreen() {
   }, [selectedOrder, userLocation]);
 
   const renderOrderCard = ({ item }: { item: any }) => {
-    const isReady = item.status === 'READY_FOR_DELIVERY';
     const statusCfg = require('../../constants/StatusColors').StatusColors[item.status] || { dot: statusConfig.color };
-
     const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
+    const address = item.client?.addresses?.[0]?.address || item.clientAdresse || null;
 
     return (
       <TouchableOpacity
@@ -202,48 +204,51 @@ export default function OrdersByStatusScreen() {
         onPress={() => router.push(`/order/${item.id}`)}
         activeOpacity={0.7}
       >
-        <View style={[isArabic ? styles.accentBarAr : styles.accentBar, { backgroundColor: statusCfg.dot }]} />
-
-        <View style={[styles.orderTop, row(isArabic)]}>
-          <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
-          {isReady ? (
-            <View style={[styles.readyBadge, row(isArabic)]}>
-              <View style={styles.readyDot} />
-              <Text style={styles.readyText}>{t('admin.orders.ready')}</Text>
-            </View>
-          ) : (
-            <StatusBadge status={item.status} />
-          )}
+        {/* Top row: status badge + order id */}
+        <View style={[styles.cardTop, row(isArabic)]}>
+          <StatusBadge status={item.status} />
+          <Text style={[styles.orderRef, arabicSafe(isArabic), { color: statusCfg.dot, fontSize: 17, fontWeight: '800' }]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>#{item.id}</Text>
         </View>
 
-        <Text style={[styles.orderClientName, isArabic && { textAlign: 'right' }]}>{item.client?.name || item.clientNom}</Text>
+        {/* Client name */}
+        <Text style={[styles.clientName, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.client?.name || item.clientNom}</Text>
 
+        {/* Address */}
+        {address && (
+          <View style={[styles.addressItem, { marginTop: 4 }, row(isArabic)]}>
+            <Ionicons name="location-outline" size={13} color={AdminColors.textMuted} />
+            <Text style={[styles.addressText, textAlign(isArabic)]} numberOfLines={1} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{address}</Text>
+          </View>
+        )}
+
+        {/* Items + date */}
         <View style={[styles.infoRow, row(isArabic)]}>
           <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="cube-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{itemsSummary}</Text>
+            <Ionicons name="cube-outline" size={13} color={AdminColors.textSecondary} />
+            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{itemsSummary}</Text>
           </View>
           <View style={[styles.infoItem, row(isArabic)]}>
-            <Ionicons name="calendar-outline" size={14} color={AdminColors.textSecondary} />
-            <Text style={styles.infoText}>{new Date(item.dateCreation).toLocaleDateString(isArabic ? 'fr-FR' : 'fr-FR')}</Text>
+            <Ionicons name="calendar-outline" size={13} color={AdminColors.textSecondary} />
+            <Text style={[styles.infoText, font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{new Date(item.dateCreation).toLocaleDateString('fr-FR')}</Text>
           </View>
         </View>
 
+        {/* Bottom row: amount + financials */}
         <View style={[styles.cardBottom, row(isArabic)]}>
-          <View style={isArabic && { alignItems: 'flex-end' }}>
-            <Text style={styles.amountText}>{item.montantTotal} {t('common.dh')}</Text>
+          <View style={isArabic ? { alignItems: 'flex-end' } : {}}>
+            <Text style={[styles.amountText, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{item.montantTotal} {t('common.dh')}</Text>
             {(item.montantPaye > 0 || item.resteAPayer > 0) && (
               <View style={[styles.financialRow, row(isArabic)]}>
-                <Text style={styles.payeText}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
+                <Text style={[styles.payeText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.paid')}: {item.montantPaye || 0} {t('common.dh')}</Text>
                 {item.resteAPayer > 0 && (
-                  <Text style={styles.resteText}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
+                  <Text style={[styles.resteText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{t('financial.remaining')}: {item.resteAPayer} {t('common.dh')}</Text>
                 )}
               </View>
             )}
             {!!item.debtSettledAt && specialFilter === 'PAID_DEBTS' && (
               <View style={[styles.financialRow, row(isArabic)]}>
                 <Ionicons name="checkmark-circle" size={13} color="#10B981" />
-                <Text style={styles.settledText}>
+                <Text style={[styles.settledText, font.semibold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
                   {t('dashboard.settled_on')}: {new Date(item.debtSettledAt).toLocaleDateString('fr-FR')}
                 </Text>
               </View>
@@ -452,6 +457,23 @@ export default function OrdersByStatusScreen() {
             </View>
           </View>
 
+          {/* Search */}
+          <View style={[styles.searchContainer, row(isArabic)]}>
+            <Ionicons name="search" size={18} color={AdminColors.primary} />
+            <TextInput
+              style={[styles.searchInput, textAlign(isArabic)]}
+              placeholder={t('admin.orders.search_placeholder')}
+              placeholderTextColor={AdminColors.textMuted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color={AdminColors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Filters */}
           <View style={[styles.filtersContainer, row(isArabic)]}>
             <TouchableOpacity
@@ -627,6 +649,14 @@ const styles = StyleSheet.create({
   summaryAmountValue: { fontSize: 16, fontWeight: '800' },
   summaryAmountDivider: { height: 1, width: '60%', backgroundColor: '#F1F5F9' },
 
+  // Search
+  searchContainer: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'white', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10,
+    marginHorizontal: 16, marginBottom: 10, ...AdminShadows.shadowSmall,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: AdminColors.textPrimary },
+
   // Filters
   filtersContainer: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, gap: 10 },
   filterBtn: {
@@ -645,89 +675,64 @@ const styles = StyleSheet.create({
   // List
   listContainer: { paddingBottom: 24, paddingTop: 4 },
 
-  // Order card — simple 3-row layout
   orderCard: {
-    backgroundColor: 'white', borderRadius: 16, marginHorizontal: 16, marginBottom: 10,
-    paddingVertical: 16, paddingHorizontal: 18, paddingLeft: 22,
-    overflow: 'hidden', ...AdminShadows.shadowSmall,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    ...AdminShadows.shadowSmall,
   },
-  accentBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5 },
-  accentBarAr: { position: 'absolute', right: 0, left: undefined, top: 0, bottom: 0, width: 5 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  orderRef: { fontSize: 12, fontWeight: '700', color: AdminColors.textMuted, letterSpacing: 0.5 },
-  cardAmount: { fontSize: 16, fontWeight: '800' },
-  cardClient: { fontSize: 17, fontWeight: '700', color: AdminColors.textPrimary, marginBottom: 8 },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardMetaText: { fontSize: 13, color: AdminColors.textSecondary, fontWeight: '500' },
-  orderTop: {
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  orderClientName: {
-    fontSize: 16,
+  orderRef: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  clientName: {
+    fontSize: 17,
     fontWeight: '700',
     color: AdminColors.textPrimary,
-    marginBottom: 10,
+    marginTop: 2,
   },
-  readyBadge: {
+  addressItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
+    gap: 4,
   },
-  readyDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  readyText: {
+  addressText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#059669',
+    color: AdminColors.textMuted,
+    fontWeight: '500',
+    flex: 1,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 16,
-    marginTop: 12,
+    gap: 14,
+    marginTop: 10,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   infoText: {
     fontSize: 13,
     color: AdminColors.textSecondary,
     fontWeight: '500',
   },
-  areaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  areaText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0284C7',
-  },
   cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },

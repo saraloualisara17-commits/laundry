@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -20,7 +21,7 @@ public class CreateCommandeRequest {
     private String mode; // IMMEDIATE or SCHEDULED
     private String deliveryType;
     private Long pickupDriverId;
-    private String scheduledPickupDate;
+    private LocalDateTime scheduledPickupDate;
     private String paymentMethod;
     private BigDecimal montantPaye;
     private String notes;
@@ -49,8 +50,8 @@ public class CreateCommandeRequest {
     public void setDeliveryType(String deliveryType) { this.deliveryType = deliveryType; }
     public Long getPickupDriverId() { return pickupDriverId; }
     public void setPickupDriverId(Long pickupDriverId) { this.pickupDriverId = pickupDriverId; }
-    public String getScheduledPickupDate() { return scheduledPickupDate; }
-    public void setScheduledPickupDate(String scheduledPickupDate) { this.scheduledPickupDate = scheduledPickupDate; }
+    public LocalDateTime getScheduledPickupDate() { return scheduledPickupDate; }
+    public void setScheduledPickupDate(LocalDateTime scheduledPickupDate) { this.scheduledPickupDate = scheduledPickupDate; }
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
     public BigDecimal getMontantPaye() { return montantPaye; }

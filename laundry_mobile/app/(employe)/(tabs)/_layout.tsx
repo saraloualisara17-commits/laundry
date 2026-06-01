@@ -69,6 +69,18 @@ export default function EmployeTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          tabBarLabel: t('tabs.clients'),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.iconWrap}>
+              {focused && <View style={styles.dot} />}
+              <Ionicons name={focused ? 'people' : 'people-outline'} size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

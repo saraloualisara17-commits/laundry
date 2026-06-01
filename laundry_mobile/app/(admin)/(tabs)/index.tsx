@@ -20,7 +20,7 @@ import { useOrderCreation } from '../../../src/context/OrderCreationContext';
 import { useRTL, row, font, arabicSafe, pos, textAlign, alignStart, alignEnd, chevronForward, borderStart, textProps } from '../../../src/utils/rtl';
 import { ScannerModal } from '../../../components/admin/ScannerModal';
 import { useDashboardStats, useStatusOverview, useUnpaidOverview } from '../../../src/hooks/query/useDashboard';
-import { useReadyDeliveries, usePendingPickups } from '../../../src/hooks/queries/useLivreur';
+import { useReadyDeliveries, usePendingPickups, useOverdueStats } from '../../../src/hooks/queries/useLivreur';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -60,10 +60,14 @@ export default function AdminDashboard() {
   const { data: unpaidOverviewData, refetch: refetchUnpaid } = useUnpaidOverview();
   const { data: pendingPickups = [], refetch: refetchPickups } = usePendingPickups();
   const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
+  const { data: overdueData, refetch: refetchOverdue } = useOverdueStats();
 
   const overview = overviewRes?.data ?? overviewRes ?? null;
   const unpaidOverview = unpaidOverviewData ?? null;
   const myMissionCount = pendingPickups.length + readyDeliveries.length;
+  const overduePickups = overdueData?.overduePickups ?? 0;
+  const overdueDeliveries = overdueData?.overdueDeliveries ?? 0;
+  const totalOverdue = overduePickups + overdueDeliveries;
   const refreshing = isFetchingOverview && !isLoadingOverview;
 
   const lastUpdated = useMemo(
@@ -77,6 +81,7 @@ export default function AdminDashboard() {
     refetchUnpaid();
     refetchPickups();
     refetchDeliveries();
+    refetchOverdue();
   };
 
   const loadOverviewData = refetchOverview;
@@ -211,8 +216,8 @@ export default function AdminDashboard() {
             <Text style={styles.quickActionLabel}>{t('admin.orders.scan')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.quickActionBtn} 
+          <TouchableOpacity
+            style={styles.quickActionBtn}
             onPress={() => router.push('/(admin)/all-orders-map')}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF6' }]}>
@@ -220,7 +225,47 @@ export default function AdminDashboard() {
             </View>
             <Text style={styles.quickActionLabel}>{t('admin.more.map_title')}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={() => router.push('/(admin)/gallery')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#F59E0B' }]}>
+              <Ionicons name="images-outline" size={22} color="white" />
+            </View>
+            <Text style={styles.quickActionLabel}>{t('admin.gallery.title', { defaultValue: 'Galerie' })}</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Overdue Alert */}
+        {totalOverdue > 0 && (
+          <View style={styles.overdueRow}>
+            {overduePickups > 0 && (
+              <TouchableOpacity
+                style={[styles.overdueChip, { borderColor: '#F59E0B' }]}
+                onPress={() => router.push({ pathname: '/(admin)/late-orders', params: { type: 'pickup' } })}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                <Text style={[styles.overdueChipText, { color: '#F59E0B' }]}>
+                  {overduePickups} {t('dashboard.overdue_pickups', { defaultValue: 'collectes en retard' })}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {overdueDeliveries > 0 && (
+              <TouchableOpacity
+                style={[styles.overdueChip, { borderColor: '#EF4444' }]}
+                onPress={() => router.push({ pathname: '/(admin)/late-orders', params: { type: 'delivery' } })}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="car-outline" size={16} color="#EF4444" />
+                <Text style={[styles.overdueChipText, { color: '#EF4444' }]}>
+                  {overdueDeliveries} {t('dashboard.overdue_deliveries', { defaultValue: 'livraisons en retard' })}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* 2. Create Order Section */}
         <View style={styles.actionsGrid}>
@@ -687,5 +732,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 4,
     textAlign: 'center',
+  },
+  overdueRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  overdueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    backgroundColor: 'white',
+  },
+  overdueChipText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

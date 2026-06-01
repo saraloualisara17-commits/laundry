@@ -78,6 +78,7 @@ export const queryKeys = {
     deliveries: () => [...queryKeys.livreur.all, 'deliveries'] as const,
     pickups: () => [...queryKeys.livreur.all, 'pickups'] as const,
     cancelled: () => [...queryKeys.livreur.all, 'cancelled'] as const,
+    overdueStats: () => [...queryKeys.livreur.all, 'overdue-stats'] as const,
   },
 
   // ─── NOTIFICATIONS ─────────────────────────────────────────────────────────

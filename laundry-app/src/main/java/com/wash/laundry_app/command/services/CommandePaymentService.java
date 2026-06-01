@@ -82,10 +82,9 @@ public class CommandePaymentService {
 
         commande = commandeRepository.save(commande);
 
-        helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser,
-                "Paiement enregistré: " + amount + " MAD (" + mode.name() + ")");
+        helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser, null);
         auditService.log("PAYMENT_RECORDED", "COMMANDE", commande.getId(),
-                         null, amount.toString(), "Mode: " + mode.name());
+                         null, amount.toString(), mode.name());
         eventPublisher.publishEvent(OrderSideEffectEvent.paymentAdded(commande.getId()));
 
         return commandeMapper.toDto(commande);
@@ -146,10 +145,9 @@ public class CommandePaymentService {
 
         commandeRepository.save(commande);
 
-        helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser,
-                "Paiement ajouté: " + amount + " MAD" + " (" + mode.name() + ")");
+        helperService.recordAudit(commande, commande.getStatus().name(), commande.getStatus().name(), currentUser, null);
         auditService.log("PAYMENT_ADDED", "COMMANDE", commande.getId(),
-                         null, amount.toString(), "Note: " + note);
+                         null, amount.toString(), mode.name());
         eventPublisher.publishEvent(OrderSideEffectEvent.paymentAdded(commande.getId()));
 
         return PaiementDTO.builder()

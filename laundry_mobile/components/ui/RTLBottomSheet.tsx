@@ -45,6 +45,8 @@ interface RTLBottomSheetProps {
   sheetStyle?: ViewStyle;
   /** Extra bottom padding inside the scroll area */
   extraBottomPad?: number;
+  /** Render as a centered card instead of a bottom sheet */
+  centered?: boolean;
   children: React.ReactNode;
 }
 
@@ -56,49 +58,43 @@ export function RTLBottomSheet({
   footer,
   sheetStyle,
   extraBottomPad = 0,
+  centered = false,
   children,
 }: RTLBottomSheetProps) {
   const { isRTL } = useRTL();
   const insets = useSafeAreaInsets();
-  const maxHeight = Dimensions.get('window').height * maxHeightFraction;
-  const bottomPad = (footer ? 0 : insets.bottom + extraBottomPad + 16);
+  const maxHeight = Dimensions.get('window').height * (centered ? Math.min(maxHeightFraction, 0.70) : maxHeightFraction);
+  const bottomPad = footer ? 0 : Math.max(insets.bottom, 16) + extraBottomPad;
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType={centered ? 'fade' : 'slide'}
       transparent
       onRequestClose={onClose}
       statusBarTranslucent={Platform.OS === 'android'}
     >
-      {/*
-        KeyboardAvoidingView wraps the ENTIRE overlay so it has the full
-        screen height as its reference frame. This is the only placement
-        where behavior="padding" works correctly inside a transparent Modal
-        on iOS — wrapping just the sheet content gives it a zero-height
-        reference and produces wrong offsets.
-      */}
       <KeyboardAvoidingView
-        style={styles.overlay}
+        style={centered ? styles.overlayCenter : styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
         {/* Tap backdrop to dismiss */}
         <TouchableOpacity
-          style={styles.backdrop}
+          style={centered ? StyleSheet.absoluteFillObject : styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
         />
 
         <View
           style={[
-            styles.sheet,
-            { maxHeight },
+            centered ? styles.card : styles.sheet,
+            centered ? { maxHeight } : { maxHeight },
             sheetStyle,
           ]}
         >
-          {/* Drag handle */}
-          <View style={styles.handle} />
+          {/* Drag handle — bottom sheet only */}
+          {!centered && <View style={styles.handle} />}
 
           {/* Optional title */}
           {!!title && (
@@ -110,21 +106,19 @@ export function RTLBottomSheet({
             </Text>
           )}
 
-          {/* Scrollable content — plain ScrollView, keyboard is handled by
-              the outer KeyboardAvoidingView which has the correct frame */}
           <ScrollView
             style={styles.scrollContainer}
             bounces={false}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: bottomPad }}
+            contentContainerStyle={{ paddingBottom: centered ? 0 : bottomPad }}
           >
             {children}
           </ScrollView>
 
           {/* Sticky footer */}
           {footer && (
-            <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16 }]}>
+            <View style={[styles.footer, { paddingBottom: centered ? 0 : insets.bottom + 12 }]}>
               {footer}
             </View>
           )}
@@ -140,8 +134,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,18,25,0.55)',
     justifyContent: 'flex-end',
   },
+  overlayCenter: {
+    flex: 1,
+    backgroundColor: 'rgba(0,18,25,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+  },
   backdrop: {
     flex: 1,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
   },
   sheet: {
     backgroundColor: Colors.surface,

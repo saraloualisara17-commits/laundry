@@ -67,7 +67,7 @@ public class CommandeWorkflowValidator {
                 CommandeStatus.DELIVERY_FAILED,
                 CommandeStatus.CANCELLED
         ));
-        // Failure states — admin can reschedule or cancel
+        // Failure states — can be reactivated or cancelled
         VALID_TRANSITIONS.put(CommandeStatus.PICKUP_FAILED, Set.of(
                 CommandeStatus.PENDING_PICKUP,
                 CommandeStatus.CANCELLED
@@ -76,9 +76,12 @@ public class CommandeWorkflowValidator {
                 CommandeStatus.READY_FOR_DELIVERY,
                 CommandeStatus.CANCELLED
         ));
-        // Terminal states — no outgoing transitions
+        // Cancelled — can be reactivated to restart pickup
+        VALID_TRANSITIONS.put(CommandeStatus.CANCELLED, Set.of(
+                CommandeStatus.PENDING_PICKUP
+        ));
+        // Terminal state — no outgoing transitions
         VALID_TRANSITIONS.put(CommandeStatus.DELIVERED, Set.of());
-        VALID_TRANSITIONS.put(CommandeStatus.CANCELLED, Set.of());
 
         // ── Role permissions per transition ───────────────────────────────────
         addRole(CommandeStatus.PENDING_PICKUP,    CommandeStatus.PICKED_UP,           Role.LIVREUR, Role.ADMIN);
@@ -91,10 +94,11 @@ public class CommandeWorkflowValidator {
         addRole(CommandeStatus.READY_FOR_DELIVERY, CommandeStatus.DELIVERED,          Role.LIVREUR, Role.ADMIN);
         addRole(CommandeStatus.READY_FOR_DELIVERY, CommandeStatus.DELIVERY_FAILED,    Role.LIVREUR, Role.ADMIN);
         addRole(CommandeStatus.READY_FOR_DELIVERY, CommandeStatus.CANCELLED,          Role.ADMIN);
-        addRole(CommandeStatus.PICKUP_FAILED,     CommandeStatus.PENDING_PICKUP,      Role.ADMIN);
-        addRole(CommandeStatus.PICKUP_FAILED,     CommandeStatus.CANCELLED,           Role.ADMIN);
-        addRole(CommandeStatus.DELIVERY_FAILED,   CommandeStatus.READY_FOR_DELIVERY,  Role.ADMIN);
-        addRole(CommandeStatus.DELIVERY_FAILED,   CommandeStatus.CANCELLED,           Role.ADMIN);
+        addRole(CommandeStatus.PICKUP_FAILED,     CommandeStatus.PENDING_PICKUP,      Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.PICKUP_FAILED,     CommandeStatus.CANCELLED,           Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.DELIVERY_FAILED,   CommandeStatus.READY_FOR_DELIVERY,  Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.DELIVERY_FAILED,   CommandeStatus.CANCELLED,           Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
+        addRole(CommandeStatus.CANCELLED,         CommandeStatus.PENDING_PICKUP,      Role.LIVREUR, Role.EMPLOYE, Role.ADMIN);
     }
 
     private static void addRole(CommandeStatus from, CommandeStatus to, Role... roles) {

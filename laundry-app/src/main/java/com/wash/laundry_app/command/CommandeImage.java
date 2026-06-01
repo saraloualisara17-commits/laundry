@@ -55,8 +55,16 @@ public class CommandeImage {
     private Boolean isArchived = false;
 
     public enum PhotoType {
-        reception,
-        apres_traitement,
-        livraison
+        pending_pickup,
+        reception,       // legacy / picked_up
+        picked_up,
+        in_process,
+        apres_traitement, // legacy / in_process
+        ready_for_delivery,
+        livraison,
+        delivered,
+        pickup_failed,
+        delivery_failed,
+        cancelled
     }
 }

@@ -19,6 +19,7 @@ export const useStatusOverview = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.overview(),
     queryFn: () => adminApi.getStatusOverview().then(res => res.data),
+    staleTime: 0,
   });
 };
 
@@ -29,5 +30,6 @@ export const useUnpaidOverview = () => {
   return useQuery({
     queryKey: queryKeys.dashboard.unpaidOverview(),
     queryFn: () => adminApi.getUnpaidOverview().then(res => res.data),
+    staleTime: 0,
   });
 };

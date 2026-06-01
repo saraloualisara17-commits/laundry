@@ -109,8 +109,21 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("status") CommandeStatus status
     );
 
-    @Query("SELECT c FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' AND c.deliveryDriver.id = :driverId")
-    List<Commande> findReadyForDeliveryDueForDriver(@Param("driverId") Long driverId);
+    @Query("SELECT c FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' " +
+           "AND c.deliveryDriver.id = :driverId " +
+           "AND (c.scheduledDeliveryDate IS NULL OR c.scheduledDeliveryDate <= :now)")
+    List<Commande> findReadyForDeliveryDueForDriver(
+            @Param("driverId") Long driverId,
+            @Param("now") LocalDateTime now
+    );
+
+    @Query("SELECT c FROM Commande c WHERE c.status = 'PENDING_PICKUP' " +
+           "AND c.livreur.id = :driverId " +
+           "AND (c.scheduledPickupDate IS NULL OR c.scheduledPickupDate <= :now)")
+    List<Commande> findPendingPickupsDueForDriver(
+            @Param("driverId") Long driverId,
+            @Param("now") LocalDateTime now
+    );
 
     // ── Client queries ────────────────────────────────────────────────────────
     List<Commande> findByClientId(Long clientId);
@@ -161,7 +174,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
-            "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(:search IS NULL OR str(c.id) = :search OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))",
            countQuery = "SELECT COUNT(c) FROM Commande c LEFT JOIN c.livreur ld LEFT JOIN c.deliveryDriver dd WHERE " +
             "(:status IS NULL OR c.status = :status) AND " +
@@ -172,7 +185,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
-            "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(:search IS NULL OR str(c.id) = :search OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Commande> findFiltered(
             @Param("status") CommandeStatus status,
@@ -196,7 +209,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
-            "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(:search IS NULL OR str(c.id) = :search OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     BigDecimal findFilteredTotalValue(
             @Param("status") CommandeStatus status,
@@ -219,7 +232,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
-            "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(:search IS NULL OR str(c.id) = :search OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     BigDecimal findFilteredTotalUnpaid(
             @Param("status") CommandeStatus status,
@@ -242,7 +255,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateDebut IS NULL OR (:paidDebts = true AND c.debtSettledAt >= :dateDebut) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation >= :dateDebut) AND " +
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
-            "(:search IS NULL OR LOWER(c.numeroCommande) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(:search IS NULL OR str(c.id) = :search OR " +
             "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     Long findFilteredTotalVolume(
             @Param("status") CommandeStatus status,
@@ -357,13 +370,23 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     // ── Operational alert queries ─────────────────────────────────────────────
 
-    /** Orders stuck in PENDING_PICKUP beyond a threshold (overdue pickup). */
-    @Query("SELECT c FROM Commande c WHERE c.status = 'PENDING_PICKUP' AND c.dateCreation <= :cutoff")
-    List<Commande> findOverduePickups(@Param("cutoff") LocalDateTime cutoff);
+    /** Orders in PENDING_PICKUP whose scheduledPickupDate has already passed. */
+    @Query("SELECT c FROM Commande c WHERE c.status = 'PENDING_PICKUP' " +
+           "AND c.scheduledPickupDate IS NOT NULL AND c.scheduledPickupDate < :now")
+    List<Commande> findOverduePickups(@Param("now") LocalDateTime now);
 
-    /** Orders stuck in READY_FOR_DELIVERY beyond a threshold (delayed delivery). */
-    @Query("SELECT c FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' AND c.dateCreation <= :cutoff")
-    List<Commande> findDelayedDeliveries(@Param("cutoff") LocalDateTime cutoff);
+    /** Orders in READY_FOR_DELIVERY whose scheduledDeliveryDate has already passed. */
+    @Query("SELECT c FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' " +
+           "AND c.scheduledDeliveryDate IS NOT NULL AND c.scheduledDeliveryDate < :now")
+    List<Commande> findDelayedDeliveries(@Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'PENDING_PICKUP' " +
+           "AND c.scheduledPickupDate IS NOT NULL AND c.scheduledPickupDate < :now")
+    long countOverduePickups(@Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' " +
+           "AND c.scheduledDeliveryDate IS NOT NULL AND c.scheduledDeliveryDate < :now")
+    long countOverdueDeliveries(@Param("now") LocalDateTime now);
 
     /** Delivered orders with outstanding balance (unpaid debt). */
     @Query("SELECT c FROM Commande c WHERE c.status = 'DELIVERED' " +
@@ -390,4 +413,44 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     @Query("SELECT MIN(c.dateCreation) FROM Commande c")
     Optional<LocalDateTime> findEarliestCreationDate();
+
+    // ── Gallery: orders that have at least one non-archived image ─────────────
+    @Query(value =
+           "SELECT DISTINCT c FROM Commande c " +
+           "JOIN c.client cl " +
+           "WHERE EXISTS (SELECT img FROM CommandeImage img WHERE img.commande = c AND img.isArchived = false) " +
+           "AND (:status IS NULL OR str(c.status) = :status) " +
+           "AND (:dateDebut IS NULL OR c.dateCreation >= :dateDebut) " +
+           "AND (:dateFin  IS NULL OR c.dateCreation <= :dateFin) " +
+           "AND (:search IS NULL OR (" +
+           "     str(c.id) LIKE CONCAT('%', :search, '%') " +
+           "     OR LOWER(cl.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "     OR EXISTS (SELECT p FROM cl.phones p WHERE p.phoneNumber LIKE CONCAT('%', :search, '%')))) " +
+           "ORDER BY c.dateCreation DESC",
+           countQuery =
+           "SELECT COUNT(DISTINCT c) FROM Commande c " +
+           "JOIN c.client cl " +
+           "WHERE EXISTS (SELECT img FROM CommandeImage img WHERE img.commande = c AND img.isArchived = false) " +
+           "AND (:status IS NULL OR str(c.status) = :status) " +
+           "AND (:dateDebut IS NULL OR c.dateCreation >= :dateDebut) " +
+           "AND (:dateFin  IS NULL OR c.dateCreation <= :dateFin) " +
+           "AND (:search IS NULL OR (" +
+           "     str(c.id) LIKE CONCAT('%', :search, '%') " +
+           "     OR LOWER(cl.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "     OR EXISTS (SELECT p FROM cl.phones p WHERE p.phoneNumber LIKE CONCAT('%', :search, '%'))))")
+    Page<Commande> findOrdersWithImages(
+            @Param("status") String status,
+            @Param("search") String search,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            Pageable pageable
+    );
+
+    // Two separate queries to avoid Hibernate multi-bag fetch exception:
+    // phones and images are both @OneToMany bags — fetching both in one query is forbidden.
+    @Query("SELECT DISTINCT c FROM Commande c LEFT JOIN FETCH c.client cl LEFT JOIN FETCH cl.phones WHERE c.id IN :ids")
+    List<Commande> findByIdsWithClient(@Param("ids") List<Long> ids);
+
+    @Query("SELECT DISTINCT c FROM Commande c LEFT JOIN FETCH c.images img WHERE c.id IN :ids AND img.isArchived = false")
+    List<Commande> findByIdsWithImages(@Param("ids") List<Long> ids);
 }

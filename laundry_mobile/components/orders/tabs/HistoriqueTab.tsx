@@ -9,7 +9,7 @@ import {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { fr, arDZ as ar } from 'date-fns/locale';
-import { Colors, Shadows } from '../../../constants/theme';
+import { Colors } from '../../../constants/theme';
 import { useRTL, row, textAlign, font, textProps } from '../../../src/utils/rtl';
 import { useOrderTimeline } from '../../../src/hooks/query/useAudit';
 import { TimelineEntry } from '../../../src/services/api/auditApi';
@@ -18,11 +18,11 @@ interface HistoriqueTabProps {
   orderId: string | number;
 }
 
-const TYPE_CONFIG: Record<string, { icon: string; iconLib: 'ion' | 'feather'; color: string; bg: string; label: string }> = {
-  STATUS_CHANGE: { icon: 'git-branch-outline', iconLib: 'ion',    color: Colors.primary,   bg: Colors.primary50,   label: 'Statut' },
-  PAYMENT:       { icon: 'cash-outline',        iconLib: 'ion',    color: Colors.success,   bg: '#F0FDF4',          label: 'Paiement' },
-  ATTEMPT_FAILED:{ icon: 'alert-circle-outline',iconLib: 'ion',    color: '#D97706',        bg: '#FFFBEB',          label: 'Tentative' },
-  AUDIT:         { icon: 'shield',              iconLib: 'feather', color: Colors.textMuted, bg: '#F8FAFC',          label: 'Audit' },
+const TYPE_CONFIG: Record<string, { icon: string; iconLib: 'ion' | 'feather'; color: string; bg: string; label: Record<string, string> }> = {
+  STATUS_CHANGE: { icon: 'git-branch-outline', iconLib: 'ion',     color: Colors.primary,   bg: Colors.primary50, label: { fr: 'Statut',    ar: 'الحالة'  } },
+  PAYMENT:       { icon: 'cash-outline',        iconLib: 'ion',     color: Colors.success,   bg: '#F0FDF4',        label: { fr: 'Paiement',  ar: 'دفع'     } },
+  ATTEMPT_FAILED:{ icon: 'alert-circle-outline',iconLib: 'ion',     color: '#D97706',        bg: '#FFFBEB',        label: { fr: 'Tentative', ar: 'محاولة'  } },
+  AUDIT:         { icon: 'shield',              iconLib: 'feather', color: Colors.textMuted, bg: '#F8FAFC',        label: { fr: 'Audit',     ar: 'تدقيق'  } },
 };
 
 function formatTs(ts: string, isRTL: boolean) {
@@ -42,17 +42,99 @@ function EntryIcon({ type }: { type: string }) {
   return <Ionicons name={cfg.icon as any} size={16} color={cfg.color} />;
 }
 
-function TimelineItem({ entry, isRTL, isLast }: { entry: TimelineEntry; isRTL: boolean; isLast: boolean }) {
+function translateStatus(raw: string, t: (k: string, o?: any) => string): string {
+  const key = `status.${raw.trim()}`;
+  const translated = t(key, { defaultValue: raw.trim() });
+  return translated;
+}
+
+const PAYMENT_MODES: Record<string, Record<string, string>> = {
+  ESPECES:  { fr: 'Espèces',  ar: 'نقداً'   },
+  CARTE:    { fr: 'Carte',    ar: 'بطاقة'   },
+  CHEQUE:   { fr: 'Chèque',   ar: 'شيك'     },
+  VIREMENT: { fr: 'Virement', ar: 'تحويل'   },
+};
+
+const ATTEMPT_TYPES: Record<string, Record<string, string>> = {
+  PICKUP:   { fr: 'Collecte échouée',  ar: 'فشل الاستلام'  },
+  DELIVERY: { fr: 'Livraison échouée', ar: 'فشل التوصيل'   },
+};
+
+function translateDescription(entry: TimelineEntry, t: (k: string, o?: any) => string, isRTL: boolean): string {
+  const lang = isRTL ? 'ar' : 'fr';
+
+  if (entry.type === 'STATUS_CHANGE') {
+    return entry.description.split('→').map(s => translateStatus(s.trim(), t)).join(' → ');
+  }
+
+  if (entry.type === 'PAYMENT') {
+    // Backend: "Paiement: 150.0 MAD (ESPECES)" — translate label + payment mode
+    let desc = entry.description.replace(
+      /^Paiement:/,
+      t('audit.payment_label', { defaultValue: 'Paiement' }) + ':'
+    );
+    desc = desc.replace(/\((\w+)\)$/, (_, mode) => {
+      const m = PAYMENT_MODES[mode];
+      return m ? `(${m[lang]})` : `(${mode})`;
+    });
+    return desc;
+  }
+
+  if (entry.type === 'AUDIT') {
+    const actionKey = `audit.actions.${entry.description.toLowerCase()}`;
+    return t(actionKey, { defaultValue: entry.description });
+  }
+
+  if (entry.type === 'ATTEMPT_FAILED') {
+    // Backend: "PICKUP — reason" or "DELIVERY — reason"
+    const parts = entry.description.split('—');
+    const typeRaw = parts[0]?.trim().toUpperCase();
+    const reason = parts.slice(1).join('—').trim();
+    const typeLabel = ATTEMPT_TYPES[typeRaw]?.[lang] ?? typeRaw;
+    return reason ? `${typeLabel} — ${reason}` : typeLabel;
+  }
+
+  return entry.description;
+}
+
+const STATUS_KEYS = new Set([
+  'PENDING_PICKUP', 'PICKED_UP', 'IN_PROCESS',
+  'READY_FOR_DELIVERY', 'DELIVERED', 'CANCELLED',
+  'PICKUP_FAILED', 'DELIVERY_FAILED',
+]);
+
+function maybeTranslateValue(raw: string, t: (k: string, o?: any) => string): string {
+  if (!raw) return raw;
+  const upper = raw.trim().toUpperCase();
+  if (STATUS_KEYS.has(upper)) return translateStatus(upper, t);
+  return raw;
+}
+
+function TimelineItem({ entry, isRTL, isLast, t }: { entry: TimelineEntry; isRTL: boolean; isLast: boolean; t: (k: string, o?: any) => string }) {
   const cfg = TYPE_CONFIG[entry.type] ?? TYPE_CONFIG.AUDIT;
+
+  const prevTrans = entry.previousValue ? maybeTranslateValue(entry.previousValue, t) : '';
+  const newTrans  = entry.newValue      ? maybeTranslateValue(entry.newValue, t)      : '';
+
+  const lang = isRTL ? 'ar' : 'fr';
+  const metaDisplay = (() => {
+    const m = entry.metadata?.trim();
+    if (!m) return '';
+    // payment mode stored as enum name
+    if (PAYMENT_MODES[m]) return PAYMENT_MODES[m][lang];
+    // order number (starts with digits or contains dashes) — suppress, already in header
+    if (/^\d|^[A-Z]{2,}-/.test(m)) return '';
+    return m;
+  })();
 
   const extra = [
     entry.note,
     entry.commentaire,
     entry.notes,
-    entry.previousValue && entry.newValue
-      ? `${entry.previousValue} → ${entry.newValue}`
-      : entry.previousValue || entry.newValue,
-    entry.metadata,
+    prevTrans && newTrans
+      ? `${prevTrans} → ${newTrans}`
+      : prevTrans || newTrans,
+    metaDisplay,
   ].filter(Boolean).join(' · ');
 
   return (
@@ -71,7 +153,7 @@ function TimelineItem({ entry, isRTL, isLast }: { entry: TimelineEntry; isRTL: b
           <View style={[styles.typePill, { backgroundColor: cfg.bg }]}>
             <Text style={[styles.typePillText, { color: cfg.color }, font.semibold(isRTL)]}
               maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-              {cfg.label}
+              {isRTL ? cfg.label.ar : cfg.label.fr}
             </Text>
           </View>
           <Text style={[styles.ts, font.regular(isRTL)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
@@ -81,7 +163,7 @@ function TimelineItem({ entry, isRTL, isLast }: { entry: TimelineEntry; isRTL: b
 
         <Text style={[styles.description, textAlign(isRTL), font.semibold(isRTL)]}
           maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-          {entry.description}
+          {translateDescription(entry, t, isRTL)}
         </Text>
 
         {!!entry.actor && (
@@ -144,6 +226,7 @@ export default function HistoriqueTab({ orderId }: HistoriqueTabProps) {
           entry={entry}
           isRTL={isRTL}
           isLast={idx === data.length - 1}
+          t={t}
         />
       ))}
     </View>

@@ -73,7 +73,7 @@ export default function EmployeOrdersScreen() {
         <View style={[styles.statusAccent, { backgroundColor: statusCfg.dot }]} />
         
         <View style={styles.cardTop}>
-          <Text style={styles.orderRef}>#{item.numeroCommande}</Text>
+          <Text style={[styles.orderRef, { color: statusCfg.dot, fontSize: 17, fontWeight: '800' }]}>#{item.id}</Text>
           <StatusBadge status={item.status} />
         </View>
 

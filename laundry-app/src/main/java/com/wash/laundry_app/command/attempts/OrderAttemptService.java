@@ -90,7 +90,7 @@ public class OrderAttemptService {
 
         String cancelReason = request != null ? request.getReason() : null;
         auditService.log("ORDER_CANCELLED", "COMMANDE", commandeId,
-                oldStatus, "CANCELLED", cancelReason != null ? cancelReason : "Annulé");
+                oldStatus, "CANCELLED", cancelReason);
         eventPublisher.publishEvent(OrderSideEffectEvent.statusChanged(commandeId, CommandeStatus.CANCELLED));
 
         return commandeMapper.toDto(commande);

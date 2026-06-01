@@ -102,7 +102,7 @@ function DeliveryCard({ order, onDeliver, onReportProblem }: any) {
     <View style={styles.cardContainer}>
       <View style={[styles.card, { borderLeftColor: C.success }]}>
         <TouchableOpacity style={styles.cardTop} activeOpacity={0.7} onPress={() => router.push(`/order/${order.id}`)}>
-          <Text style={styles.cardRef}>#{(order.numeroCommande || '').slice(-10)}</Text>
+          <Text style={[styles.cardRef, { color: C.success }]}>#{order.id}</Text>
           <Text style={styles.cardClient}>{order.client?.name || order.clientNom}</Text>
           {addr ? <Text style={styles.cardAddress} numberOfLines={1}>{addr}</Text> : null}
 
@@ -183,7 +183,7 @@ function PickupCard({ order, onCollect, onReportProblem }: any) {
     <View style={styles.cardContainer}>
       <View style={[styles.card, { borderLeftColor: C.warning }]}>
         <TouchableOpacity style={styles.cardTop} activeOpacity={0.7} onPress={() => router.push(`/order/${order.id}`)}>
-          <Text style={styles.cardRef}>#{(order.numeroCommande || '').slice(-10)}</Text>
+          <Text style={[styles.cardRef, { color: C.warning }]}>#{order.id}</Text>
           <Text style={styles.cardClient}>{order.client?.name || order.clientNom}</Text>
           {addr ? <Text style={styles.cardAddress} numberOfLines={1}>{addr}</Text> : null}
 
@@ -218,11 +218,11 @@ function PickupCard({ order, onCollect, onReportProblem }: any) {
               <Text style={[styles.utilBtnText, { color: C.primary }]}>{t('common.navigate')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.utilBtn, { backgroundColor: 'rgba(217,119,6,0.10)', borderColor: 'rgba(217,119,6,0.2)' }]}
-              onPress={() => router.push({ pathname: '/(livreur)/edit-order-items', params: { id: order.id } } as any)}
+              style={[styles.utilBtn, { backgroundColor: 'rgba(0,0,0,0.04)', borderColor: 'rgba(0,0,0,0.08)' }]}
+              onPress={() => router.push(`/order/${order.id}` as any)}
             >
-              <Ionicons name="create-outline" size={18} color={Colors.warning} />
-              <Text style={[styles.utilBtnText, { color: Colors.warning }]}>{t('orders.edit_items', { defaultValue: 'Articles' })}</Text>
+              <Ionicons name="list" size={18} color={Colors.textSecondary} />
+              <Text style={[styles.utilBtnText, { color: Colors.textSecondary }]}>{t('common.details')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -274,7 +274,7 @@ export default function LivreurMissionsScreen() {
   const [deliveryPhotoUris, setDeliveryPhotoUris] = useState<string[]>([]);
 
 
-  const { clearOrder, setPickupOrderId, setOrderNotes, driverLocalImages, clearDriverLocalImages } = useOrderCreation();
+  const { driverLocalImages, clearDriverLocalImages } = useOrderCreation();
 
   const { data: pickupOrders = [], isLoading: loadingPickups, isFetching: fetchingPickups, refetch: refetchPickups } = usePendingPickups();
   const { data: deliveryOrders = [], isLoading: loadingDeliveries, isFetching: fetchingDeliveries, refetch: refetchDeliveries } = useReadyDeliveries();
@@ -290,7 +290,9 @@ export default function LivreurMissionsScreen() {
     selOrder?.id,
     selOrder?.status,
     selOrder?.numeroCommande,
-    t
+    t,
+    selOrder?.client?.phones?.[0]?.phoneNumber || selOrder?.clientPhone,
+    selOrder
   );
 
   const onRefresh = useCallback(async () => {
@@ -338,13 +340,8 @@ export default function LivreurMissionsScreen() {
     );
   };
 
-  // Navigate to order-items so the driver adds items before confirming PICKED_UP.
-  // This mirrors the flow triggered from the order detail page.
   const handleCollect = (order: any) => {
-    clearOrder();
-    setPickupOrderId(String(order.id));
-    setOrderNotes(order.notes || '');
-    router.push('/(admin)/order-items');
+    handleStatusUpdate(order.id, 'PICKED_UP');
   };
 
   const todayOrders = deliveryOrders.filter(o => isScheduledToday(o.scheduledDeliveryDate));
@@ -498,6 +495,7 @@ export default function LivreurMissionsScreen() {
             notesPaiement: deliveryNotes,
           })}
           totalAmount={selOrder.montantTotal || 0}
+          remainingAmount={parseFloat(selOrder.montantRestant ?? selOrder.montantTotal ?? 0)}
           collectedAmount={collectedAmount}
           setCollectedAmount={setCollectedAmount}
           deliveryNotes={deliveryNotes}
@@ -543,7 +541,7 @@ const styles = StyleSheet.create({
   cardContainer: { paddingHorizontal: 16, marginBottom: 14 },
   card: { backgroundColor: Colors.surface, borderRadius: 20, borderLeftWidth: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
   cardTop: { padding: 16 },
-  cardRef: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, marginBottom: 4 },
+  cardRef: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
   cardClient: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
   cardAddress: { fontSize: 14, color: Colors.textSecondary, marginBottom: 12 },
   cardStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -48,8 +48,9 @@
     "time": "Heure",
     "new": "Nouveau",
     "notes": "Notes",
-    "photo_lab": "Photo Labo",
+    "photo_lab": "Photo Traitement",
     "photo_reception": "Photo Récep.",
+    "photo_livraison": "Photo Livraison",
     "whatsapp": "WhatsApp",
     "print": "Imprimer",
     "done": "Terminé",
@@ -64,7 +65,11 @@
     "change": "Changer",
     "deleted": "Supprimé",
     "add_photo": "Ajouter une photo",
-    "share": "Partager"
+    "share": "Partager",
+    "camera_permission_denied": "Accès à la caméra refusé",
+    "gallery_permission_denied": "Accès à la galerie refusé",
+    "system": "Système",
+    "by": "Par"
   },
   "errors": {
     "network": "Erreur réseau. Veuillez vérifier votre connexion.",
@@ -115,7 +120,12 @@
     "retry": "Appuyez pour réessayer",
     "empty_recent": "Aucune commande récente",
     "scan_title": "Scanner une commande",
-    "scan_hint": "Placez le code QR dans le cadre"
+    "scan_hint": "Placez le code QR dans le cadre",
+    "overdue_pickups": "collectes en retard",
+    "overdue_deliveries": "livraisons en retard",
+    "late": "de retard",
+    "no_driver": "Non assigné",
+    "settled_on": "Réglé le"
   },
   "status": {
     "PENDING_PICKUP": "En attente",
@@ -275,6 +285,7 @@
           "self": "Retrait sur place"
         },
         "items": {
+          "dimensions": "Dimensions",
           "enter_dimensions": "Entrez les dimensions",
           "enter_price": "Entrez un prix",
           "photo_captured": "Photo capturée.",
@@ -502,7 +513,8 @@
     "total_unpaid": "Total non payé",
     "total_items": "Total articles",
     "total_m2": "Total m²",
-    "total_price": "Total commandes"
+    "total_price": "Total commandes",
+    "total_amount": "Montant total"
   },
   "livreur": {
     "greeting": "Bonjour,",
@@ -594,6 +606,13 @@
     "title": "Journal d'audit",
     "subtitle": "Historique des opérations",
     "tab": "Audit",
+    "type_status": "Statut",
+    "type_payment": "Paiement",
+    "type_attempt": "Tentative",
+    "type_audit": "Audit",
+    "payment_label": "Paiement",
+    "attempt_failed": "Tentative échouée",
+    "order_pickup_confirmed": "Collecte confirmée",
     "actions": {
       "order_created": "Commande créée",
       "order_status_changed": "Statut modifié",
@@ -617,7 +636,10 @@
       "catalog_product_updated": "Produit modifié",
       "catalog_product_toggled": "Produit activé/désact.",
       "catalog_product_deleted": "Produit supprimé",
-      "client_updated": "Client modifié"
+      "client_updated": "Client modifié",
+      "order_attempt_failed": "Tentative échouée",
+      "order_cancelled": "Commande annulée",
+      "order_pickup_confirmed": "Collecte confirmée"
     }
   },
   "settings": {
@@ -646,7 +668,36 @@
     "not_pickup_driver": "Seul le livreur de collecte assigné ({{name}}) peut confirmer la collecte. Changez d'abord le livreur si nécessaire.",
     "not_delivery_driver": "Seul le livreur de livraison assigné ({{name}}) peut confirmer la livraison. Changez d'abord le livreur si nécessaire.",
     "not_allowed": "Non autorisé",
-    "add_items": "Ajouter / modifier les articles"
+    "add_items": "Ajouter / modifier les articles",
+    "edit_order": "Modifier la commande",
+    "change_status": "Changer le statut",
+    "reactivate": "Réactiver la commande",
+    "retry_pickup": "Relancer la collecte",
+    "retry_delivery": "Relancer la livraison",
+    "confirm_status_change_title": "Confirmer le changement",
+    "confirm_status_change_body": "Changer le statut vers : {{status}} ?",
+    "edit_address": "Modifier l'adresse",
+    "add_payment": "Ajouter un paiement",
+    "send_sms": "Envoyer un SMS",
+    "edit_responsible": "Modifier les responsables",
+    "edit_pickup_date": "Modifier la date",
+    "edit_pickup_time": "Modifier l'heure",
+    "edit_pickup_datetime": "Date et heure de collecte",
+    "edit_delivery_date": "Modifier date livraison",
+    "edit_delivery_time": "Modifier heure livraison",
+    "cannot_edit_date_now": "Modification impossible à cette étape",
+    "whatsapp_receipt": "Reçu WhatsApp",
+    "print": "Imprimer",
+    "take_photo": "Prendre photo",
+    "from_gallery": "Galerie",
+    "total_m2": "Surface totale",
+    "payment_value": "Valeur du paiement",
+    "photo_gallery": "Galerie photos",
+    "payments_section": "Paiements",
+    "sms_body": "Bonjour, votre commande #{{numero}} est en cours de traitement. Merci de nous faire confiance — Astra Pro."
+  },
+  "order": {
+    "deleted_notice": "Cette commande a été supprimée."
   },
   "pickup": {
     "choose_mode_title": "Confirmer la collecte",

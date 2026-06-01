@@ -4,7 +4,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useReadyDeliveries, usePendingPickups } from '../../src/hooks/queries/useLivreur';
-import { isVisibleToday } from '../../src/utils/deliveryDateUtils';
 
 const PRIMARY = '#0D7377';
 const TEXT_MUTED = '#94A3B8';
@@ -14,8 +13,7 @@ export default function LivreurLayout() {
   const { t } = useTranslation();
   const { data: readyDeliveries = [] } = useReadyDeliveries();
   const { data: readyOrders = [] } = usePendingPickups();
-  const visibleDeliveryCount = readyDeliveries.filter((o: any) => isVisibleToday(o.scheduledDeliveryDate)).length;
-  const missionCount = visibleDeliveryCount + readyOrders.length;
+  const missionCount = readyDeliveries.length + readyOrders.length;
 
   return (
     <Tabs
@@ -109,6 +107,7 @@ export default function LivreurLayout() {
       {/* Hidden screens — accessible via Stack push */}
       <Tabs.Screen name="create-order" options={{ href: null }} />
       <Tabs.Screen name="edit-order-items" options={{ href: null }} />
+      <Tabs.Screen name="gallery" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -148,15 +148,16 @@ export default function UnpaidOrdersScreen() {
 
   const renderOrderCard = ({ item }: { item: any }) => {
     const itemsSummary = formatOrderItemsSummary(item.commandeTapis, t);
+    const statusDot = (require('../../constants/StatusColors').StatusColors[item.status] || { dot: '#94A3B8' }).dot;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.orderCard}
         onPress={() => router.push(`/order/${item.orderId || item.id}`)}
       >
         <View style={[styles.orderHeader, row(isArabic)]}>
           <View>
-            <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }]}>#{item.reference || item.numeroCommande}</Text>
+            <Text style={[styles.orderRef, isArabic && { textAlign: 'right' }, { color: statusDot, fontSize: 17, fontWeight: '800' }]}>#{item.orderId || item.id}</Text>
             <Text style={[styles.orderClient, isArabic && { textAlign: 'right' }]}>{item.clientName || item.clientNom || item.client?.name}</Text>
           </View>
           <StatusBadge status={item.status} />

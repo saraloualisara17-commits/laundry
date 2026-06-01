@@ -138,7 +138,7 @@ export default function AdminMissionsScreen() {
             activeOpacity={0.7}
           >
             <View style={[styles.cardHeaderRow, row(isArabic)]}>
-              <Text style={styles.cardRef}>#{item.numeroCommande}</Text>
+              <Text style={[styles.cardRef, { color: isPickup ? C.warning : C.success, fontSize: 17, fontWeight: '800' }]}>#{item.id}</Text>
               <View style={[styles.cardHeaderRight, row(isArabic)]}>
                 {item.montantTotal > 0 && (
                   <Text style={styles.cardPrice}>{item.montantTotal} {t('common.dh')}</Text>
@@ -294,6 +294,7 @@ export default function AdminMissionsScreen() {
             notesPaiement: deliveryNotes 
           })}
           totalAmount={selectedOrder.montantTotal || 0}
+          remainingAmount={parseFloat(selectedOrder.montantRestant ?? selectedOrder.montantTotal ?? 0)}
           collectedAmount={collectedAmount}
           setCollectedAmount={setCollectedAmount}
           deliveryNotes={deliveryNotes}

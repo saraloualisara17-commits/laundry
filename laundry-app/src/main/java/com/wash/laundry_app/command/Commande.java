@@ -325,6 +325,12 @@ public class Commande {
     public java.math.BigDecimal getDeliveryLongitude() { return deliveryLongitude; }
     public void setDeliveryLongitude(java.math.BigDecimal deliveryLongitude) { this.deliveryLongitude = deliveryLongitude; }
 
+    public LocalDateTime getScheduledPickupDate() { return scheduledPickupDate; }
+    public void setScheduledPickupDate(LocalDateTime scheduledPickupDate) { this.scheduledPickupDate = scheduledPickupDate; }
+
+    public LocalDateTime getScheduledDeliveryDate() { return scheduledDeliveryDate; }
+    public void setScheduledDeliveryDate(LocalDateTime scheduledDeliveryDate) { this.scheduledDeliveryDate = scheduledDeliveryDate; }
+
     public String getCreationIdempotencyKey() { return creationIdempotencyKey; }
     public void setCreationIdempotencyKey(String k) { this.creationIdempotencyKey = k; }
 

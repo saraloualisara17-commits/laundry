@@ -35,6 +35,7 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
 
     const status = order?.status;
     const delivered = isDelivered(status);
+    const cancelled = status === 'CANCELLED';
 
     const totalAmount = Math.max(0, Number(order?.montantTotal) || 0);
     const paidAmount = Math.max(0, Number(order?.montantPaye) || 0);
@@ -42,34 +43,30 @@ export const useOrderPermissions = (user: any, order: any): OrderPermissions => 
 
     const canDelete = isAdmin;
 
-    const canEdit = (isAdmin || isEmploye || (isLivreur && isPickupPhase(status))) && !delivered;
+    const canEdit = (isAdmin || isEmploye || isLivreur) && !delivered;
 
     // No photos needed once the order is delivered
     const canAddLaboPhoto = (isAdmin || isEmploye || isLivreur) && !delivered;
     const canAddReceptionPhoto = (isAdmin || isEmploye || isLivreur) && !delivered;
 
     // No payment button when already fully paid
-    // LIVREUR can also add payment — they collect cash at delivery
-    const canAddPayment = (isAdmin || isEmploye || isLivreur) && delivered && !fullyPaid;
+    const canAddPayment = (isAdmin || isEmploye || isLivreur) && !cancelled && !fullyPaid;
 
     const canAssignDriver = (isAdmin || isEmploye || isLivreur) && isReadyForDelivery(status);
-    const orderMode = order?.mode?.toLowerCase(); // 'immediate' or 'scheduled'
+    const orderMode = order?.mode?.toLowerCase();
     const isScheduled = orderMode === 'scheduled';
 
     // Pickup driver assignment only relevant for scheduled orders
     const canAssignPickupDriver = (isAdmin || isEmploye || isLivreur) && status === 'PENDING_PICKUP' && isScheduled;
 
-    // Confirm pickup: scheduled orders only (immediate start as PICKED_UP, no pickup step)
-    // Scheduled: Admin or the assigned Livreur
+    // Confirm pickup: scheduled orders only
     const canConfirmPickup =
       status === 'PENDING_PICKUP' &&
       isScheduled &&
-      (isAdmin || isLivreur);
+      (isAdmin || isEmploye || isLivreur);
 
-    // Livreur can only change status when they are the assigned pickup OR delivery driver
-    const livreurIsPickupDriver = isLivreur && order?.livreur?.id != null && String(order.livreur.id) === String(user?.id);
-    const livreurIsDeliveryDriver = isLivreur && order?.deliveryDriver?.id != null && String(order.deliveryDriver.id) === String(user?.id);
-    const canChangeStatus = isAdmin || isEmploye || livreurIsPickupDriver || livreurIsDeliveryDriver;
+    // All roles can change status
+    const canChangeStatus = isAdmin || isEmploye || isLivreur;
 
     return {
       isAdmin,

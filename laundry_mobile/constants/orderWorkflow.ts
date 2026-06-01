@@ -61,27 +61,22 @@ export const ORDER_WORKFLOW: Record<OrderStatus, WorkflowAction> = {
     icon: 'check-double'
   },
   CANCELLED: {
-    labelKey: 'status.CANCELLED',
-    nextStatus: null,
-    bg: Colors.danger,
-    disabled: true,
-    icon: 'times-circle'
+    labelKey: 'orders.reactivate',
+    nextStatus: 'PENDING_PICKUP',
+    bg: '#6366F1',
+    icon: 'refresh-cw'
   },
-  // Failure states — Admin can reschedule from these on the backend.
-  // No direct UI action button; they show as informational terminal states.
   PICKUP_FAILED: {
-    labelKey: 'status.PICKUP_FAILED',
-    nextStatus: null,
-    bg: Colors.danger,
-    disabled: true,
-    icon: 'exclamation-circle'
+    labelKey: 'orders.retry_pickup',
+    nextStatus: 'PENDING_PICKUP',
+    bg: '#6366F1',
+    icon: 'refresh-cw'
   },
   DELIVERY_FAILED: {
-    labelKey: 'status.DELIVERY_FAILED',
-    nextStatus: null,
-    bg: Colors.danger,
-    disabled: true,
-    icon: 'exclamation-triangle'
+    labelKey: 'orders.retry_delivery',
+    nextStatus: 'READY_FOR_DELIVERY',
+    bg: '#6366F1',
+    icon: 'refresh-cw'
   },
 };
 

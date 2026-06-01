@@ -18,6 +18,8 @@ export default function AdminLayout() {
       <Stack.Screen name="client-debt-detail" />
       <Stack.Screen name="all-orders-map" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ headerShown: false }} />
+      <Stack.Screen name="gallery" options={{ headerShown: false }} />
+      <Stack.Screen name="late-orders" options={{ headerShown: false }} />
       <Stack.Screen name="order-confirmation" options={{ presentation: 'fullScreenModal' }} />
     </Stack>
   );

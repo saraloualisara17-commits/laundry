@@ -10,19 +10,17 @@ export const login = createAsyncThunk(
       const res = await loginRequest(credentials)
 
       const accessToken = res.data.accessToken || res.data.token
-      const refreshToken = res.data.refreshToken
-
       const decoded = jwtDecode(accessToken)
 
+      // refreshToken is set as HttpOnly cookie by the backend — do not read or store it
       dispatch(setCredentials({
         user: {
           id: decoded.sub,
           name: decoded.name,
           email: decoded.email,
-          role: decoded.role
+          role: decoded.role?.toLowerCase(),
         },
         token: accessToken,
-        refreshToken,
       }))
     } catch (error) {
       if (error.response?.data?.error === "ACCOUNT_DISABLED") {

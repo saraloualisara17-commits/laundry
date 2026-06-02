@@ -1,5 +1,4 @@
 import React from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import {
   View,
   Text,
@@ -17,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminColors, AdminShadows } from '../../../constants/AdminColors';
 import { adminApi } from '../../../src/services/adminApi';
+import { BASE_URL } from '../../../src/services/api/client';
 import { SkeletonCard } from '../../../components/admin/SkeletonCard';
 import { EmptyState } from '../../../components/admin/EmptyState';
 import { useFormStyles } from '../../../src/hooks/useFormStyles';
@@ -41,7 +41,7 @@ export default function CatalogScreen() {
     CUSTOM: { label: t('admin.catalog.pricing.custom'), color: AdminColors.textMuted, icon: 'create-outline' },
   };
 
-  const baseUrl = adminApi.getOrderPdfUrl(1).split('/api/')[0];
+  const baseUrl = BASE_URL;
 
   const renderProduct = (product: any) => {
     const method = PRICING_METHODS[product.pricingMethod] || PRICING_METHODS.PER_UNIT;

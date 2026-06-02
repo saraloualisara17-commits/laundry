@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -100,6 +101,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         return buildErrorResponse(HttpStatus.CONFLICT, "Concurrent Update",
                 "Cette commande a été modifiée par un autre utilisateur. Veuillez recharger et réessayer.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        // Unique constraint violations (e.g. duplicate idempotency key, duplicate order number)
+        // should surface as 409 Conflict rather than a raw 500.
+        log.warn("DataIntegrityViolation: {}", ex.getMostSpecificCause().getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict",
+                "Cette opération ne peut pas être effectuée car elle violerait une contrainte d'unicité. Veuillez réessayer.");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -3,6 +3,9 @@ package com.wash.laundry_app.catalog;
 import com.wash.laundry_app.audit.AuditService;
 import com.wash.laundry_app.catalog.dto.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,7 @@ public class ProductCatalogService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
+    @Cacheable("categories")
     public List<CategoryDto> getAllCategories() {
         return categoryRepository.findAllByOrderBySortOrderAsc().stream()
                 .map(this::mapToCategoryDto)
@@ -32,13 +36,11 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryDto createCategory(CategoryRequest request) {
         ProductCategory category = new ProductCategory();
         if (request.getSortOrder() == null) {
-            Integer maxSort = categoryRepository.findAll().stream()
-                    .map(ProductCategory::getSortOrder)
-                    .max(Integer::compare)
-                    .orElse(0);
+            int maxSort = categoryRepository.findMaxSortOrder().orElse(0);
             category.setSortOrder(maxSort + 1);
         }
         updateCategoryFields(category, request);
@@ -49,6 +51,7 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryDto updateCategory(Long id, CategoryRequest request) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
@@ -61,6 +64,7 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryDto toggleCategory(Long id) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
@@ -73,6 +77,7 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public void deleteCategory(Long id) {
         ProductCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
@@ -94,6 +99,7 @@ public class ProductCatalogService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable("products")
     public List<ProductDto> getAllProducts() {
         return productRepository.findAll().stream()
                 .map(this::mapToProductDto)
@@ -101,6 +107,10 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", allEntries = true),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public ProductDto createProduct(Long categoryId, ProductRequest request) {
         ProductCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
@@ -108,10 +118,7 @@ public class ProductCatalogService {
         Product product = new Product();
         product.setCategory(category);
         if (request.getSortOrder() == null) {
-            Integer maxSort = productRepository.findByCategoryIdOrderBySortOrderAsc(categoryId).stream()
-                    .map(Product::getSortOrder)
-                    .max(Integer::compare)
-                    .orElse(0);
+            int maxSort = productRepository.findMaxSortOrderByCategoryId(categoryId).orElse(0);
             product.setSortOrder(maxSort + 1);
         }
         updateProductFields(product, request);
@@ -122,6 +129,10 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", allEntries = true),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public ProductDto updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
@@ -134,6 +145,10 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", allEntries = true),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public ProductDto toggleProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
@@ -146,6 +161,10 @@ public class ProductCatalogService {
     }
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "products", allEntries = true),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));

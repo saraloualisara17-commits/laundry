@@ -46,16 +46,7 @@ export default function EmployeTabsLayout() {
       />
       <Tabs.Screen
         name="orders"
-        options={{
-          title: t('tabs.orders'),
-          tabBarLabel: t('tabs.orders'),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              {focused && <View style={styles.dot} />}
-              <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={22} color={color} />
-            </View>
-          ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="unpaid"

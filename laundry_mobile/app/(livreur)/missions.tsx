@@ -246,6 +246,7 @@ export default function LivreurMissionsScreen() {
     }
   }, [tab]);
   const [deliverySubTab, setDeliverySubTab] = useState<'today' | 'overdue'>('today');
+  const [pickupSubTab, setPickupSubTab] = useState<'today' | 'overdue'>('today');
   const [selOrder, setSelOrder] = useState<any>(null);
 
   // Unified modal state matching Admin
@@ -334,6 +335,10 @@ export default function LivreurMissionsScreen() {
   const overdueOrders = deliveryOrders.filter(o => isScheduledOverdue(o.scheduledDeliveryDate));
   const activeDeliveryList = deliverySubTab === 'today' ? todayOrders : overdueOrders;
 
+  const todayPickups = pickupOrders.filter(o => isScheduledToday(o.scheduledPickupDate));
+  const overduePickups = pickupOrders.filter(o => isScheduledOverdue(o.scheduledPickupDate));
+  const activePickupList = pickupSubTab === 'today' ? todayPickups : overduePickups;
+
   const tabs: Array<{ key: 'delivery' | 'pickup'; label: string; badge?: number; badgeColor?: string }> = [
     { key: 'delivery', label: t('livreur.deliveries_tab'), badge: (todayOrders.length + overdueOrders.length) || undefined, badgeColor: C.danger },
     { key: 'pickup',   label: t('livreur.pickups_tab'),   badge: pickupOrders.length || undefined,                         badgeColor: C.warning },
@@ -342,10 +347,10 @@ export default function LivreurMissionsScreen() {
   const emptyIcon  = activeTab === 'delivery' ? '🎉' : '📭';
   const emptyTitle = activeTab === 'delivery'
     ? (deliverySubTab === 'today' ? t('livreur.no_delivery') : t('livreur.no_overdue'))
-    : t('livreur.no_pickup');
+    : (pickupSubTab === 'today' ? t('livreur.no_pickup') : t('livreur.no_overdue'));
   const emptySub = activeTab === 'delivery'
     ? (deliverySubTab === 'today' ? t('livreur.no_delivery_sub') : t('livreur.no_overdue_sub'))
-    : t('livreur.no_pickup_sub');
+    : (pickupSubTab === 'today' ? t('livreur.no_pickup_sub') : t('livreur.no_overdue_sub'));
 
   const renderDeliveryItem = useCallback(({ item }: { item: any }) => (
     <DeliveryCard
@@ -448,28 +453,60 @@ export default function LivreurMissionsScreen() {
           />
         </>
       ) : (
-        <FlatList
-          data={pickupOrders}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ paddingVertical: 16 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-          renderItem={renderPickupItem}
-          ListEmptyComponent={
-            loading
-              ? <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
-              : (
-                <View style={styles.emptyContainer}>
-                  <Text style={{ fontSize: 52 }}>{emptyIcon}</Text>
-                  <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-                  <Text style={styles.emptySub}>{emptySub}</Text>
+        <>
+          {/* Sub-filter buttons */}
+          <View style={styles.subTabsContainer}>
+            <TouchableOpacity
+              style={[styles.subTab, pickupSubTab === 'today' && styles.subTabActiveToday]}
+              onPress={() => setPickupSubTab('today')}
+            >
+              <Text style={[styles.subTabText, pickupSubTab === 'today' && { color: C.success, fontWeight: '700' }]}>
+                {t('livreur.section_today')}
+              </Text>
+              {todayPickups.length > 0 && (
+                <View style={[styles.subTabBadge, { backgroundColor: C.success }]}>
+                  <Text style={styles.subTabBadgeText}>{todayPickups.length}</Text>
                 </View>
-              )
-          }
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={8}
-          windowSize={5}
-          initialNumToRender={10}
-        />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, pickupSubTab === 'overdue' && styles.subTabActiveOverdue]}
+              onPress={() => setPickupSubTab('overdue')}
+            >
+              <Text style={[styles.subTabText, pickupSubTab === 'overdue' && { color: C.danger, fontWeight: '700' }]}>
+                {t('livreur.section_overdue')}
+              </Text>
+              {overduePickups.length > 0 && (
+                <View style={[styles.subTabBadge, { backgroundColor: C.danger }]}>
+                  <Text style={styles.subTabBadgeText}>{overduePickups.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={activePickupList}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={{ paddingVertical: 16 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+            renderItem={renderPickupItem}
+            ListEmptyComponent={
+              loading
+                ? <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
+                : (
+                  <View style={styles.emptyContainer}>
+                    <Text style={{ fontSize: 52 }}>{emptyIcon}</Text>
+                    <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+                    <Text style={styles.emptySub}>{emptySub}</Text>
+                  </View>
+                )
+            }
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            initialNumToRender={10}
+          />
+        </>
       )}
 
       {/* --- Standardized Modals --- */}

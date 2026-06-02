@@ -334,9 +334,12 @@ public class Commande {
     public String getCreationIdempotencyKey() { return creationIdempotencyKey; }
     public void setCreationIdempotencyKey(String k) { this.creationIdempotencyKey = k; }
 
-    // Helper method to generate order number
+    // Generates a unique order number. Uses UUID suffix instead of currentTimeMillis
+    // to eliminate the race condition where two concurrent inserts at the same
+    // millisecond produced identical numbers and hit the UNIQUE constraint.
     private String generateOrderNumber() {
-        return "CMD-" + LocalDateTime.now().getYear() + "-" + System.currentTimeMillis();
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        return "CMD-" + LocalDateTime.now().getYear() + "-" + suffix;
     }
 
     // Helper method to add tapis to order

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -53,9 +54,12 @@ public class OperationalAlertSchedulerService {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(unpaidDebtDays);
         List<com.wash.laundry_app.command.Commande> orders = commandeRepository.findDeliveredWithUnpaidBalance(cutoff);
 
+        // Load all open alert client IDs in one query instead of one EXISTS per order
+        Set<Long> alreadyAlertedClientIds = alertRepository.findOpenClientIdsByAlertType(UNPAID_DEBT);
+
         int created = 0;
         for (var order : orders) {
-            if (alertRepository.existsByAlertTypeAndClient_IdAndResolvedFalse(UNPAID_DEBT, order.getClient().getId())) {
+            if (alreadyAlertedClientIds.contains(order.getClient().getId())) {
                 continue;
             }
             java.math.BigDecimal unpaid = order.getMontantTotal().subtract(
@@ -66,15 +70,16 @@ public class OperationalAlertSchedulerService {
                     unpaid,
                     order.getNumeroCommande(),
                     order.getDateLivraison() != null ? order.getDateLivraison().toLocalDate() : "N/A");
-            var alert = OperationalAlert.builder()
+            alertRepository.save(OperationalAlert.builder()
                     .alertType(UNPAID_DEBT)
                     .commande(order)
                     .client(order.getClient())
                     .severity("WARNING")
                     .message(msg)
                     .resolved(false)
-                    .build();
-            alertRepository.save(alert);
+                    .build());
+            // Track locally so subsequent iterations in the same run don't re-alert same client
+            alreadyAlertedClientIds.add(order.getClient().getId());
             notificationService.notifyRole(
                     Role.ADMIN,
                     "Dette Impayée",
@@ -93,12 +98,15 @@ public class OperationalAlertSchedulerService {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(overduePickupHours);
         List<com.wash.laundry_app.command.Commande> orders = commandeRepository.findOverduePickups(cutoff);
 
+        // Load all open alert commande IDs in one query instead of one EXISTS per order
+        Set<Long> alreadyAlertedIds = alertRepository.findOpenCommandeIdsByAlertType(OVERDUE_PICKUP);
+
         int created = 0;
         for (var order : orders) {
-            if (alertRepository.existsByAlertTypeAndCommande_IdAndResolvedFalse(OVERDUE_PICKUP, order.getId())) {
+            if (alreadyAlertedIds.contains(order.getId())) {
                 continue;
             }
-            var alert = OperationalAlert.builder()
+            alertRepository.save(OperationalAlert.builder()
                     .alertType(OVERDUE_PICKUP)
                     .commande(order)
                     .client(order.getClient())
@@ -110,8 +118,7 @@ public class OperationalAlertSchedulerService {
                             overduePickupHours,
                             order.getDateCreation()))
                     .resolved(false)
-                    .build();
-            alertRepository.save(alert);
+                    .build());
             notificationService.notifyRole(
                     Role.ADMIN,
                     "Collecte en Retard",
@@ -130,12 +137,15 @@ public class OperationalAlertSchedulerService {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(delayedDeliveryHours);
         List<com.wash.laundry_app.command.Commande> orders = commandeRepository.findDelayedDeliveries(cutoff);
 
+        // Load all open alert commande IDs in one query instead of one EXISTS per order
+        Set<Long> alreadyAlertedIds = alertRepository.findOpenCommandeIdsByAlertType(DELAYED_DELIVERY);
+
         int created = 0;
         for (var order : orders) {
-            if (alertRepository.existsByAlertTypeAndCommande_IdAndResolvedFalse(DELAYED_DELIVERY, order.getId())) {
+            if (alreadyAlertedIds.contains(order.getId())) {
                 continue;
             }
-            var alert = OperationalAlert.builder()
+            alertRepository.save(OperationalAlert.builder()
                     .alertType(DELAYED_DELIVERY)
                     .commande(order)
                     .client(order.getClient())
@@ -147,8 +157,7 @@ public class OperationalAlertSchedulerService {
                             delayedDeliveryHours,
                             order.getDateCreation()))
                     .resolved(false)
-                    .build();
-            alertRepository.save(alert);
+                    .build());
             notificationService.notifyRole(
                     Role.ADMIN,
                     "Livraison Retardée",
@@ -156,7 +165,6 @@ public class OperationalAlertSchedulerService {
                     DELAYED_DELIVERY,
                     order.getId().toString()
             );
-            // Also notify the assigned delivery driver if there is one
             if (order.getDeliveryDriver() != null) {
                 notificationService.createNotification(
                         order.getDeliveryDriver(),

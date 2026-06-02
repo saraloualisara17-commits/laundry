@@ -12,7 +12,7 @@ export const useNotifications = () =>
 export const useUnreadCount = () =>
   useQuery({
     queryKey: queryKeys.notifications.unreadCount(),
-    queryFn: () => notificationsApi.getUnreadCount().then(r => r.data.count),
+    queryFn: () => notificationsApi.getUnreadCount().then(r => r.data),
     staleTime: 30_000,
   });
 

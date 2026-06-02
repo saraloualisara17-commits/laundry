@@ -1,6 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Image, Platform } from 'react-native';
+import { Image } from 'react-native';
 import { logger } from '../../lib/logger';
 
 const log = logger.ns('compress');
@@ -19,12 +19,9 @@ const PROFILES: Record<CompressionProfile, { maxWidth: number; quality: number; 
   full:      { maxWidth: 1600, quality: 0.82, skipBytes: 300 * 1024 },  // 300 KB
 };
 
-// Android has supported WebP encoding since API 18 (2013).
-// expo-image-manipulator emits valid WebP on Android from SDK 50+.
-// iOS WebP encode requires SDK 51+ — use JPEG as fallback until then.
-const PREFERRED_FORMAT = Platform.OS === 'android'
-  ? ImageManipulator.SaveFormat.WEBP
-  : ImageManipulator.SaveFormat.JPEG;
+// expo-image-manipulator supports WebP encoding on both Android and iOS from SDK 51+.
+// This project targets Expo SDK 54, so WebP is safe on all platforms.
+const PREFERRED_FORMAT = ImageManipulator.SaveFormat.WEBP;
 
 // ─── Dimension helper ────────────────────────────────────────────────────────
 
@@ -100,7 +97,7 @@ export async function compressImage(
       const result = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: Math.min(maxWidth, 800) } }],
-        { compress: Math.max(0.4, fallbackQuality), format: ImageManipulator.SaveFormat.JPEG },
+        { compress: Math.max(0.4, fallbackQuality), format: PREFERRED_FORMAT },
       );
       log.info('Fallback compression succeeded');
       return result.uri;

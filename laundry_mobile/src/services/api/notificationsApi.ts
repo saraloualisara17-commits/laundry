@@ -15,7 +15,7 @@ export const notificationsApi = {
     client.get<AppNotification[]>('/api/notifications'),
 
   getUnreadCount: () =>
-    client.get<{ count: number }>('/api/notifications/unread-count'),
+    client.get<number>('/api/notifications/unread-count'),
 
   markAsRead: (id: number) =>
     client.put(`/api/notifications/${id}/read`),

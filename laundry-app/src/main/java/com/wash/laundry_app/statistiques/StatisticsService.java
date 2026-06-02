@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,20 @@ public class StatisticsService {
     private final ClientRepository clientRepository;
     private final UnpaidService unpaidService;
     private final HistoriqueStatutRepository historiqueStatutRepository;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HELPER — single GROUP BY query → EnumMap of status → count
+    // Replaces 7 separate in-memory stream filters per statistics request.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private Map<CommandeStatus, Long> statusCountsForPeriod(LocalDateTime start, LocalDateTime end) {
+        Map<CommandeStatus, Long> counts = new EnumMap<>(CommandeStatus.class);
+        for (CommandeStatus s : CommandeStatus.values()) counts.put(s, 0L);
+        for (Object[] row : commandeRepository.countByStatusBetween(start, end)) {
+            counts.put((CommandeStatus) row[0], (Long) row[1]);
+        }
+        return counts;
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // HELPER — event-based breakdown anchored on when the status transition
@@ -49,7 +64,7 @@ public class StatisticsService {
 
     private StatisticsDTO.StatisticsDTOBuilder applyEventBreakdown(
             StatisticsDTO.StatisticsDTOBuilder builder,
-            List<Commande> period,
+            List<Commande> ignored,
             LocalDateTime start, LocalDateTime end) {
 
         // ── Reçues: orders that transitioned to PICKED_UP in the window ─────────
@@ -108,20 +123,10 @@ public class StatisticsService {
         LocalDateTime start = LocalDate.now().atStartOfDay();
         LocalDateTime end   = LocalDate.now().atTime(LocalTime.MAX);
 
-        List<Commande> todayCommandes = commandeRepository.findByDateCreationBetween(start, end);
+        Map<CommandeStatus, Long> counts = statusCountsForPeriod(start, end);
+        long totalToday = counts.values().stream().mapToLong(Long::longValue).sum();
 
-        long enAttente    = todayCommandes.stream().filter(c -> c.getStatus() == CommandeStatus.PENDING_PICKUP).count();
-        long validees     = todayCommandes.stream().filter(c -> c.getStatus() == CommandeStatus.PICKED_UP).count();
-        long enTraitement = todayCommandes.stream().filter(c -> c.getStatus() == CommandeStatus.IN_PROCESS).count();
-        long pretes       = todayCommandes.stream().filter(c -> c.getStatus() == CommandeStatus.READY_FOR_DELIVERY).count();
-        long livrees      = todayCommandes.stream().filter(c -> c.getStatus() == CommandeStatus.DELIVERED).count();
-        long payees       = todayCommandes.stream()
-                .filter(c -> c.getStatus() == CommandeStatus.DELIVERED
-                          && c.getMontantTotal() != null
-                          && c.getMontantTotal().compareTo(BigDecimal.ZERO) > 0
-                          && c.getMontantPaye() != null
-                          && c.getMontantPaye().compareTo(c.getMontantTotal()) >= 0)
-                .count();
+        long payees = commandeRepository.countFullyPaidDeliveredBetween(start, end);
 
         UnpaidOverviewDto unpaid = unpaidService.getOverview();
         Map<String, Object> unpaidData = new HashMap<>();
@@ -129,25 +134,21 @@ public class StatisticsService {
         unpaidData.put("clientsCount", unpaid.getClientsWithDebt());
         unpaidData.put("amount",       unpaid.getTotalRemaining() != null ? unpaid.getTotalRemaining() : BigDecimal.ZERO);
 
-        long todayClients = todayCommandes.stream()
-                .filter(c -> c.getClient() != null)
-                .map(c -> c.getClient().getId())
-                .distinct()
-                .count();
+        long todayClients = commandeRepository.countDistinctClientsBetween(start, end);
 
         StatisticsDTO.StatisticsDTOBuilder builder = StatisticsDTO.builder()
-                .totalCommandesToday((long) todayCommandes.size())
+                .totalCommandesToday(totalToday)
                 .totalCommandes(commandeRepository.count())
                 .totalClients(todayClients)
-                .commandesEnAttente(enAttente)
-                .commandesValidees(validees)
-                .commandesEnTraitement(enTraitement)
-                .commandesPretes(pretes)
-                .commandesLivrees(livrees)
+                .commandesEnAttente(counts.get(CommandeStatus.PENDING_PICKUP))
+                .commandesValidees(counts.get(CommandeStatus.PICKED_UP))
+                .commandesEnTraitement(counts.get(CommandeStatus.IN_PROCESS))
+                .commandesPretes(counts.get(CommandeStatus.READY_FOR_DELIVERY))
+                .commandesLivrees(counts.get(CommandeStatus.DELIVERED))
                 .commandesPayees(payees)
                 .unpaid(unpaidData);
 
-        return applyEventBreakdown(builder, todayCommandes, start, end).build();
+        return applyEventBreakdown(builder, List.of(), start, end).build();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -165,32 +166,11 @@ public class StatisticsService {
         LocalDateTime start = dateDebut.atStartOfDay();
         LocalDateTime end   = dateFin.atTime(LocalTime.MAX);
 
-        // ── Order volume counts (scoped by creation date) ─────────────────────
-        List<Commande> period = commandeRepository.findByDateCreationBetween(start, end);
+        Map<CommandeStatus, Long> counts = statusCountsForPeriod(start, end);
+        long totalCommandes = counts.values().stream().mapToLong(Long::longValue).sum();
+        long paidOrders     = commandeRepository.countFullyPaidDeliveredBetween(start, end);
+        long periodClients  = commandeRepository.countDistinctClientsBetween(start, end);
 
-        long totalCommandes = period.size();
-        long enAttente      = period.stream().filter(c -> c.getStatus() == CommandeStatus.PENDING_PICKUP).count();
-        long validees       = period.stream().filter(c -> c.getStatus() == CommandeStatus.PICKED_UP).count();
-        long enTraitement   = period.stream().filter(c -> c.getStatus() == CommandeStatus.IN_PROCESS).count();
-        long pretes         = period.stream().filter(c -> c.getStatus() == CommandeStatus.READY_FOR_DELIVERY).count();
-        long livrees        = period.stream().filter(c -> c.getStatus() == CommandeStatus.DELIVERED).count();
-
-        // Fully-paid delivered orders created in this period
-        long paidOrders = period.stream()
-                .filter(c -> c.getStatus() == CommandeStatus.DELIVERED
-                          && c.getMontantTotal() != null
-                          && c.getMontantTotal().compareTo(BigDecimal.ZERO) > 0
-                          && c.getMontantPaye()  != null
-                          && c.getMontantPaye().compareTo(c.getMontantTotal()) >= 0)
-                .count();
-
-        long periodClients = period.stream()
-                .filter(c -> c.getClient() != null)
-                .map(c -> c.getClient().getId())
-                .distinct()
-                .count();
-
-        // Global unpaid (same as today tab — unpaid debt is business-wide, not period-scoped)
         UnpaidOverviewDto unpaid = unpaidService.getOverview();
         Map<String, Object> unpaidData = new HashMap<>();
         unpaidData.put("count",        unpaid.getTotalOrders());
@@ -200,17 +180,17 @@ public class StatisticsService {
         StatisticsDTO.StatisticsDTOBuilder builder = StatisticsDTO.builder()
                 .totalCommandes(totalCommandes)
                 .totalClients(periodClients)
-                .commandesEnAttente(enAttente)
-                .commandesValidees(validees)
-                .commandesEnTraitement(enTraitement)
-                .commandesPretes(pretes)
-                .commandesLivrees(livrees)
+                .commandesEnAttente(counts.get(CommandeStatus.PENDING_PICKUP))
+                .commandesValidees(counts.get(CommandeStatus.PICKED_UP))
+                .commandesEnTraitement(counts.get(CommandeStatus.IN_PROCESS))
+                .commandesPretes(counts.get(CommandeStatus.READY_FOR_DELIVERY))
+                .commandesLivrees(counts.get(CommandeStatus.DELIVERED))
                 .commandesPayees(paidOrders)
                 .dateDebut(dateDebut)
                 .dateFin(dateFin)
                 .unpaid(unpaidData);
 
-        return applyEventBreakdown(builder, period, start, end).build();
+        return applyEventBreakdown(builder, List.of(), start, end).build();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

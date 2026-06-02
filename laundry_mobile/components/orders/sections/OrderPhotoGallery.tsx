@@ -34,8 +34,8 @@ export default React.memo(function OrderPhotoGallery({ images, isArabic, t, onIm
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={[row(isArabic), { gap: 10, paddingHorizontal: 16 }]}
     >
-      {images.map((img: any, idx: number) => (
-        <TouchableOpacity key={idx} onPress={() => onImagePress(`${BASE_URL}${img.imageUrl}`)}>
+      {images.map((img: any) => (
+        <TouchableOpacity key={img.id ?? img.imageUrl} onPress={() => onImagePress(`${BASE_URL}${img.imageUrl}`)}>
           <Image
             source={{ uri: `${BASE_URL}${img.imageUrl}` }}
             style={styles.img}

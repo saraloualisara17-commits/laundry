@@ -2,7 +2,7 @@
 import { randomUUID } from '../../src/utils/uuid';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, Linking,
+  RefreshControl, ActivityIndicator, Alert, Linking, Modal,
 } from 'react-native';
 import { row, textAlign } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import { useReceiptActions } from '../../src/hooks/useReceiptActions';
 import { useReadyDeliveries, usePendingPickups, useUpdateOrderStatusMission } from '../../src/hooks/queries/useLivreur';
 import { uploadManager } from '../../src/services/uploads';
 import { openMapsNavigation } from '../../src/utils/mapsNavigation';
+import { ordersApi } from '../../src/services/api';
 
 // --- Constants ---
 const C = {
@@ -30,6 +31,76 @@ const C = {
   danger: '#EF4444',
   primary: '#0D7377',
 };
+
+// ─── FailedAttemptModal ───────────────────────────────────────────────────────
+function FailedAttemptModal({ visible, order, attemptType, onClose, onSuccess }: any) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const reasons = [
+    { id: 'CLIENT_ABSENT',      label: t('livreur.reason_absent') },
+    { id: 'CLIENT_UNREACHABLE', label: t('livreur.reason_unreachable') },
+    { id: 'WRONG_ADDRESS',      label: t('livreur.reason_address') },
+    { id: 'OTHER',              label: t('common.other') },
+  ];
+
+  const submit = async () => {
+    if (!reason) return Alert.alert(t('common.error'), t('livreur.select_reason'));
+    setLoading(true);
+    try {
+      await ordersApi.reportFailedAttempt(order.id, { attemptType, reason });
+      onSuccess();
+      onClose();
+    } catch {
+      Alert.alert(t('common.error'), t('livreur.action_failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!order) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.sheet}>
+          <Text style={modalStyles.title}>{t('livreur.refuse_title')}</Text>
+          {reasons.map(r => (
+            <TouchableOpacity
+              key={r.id}
+              style={[modalStyles.reasonItem, reason === r.id && { borderColor: C.primary, backgroundColor: '#F0F9F9' }]}
+              onPress={() => setReason(r.id)}
+            >
+              <Text style={[modalStyles.reasonText, reason === r.id && { color: C.primary, fontWeight: '700' }]}>{r.label}</Text>
+              {reason === r.id && <Ionicons name="checkmark-circle" size={20} color={C.primary} />}
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[modalStyles.confirmBtn, { backgroundColor: C.danger, marginTop: 24 }]}
+            onPress={submit}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="white" /> : <Text style={modalStyles.confirmBtnText}>{t('common.confirm')}</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={{ marginTop: 12 }} onPress={onClose}>
+            <Text style={{ textAlign: 'center', color: AdminColors.textMuted }}>{t('common.cancel')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const modalStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,18,25,0.6)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: 'white', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: 40 },
+  title: { fontSize: 18, fontWeight: '700', color: AdminColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  confirmBtn: { height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  confirmBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
+  reasonItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
+  reasonText: { fontSize: 15, color: AdminColors.textPrimary },
+});
 
 const keyById = (item: { id: any }) => String(item.id);
 
@@ -46,6 +117,8 @@ export default function AdminMissionsScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showProb, setShowProb] = useState(false);
+  const [probType, setProbType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
 
   // Payment states
   const [collectedAmount, setCollectedAmount] = useState('0');
@@ -165,7 +238,7 @@ export default function AdminMissionsScreen() {
                 <Ionicons name="call" size={18} color={C.success} />
                 <Text style={[styles.utilBtnText, { color: C.success }]}>{t('common.call')}</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.utilBtn, { backgroundColor: 'rgba(13,115,119,0.08)', borderColor: 'rgba(13,115,119,0.1)' }]}
                 onPress={() => openMapsNavigation(item.clientLatitude, item.clientLongitude, addr)}
@@ -173,33 +246,49 @@ export default function AdminMissionsScreen() {
                 <Ionicons name="navigate" size={18} color={AdminColors.primary} />
                 <Text style={[styles.utilBtnText, { color: AdminColors.primary }]}>{t('common.navigate')}</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.utilBtn, { backgroundColor: 'rgba(0,0,0,0.04)', borderColor: 'rgba(0,0,0,0.08)' }]}
+                onPress={() => router.push(`/order/${item.id}` as any)}
+              >
+                <Ionicons name="list" size={18} color={AdminColors.textSecondary} />
+                <Text style={[styles.utilBtnText, { color: AdminColors.textSecondary }]}>{t('common.details')}</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.mainActionBtn, { backgroundColor: isPickup ? C.warning : C.success }]}
-              onPress={() => {
-                setSelectedOrder(item);
-                if (isPickup) {
-                  clearOrder();
-                  setPickupOrderId(String(item.id));
-                  setOrderNotes(item.notes || '');
-                  router.push('/(admin)/order-items');
-                } else {
-                   setCollectedAmount(String(item.montantRestant || 0));
-                   setDeliveryNotes('');
-                   setShowPaymentModal(true);
-                }
-              }}
-              disabled={updating}
-            >
-              {updating && selectedOrder?.id === item.id ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.mainActionText}>
-                  {isPickup ? t('livreur.collect_btn') : t('livreur.deliver_btn')}
-                </Text>
-              )}
-            </TouchableOpacity>
+            <View style={[styles.utilRow, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={[styles.mainActionBtn, { flex: 3, backgroundColor: isPickup ? C.warning : C.success }]}
+                onPress={() => {
+                  setSelectedOrder(item);
+                  if (isPickup) {
+                    clearOrder();
+                    setPickupOrderId(String(item.id));
+                    setOrderNotes(item.notes || '');
+                    router.push('/(admin)/order-items');
+                  } else {
+                    setCollectedAmount(String(item.montantRestant || 0));
+                    setDeliveryNotes('');
+                    setShowPaymentModal(true);
+                  }
+                }}
+                disabled={updating}
+              >
+                {updating && selectedOrder?.id === item.id ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.mainActionText}>
+                    {isPickup ? t('livreur.collect_btn') : t('livreur.deliver_btn')}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.refusBtn, { flex: 1 }]}
+                onPress={() => { setSelectedOrder(item); setProbType(isPickup ? 'PICKUP' : 'DELIVERY'); setShowProb(true); }}
+              >
+                <Text style={styles.refusBtnText}>{t('livreur.refuse_btn')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -302,6 +391,14 @@ export default function AdminMissionsScreen() {
         onPrint={handlePrint}
         t={t}
       />
+
+      <FailedAttemptModal
+        visible={showProb}
+        order={selectedOrder}
+        attemptType={probType}
+        onClose={() => setShowProb(false)}
+        onSuccess={() => { refetchPickups(); refetchDeliveries(); }}
+      />
     </View>
   );
 }
@@ -369,6 +466,8 @@ const styles = StyleSheet.create({
   utilBtnText: { fontSize: 13, fontWeight: '700' },
   mainActionBtn: { height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', ...AdminShadows.shadowSmall },
   mainActionText: { fontSize: 15, fontWeight: '800', color: 'white' },
+  refusBtn: { height: 50, backgroundColor: '#F1F5F9', borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginLeft: 0 },
+  refusBtnText: { color: AdminColors.textSecondary, fontSize: 13, fontWeight: '600' },
 
   emptyState: { alignItems: 'center', marginTop: 100, paddingHorizontal: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: AdminColors.textPrimary, marginTop: 16 },

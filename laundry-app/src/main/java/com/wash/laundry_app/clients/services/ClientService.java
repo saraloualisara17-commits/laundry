@@ -75,14 +75,8 @@ public class ClientService {
 
     @Transactional(readOnly = true)
     public List<ClientDto> getClientsFiltered(String search) {
-        List<Client> list = clientRepository.findAll();
-        if (search != null && !search.trim().isEmpty()) {
-            String lowerSearch = search.toLowerCase().trim();
-            list = list.stream()
-                    .filter(c -> (c.getName() != null && c.getName().toLowerCase().contains(lowerSearch)) ||
-                            (c.getId() != null && c.getId().toString().contains(lowerSearch)))
-                    .toList();
-        }
+        String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        List<Client> list = clientRepository.findBySearchTerm(searchParam);
         Map<Long, Object[]> statsMap = buildClientStatsMap(list);
         return list.stream().map(client -> {
             ClientDto dto = clientMapper.toDto(client);
@@ -115,20 +109,13 @@ public class ClientService {
 
     @Transactional(readOnly = true)
     public ClientStatisticsDto getClientStatistics() {
-        List<Client> allClients = clientRepository.findAll();
-        long totalClients = allClients.size();
+        long totalClients = clientRepository.countAll();
 
-        java.time.YearMonth currentMonth = java.time.YearMonth.now();
+        java.time.LocalDateTime startOfMonth = java.time.YearMonth.now().atDay(1).atStartOfDay();
+        java.time.LocalDateTime startOfNextMonth = java.time.YearMonth.now().plusMonths(1).atDay(1).atStartOfDay();
 
-        long nouveauxCeMois = allClients.stream()
-                .filter(c -> c.getCreatedAt() != null
-                        && java.time.YearMonth.from(c.getCreatedAt()).equals(currentMonth))
-                .count();
-
-        long commandesCeMois = commandeRepository.findAll().stream()
-                .filter(cmd -> cmd.getDateCreation() != null
-                        && java.time.YearMonth.from(cmd.getDateCreation()).equals(currentMonth))
-                .count();
+        long nouveauxCeMois = clientRepository.countCreatedBetween(startOfMonth, startOfNextMonth);
+        long commandesCeMois = commandeRepository.countCommandesInPeriod(startOfMonth, startOfNextMonth);
 
         double pourcentageNouveaux = totalClients == 0 ? 0 : (double) nouveauxCeMois / totalClients * 100;
 

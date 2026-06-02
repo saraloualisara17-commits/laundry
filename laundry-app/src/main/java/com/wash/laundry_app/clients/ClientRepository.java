@@ -21,4 +21,17 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
     @Query("SELECT COUNT(c) FROM Client c WHERE c.createdAt >= :date")
     long countCreatedAfter(@Param("date") java.time.LocalDateTime date);
+
+    @Query("SELECT COUNT(c) FROM Client c")
+    long countAll();
+
+    @Query("SELECT COUNT(c) FROM Client c WHERE c.createdAt >= :start AND c.createdAt < :end")
+    long countCreatedBetween(@Param("start") java.time.LocalDateTime start,
+                             @Param("end") java.time.LocalDateTime end);
+
+    /** Filtered list for the client search endpoint — DB-side search, never loads all clients. */
+    @Query("SELECT c FROM Client c WHERE :search IS NULL " +
+           "OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR CAST(c.id AS string) LIKE CONCAT('%', :search, '%')")
+    List<Client> findBySearchTerm(@Param("search") String search);
 }

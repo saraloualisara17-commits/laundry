@@ -51,15 +51,7 @@ export default function LivreurLayout() {
       />
       <Tabs.Screen
         name="orders"
-        options={{
-          tabBarLabel: t('tabs.orders'),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconWrap}>
-              {focused && <View style={styles.pill} />}
-              <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
-            </View>
-          ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="missions"

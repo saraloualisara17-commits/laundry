@@ -95,7 +95,12 @@ public class CommandeCreationService {
         }
         if (request.getNotes() != null) commande.setNotes(request.getNotes());
         if (request.getDeliveryType() != null) commande.setDeliveryType(request.getDeliveryType());
-        if (request.getScheduledPickupDate() != null) commande.setScheduledPickupDate(request.getScheduledPickupDate());
+        if (request.getScheduledPickupDate() != null) {
+            commande.setScheduledPickupDate(request.getScheduledPickupDate());
+        } else if (!isScheduled) {
+            // IMMEDIATE walk-in: no pickup trip — stamp now as both the pickup and creation date
+            commande.setScheduledPickupDate(java.time.LocalDateTime.now());
+        }
 
         // Snapshot delivery address at order creation time — prevents retroactive changes
         // if the client updates their saved address later.

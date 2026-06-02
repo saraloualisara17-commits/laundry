@@ -461,6 +461,10 @@ export function useOrderDetailHandlers({
       Alert.alert(t('common.error'), t('orders.cannot_edit_date_now', { defaultValue: 'لا يمكن تعديل التاريخ في هذه المرحلة' }));
       return;
     }
+    if (isReadyForDelivery && currentUser?.role === 'LIVREUR') {
+      Alert.alert(t('common.error'), t('orders.livreur_cannot_edit_delivery_date', { defaultValue: 'La date de livraison ne peut plus être modifiée' }));
+      return;
+    }
     if (isReadyForDelivery) {
       const d = order.scheduledDeliveryDate ? new Date(order.scheduledDeliveryDate) : new Date();
       setDeliveryEditDate(d);

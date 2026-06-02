@@ -1,6 +1,8 @@
 package com.wash.laundry_app.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,6 +15,8 @@ public class SystemSettingsService {
     private final SystemSettingsRepository repository;
     private final FileStorageService fileStorageService;
 
+    @Transactional(readOnly = true)
+    @Cacheable("systemSettings")
     public SystemSettings getSettings() {
         return repository.findById(1L)
                 .orElseGet(() -> {
@@ -27,6 +31,7 @@ public class SystemSettingsService {
     }
 
     @Transactional
+    @CacheEvict(value = "systemSettings", allEntries = true)
     public SystemSettings updateSettings(String appName, String businessPhone, MultipartFile logo) {
         SystemSettings settings = getSettings();
 

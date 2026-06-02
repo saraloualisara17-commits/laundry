@@ -28,17 +28,13 @@ const getToken = () => store.getState()?.auth?.token
 
 const attemptTokenRefresh = async () => {
   try {
-    const refreshToken = store.getState()?.auth?.refreshToken
-    const res = await refreshApi.post('/auth/refresh', null, {
-      headers: { 'X-Refresh-Token': refreshToken },
-    })
+    // refreshToken HttpOnly cookie sent automatically via withCredentials
+    const res = await refreshApi.post('/auth/refresh', null)
     const newToken = res.data.accessToken || res.data.token
-    const newRefreshToken = res.data.refreshToken
-    store.dispatch(setCredentials({ token: newToken, refreshToken: newRefreshToken }))
+    store.dispatch(setCredentials({ token: newToken }))
     return newToken
   } catch {
     store.dispatch(logOut())
-    localStorage.removeItem('user')
     window.location.href = '/'
     return null
   }

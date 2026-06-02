@@ -36,6 +36,22 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         // Restrict browser features — minimal policy for a pure API
         response.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
 
+        // Force HTTPS for 1 year once seen over a secure connection (HSTS).
+        // Only effective when the app is served over HTTPS (reverse proxy / production).
+        // Safe to set on HTTP too — browsers ignore HSTS on plain HTTP responses.
+        response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+        // Content Security Policy: restrict resource origins for browser clients
+        // (admin web dashboard, Expo web). Pure API clients ignore this header.
+        response.setHeader("Content-Security-Policy",
+                "default-src 'self'; " +
+                "script-src 'self'; " +
+                "style-src 'self' 'unsafe-inline'; " +
+                "img-src 'self' data: blob:; " +
+                "font-src 'self'; " +
+                "connect-src 'self'; " +
+                "frame-ancestors 'none'");
+
         chain.doFilter(request, response);
     }
 }

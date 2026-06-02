@@ -92,25 +92,6 @@ export const ordersApi = {
   returnToWorkplace: (id: number | string) =>
     client.patch(`/api/livreur/commandes/${id}/return`),
 
-  // --- RECEIPTS ---
-
-  getOrderPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
-    `${client.defaults.baseURL}/api/commandes/${id}/receipt/order/pdf?lang=${lang}`,
-
-  getDeliveryPdfUrl: (id: number | string, lang: 'fr' | 'ar' = 'fr') =>
-    `${client.defaults.baseURL}/api/commandes/${id}/receipt/delivery/pdf?lang=${lang}`,
-
-  getOrderReceiptWhatsapp: (id: number | string) =>
-    client.get(`/api/commandes/${id}/receipt/order/whatsapp`),
-
-  getDeliveryReceiptWhatsapp: (id: number | string) =>
-    client.get(`/api/commandes/${id}/receipt/delivery/whatsapp`),
-
-  getDeliveryThermal: (id: number | string) =>
-    client.get<string>(`/api/commandes/${id}/receipt/delivery/thermal`, {
-      responseType: 'text',
-    }),
-
   assignPickupDriver: (id: number | string, livreurId: string | number) =>
     client.patch(`/api/admin/commandes/${id}/pickup-driver`, { livreurId }),
 

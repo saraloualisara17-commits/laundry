@@ -28,7 +28,10 @@ function changeLanguage(lang: string) {
 const STATUS_CARDS = [
   { key: 'PENDING_PICKUP',     color: '#C2185B', bg: 'rgba(194, 24, 91, 0.08)' },
   { key: 'PICKED_UP',          color: '#D32F2F', bg: 'rgba(211, 47, 47, 0.08)' },
+  { key: 'IN_PROCESS',         color: '#7B1FA2', bg: 'rgba(123, 31, 162, 0.08)' },
   { key: 'READY_FOR_DELIVERY', color: '#00897B', bg: 'rgba(0, 137, 123, 0.08)' },
+  { key: 'DELIVERY_FAILED',    color: '#B71C1C', bg: 'rgba(183, 28, 28, 0.08)' },
+  { key: 'PICKUP_FAILED',      color: '#E65100', bg: 'rgba(230, 81, 0, 0.08)' },
 ];
 
 const C = {
@@ -387,8 +390,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.5,
     marginHorizontal: 16, marginTop: 20, marginBottom: 10,
   },
-  statusRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
-  statusCard: { flex: 1, borderTopWidth: 3, borderRadius: 12, padding: 14, alignItems: 'center', ...AdminShadows.shadowSmall },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 10 },
+  statusCard: { width: '30%', flexGrow: 1, borderTopWidth: 3, borderRadius: 12, padding: 14, alignItems: 'center', ...AdminShadows.shadowSmall },
   statusCount: { fontSize: 26, fontWeight: '800', marginBottom: 6 },
   statusLabel: { fontSize: 10, fontWeight: '600', color: AdminColors.textMuted, textTransform: 'uppercase', textAlign: 'center', letterSpacing: 0.3 },
   missionActions: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },

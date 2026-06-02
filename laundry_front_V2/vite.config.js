@@ -40,14 +40,24 @@ export default defineConfig({
       '/admin': {
         target: process.env.VITE_API_URL || 'http://localhost:8080',
         changeOrigin: true,
+        bypass: (req) => {
+          // Browser page navigations (Accept: text/html) are SPA routes — serve index.html
+          if (req.headers.accept?.includes('text/html')) return '/index.html'
+        },
       },
       '/livreur': {
         target: process.env.VITE_API_URL || 'http://localhost:8080',
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.headers.accept?.includes('text/html')) return '/index.html'
+        },
       },
       '/employe': {
         target: process.env.VITE_API_URL || 'http://localhost:8080',
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.headers.accept?.includes('text/html')) return '/index.html'
+        },
       },
       '/uploads': {
         target: process.env.VITE_API_URL || 'http://localhost:8080',

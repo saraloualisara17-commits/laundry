@@ -109,6 +109,17 @@ export default function OrdersScreen() {
 
   const filteredOrders = orders;
 
+  const renderTabItem = useCallback(({ item }: { item: typeof TABS[number] }) => (
+    <TouchableOpacity
+      style={[styles.tab, activeTab === item.id && styles.activeTab]}
+      onPress={() => { setActiveTab(item.id); }}
+    >
+      <Text style={[styles.tabText, activeTab === item.id && styles.activeTabText]}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  ), [activeTab]);
+
   const renderOrderCard = useCallback(({ item }: { item: any }) => (
     <OrderCard item={item} isArabic={isArabic} t={t} onValidate={handleValidateOrder} />
   ), [isArabic, t, handleValidateOrder]);
@@ -172,16 +183,7 @@ export default function OrdersScreen() {
           keyExtractor={item => item.id}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContainer}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.tab, activeTab === item.id && styles.activeTab]}
-              onPress={() => { setActiveTab(item.id); }}
-            >
-              <Text style={[styles.tabText, activeTab === item.id && styles.activeTabText]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          )}
+          renderItem={renderTabItem}
         />
 
         <View style={[styles.searchContainer, row(isArabic)]}>

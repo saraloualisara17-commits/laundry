@@ -21,10 +21,12 @@ public class UserService {
     private final com.wash.laundry_app.auth.AuthService authService;
     private final AuditService auditService;
 
+    @Transactional(readOnly = true)
     public User getByEmail(String email) {
         return userRepository.findByEmail(email).orElseThrow(() -> new InvalidCredentialsException("Utilisateur non trouvé"));
     }
 
+    @Transactional(readOnly = true)
     public User getByIdEntity(Long id) {
         return userRepository.findById(id).orElseThrow(UserNotFoundException::new);
     }
@@ -56,6 +58,7 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
+    @Transactional(readOnly = true)
     public UserDto getSingleUser(Long id) {
         var user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
         return userMapper.toDto(user);

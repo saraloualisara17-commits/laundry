@@ -1,59 +1,52 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Outlet } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import { setCredentials } from "../store/auth/authSlice"
-import { refreshApi } from "../api/axios"  
+import { refreshApi } from "../api/axios"
 import { jwtDecode } from "jwt-decode"
 import LoadingScreen from "../components/ui/LoadingScreen"
-
 
 const PersistLogin = () => {
   const dispatch = useDispatch()
   const { token } = useSelector(state => state.auth)
   const [loading, setLoading] = useState(true)
+  const ran = useRef(false)
 
   useEffect(() => {
-    let isMounted = true
+    // ran.current prevents the double-invoke from React StrictMode
+    // from sending two refresh requests with the same cookie token
+    if (ran.current) return
+    ran.current = true
+
+    if (token) {
+      setLoading(false)
+      return
+    }
 
     const verifyRefreshToken = async () => {
       try {
-        const storedRefreshToken = localStorage.getItem('refreshToken')
-        const res = await refreshApi.post("/auth/refresh", null, {
-          headers: storedRefreshToken ? { 'X-Refresh-Token': storedRefreshToken } : {}
-        })
+        // refreshToken HttpOnly cookie is sent automatically via withCredentials
+        const res = await refreshApi.post("/auth/refresh", null)
         const newToken = res.data.accessToken || res.data.token
-        const newRefreshToken = res.data.refreshToken
         const decoded = jwtDecode(newToken)
-        if (isMounted) {
-          dispatch(setCredentials({
-            token: newToken,
-            refreshToken: newRefreshToken,
-            user: {
-              id: decoded.sub,
-              email: decoded.email,
-              name: decoded.name,
-              role: decoded.role
-            }
-          }))
-        }
-      } catch (err) {
-        // Refresh failed (expired/invalid token) — clear stale storage so
-        // the 403 interceptor in axios won't misread the old user as active
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('user')
+        dispatch(setCredentials({
+          token: newToken,
+          user: {
+            id: decoded.sub,
+            email: decoded.email,
+            name: decoded.name,
+            role: decoded.role?.toLowerCase(),
+          }
+        }))
+      } catch {
+        // Refresh failed — cookie expired or invalid, user must log in again
       } finally {
-        if (isMounted) setLoading(false)
+        setLoading(false)
       }
     }
 
-    if (!token) {
-      verifyRefreshToken()
-    } else {
-      setLoading(false)
-    }
-
-    return () => { isMounted = false }
-  }, [dispatch])
+    verifyRefreshToken()
+  }, [])
 
   if (loading) return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-4">

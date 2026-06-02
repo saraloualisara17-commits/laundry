@@ -23,6 +23,7 @@ import { pushNotificationService } from '../src/services/notifications/pushNotif
 import { initI18n } from '../src/i18n';
 import { settingsApi } from '../src/services/api/settingsApi';
 import { queryKeys } from '../src/services/query/queryKeys';
+import { fetchLogoBase64 } from '../src/utils/receiptHtml';
 import {
   Cairo_400Regular,
   Cairo_500Medium,
@@ -66,6 +67,9 @@ function RootLayoutNav() {
           queryKey: queryKeys.settings.all,
           queryFn: settingsApi.getSettings,
           staleTime: Infinity,
+        }).then(() => {
+          const settings = queryClient.getQueryData<any>(queryKeys.settings.all);
+          if (settings?.logoUrl) fetchLogoBase64(settings.logoUrl).catch(() => {});
         });
 
         const storedUser = await SecureStore.getItemAsync('user');

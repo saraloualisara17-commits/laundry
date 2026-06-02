@@ -3,13 +3,35 @@ import { fr, arDZ as ar } from 'date-fns/locale';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // ─── Logo fetcher ─────────────────────────────────────────────────────────────
+// Caches the logo as base64 on disk. Re-downloads only when the URL changes.
+const LOGO_CACHE_FILE = `${FileSystem.cacheDirectory}receipt_logo_cache`;
+const LOGO_URL_FILE   = `${FileSystem.cacheDirectory}receipt_logo_url`;
+
 export async function fetchLogoBase64(logoUrl: string | null | undefined): Promise<string | null> {
   if (!logoUrl) return null;
   try {
-    const localUri = `${FileSystem.cacheDirectory}receipt_logo_cache`;
-    const result = await FileSystem.downloadAsync(logoUrl, localUri);
+    // Check if we already have a cached version for this exact URL
+    const cachedUrlInfo = await FileSystem.getInfoAsync(LOGO_URL_FILE);
+    const cachedFileInfo = await FileSystem.getInfoAsync(LOGO_CACHE_FILE);
+    if (cachedUrlInfo.exists && cachedFileInfo.exists) {
+      const cachedUrl = await FileSystem.readAsStringAsync(LOGO_URL_FILE);
+      if (cachedUrl === logoUrl) {
+        // Cache hit — read base64 from disk without any network call
+        const base64 = await FileSystem.readAsStringAsync(LOGO_CACHE_FILE, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const lower = logoUrl.toLowerCase();
+        const mime = lower.endsWith('.png') ? 'image/png'
+                   : lower.endsWith('.webp') ? 'image/webp'
+                   : 'image/jpeg';
+        return `data:${mime};base64,${base64}`;
+      }
+    }
+    // Cache miss or URL changed — download and persist
+    const result = await FileSystem.downloadAsync(logoUrl, LOGO_CACHE_FILE);
     if (result.status !== 200) return null;
-    const base64 = await FileSystem.readAsStringAsync(result.uri, {
+    await FileSystem.writeAsStringAsync(LOGO_URL_FILE, logoUrl);
+    const base64 = await FileSystem.readAsStringAsync(LOGO_CACHE_FILE, {
       encoding: FileSystem.EncodingType.Base64,
     });
     const lower = logoUrl.toLowerCase();

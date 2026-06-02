@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { 
   User, Lock, Eye, EyeOff, Check, AlertCircle, AlertTriangle, Languages, Loader2 
 } from 'lucide-react'
@@ -12,6 +12,7 @@ const Login = () => {
     const { t, i18n } = useTranslation()
     const dispatch = useDispatch()
     const navigate = useNavigate()
+    const location = useLocation()
     const userFromStore = useSelector(selectCurrentUser)
 
     const [email, setEmail] = useState('')
@@ -36,14 +37,15 @@ const Login = () => {
             sessionStorage.removeItem('rateLimitMessage')
         }
 
-        if (!userFromStore?.role) return
+        // Only redirect from the login page itself — not when session is restored on other pages
+        if (!userFromStore?.role || location.pathname !== '/') return
         const paths = {
             admin: '/admin/dashboard',
             employe: '/employe/dashboard',
             livreur: '/livreur'
         }
-        navigate(paths[userFromStore.role] || '/unauthorized', { replace: true })
-    }, [userFromStore, navigate])
+        navigate(paths[userFromStore.role] || '/interdit', { replace: true })
+    }, [userFromStore, navigate, location.pathname])
 
     const handleLogin = async (e) => {
         e?.preventDefault()

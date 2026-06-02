@@ -18,10 +18,10 @@ const Layout = () => {
   useEffect(() => {
     if (user?.id) {
       connectWebSocket(user.id, dispatch);
-    }
-    return () => {
+    } else {
+      // User logged out — cleanly close the connection
       disconnectWebSocket();
-    };
+    }
   }, [user?.id, dispatch]);
 
   // LOGIN PAGE STRUCTURAL EXEMPTION

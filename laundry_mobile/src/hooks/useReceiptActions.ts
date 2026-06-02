@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -77,21 +77,11 @@ export function useReceiptActions(
       const { logoUrl, appName } = getSettings();
       const uri = await generateLocalPdf(order, lang, logoUrl, appName);
 
-      if (Platform.OS === 'android' && clientPhone) {
-        const phone = clientPhone.replace(/[\s\-().+]/g, '').replace(/^0/, '212');
-        const chatUrl = `whatsapp://send?phone=${phone}`;
-        try {
-          await Linking.openURL(chatUrl);
-        } catch {
-          // WhatsApp not installed — fall through to generic share sheet
-        }
-        await new Promise(resolve => setTimeout(resolve, 800));
-      } else {
-        if (clientPhone) {
-          const digits = clientPhone.replace(/[\s\-().]/g, '');
-          await Clipboard.setStringAsync(digits);
-          log('Client phone copied to clipboard', { digits });
-        }
+      // Copy phone to clipboard so the user can paste it into WhatsApp contact search
+      if (clientPhone) {
+        const digits = clientPhone.replace(/[\s\-().]/g, '');
+        await Clipboard.setStringAsync(digits);
+        log('Client phone copied to clipboard', { digits });
       }
 
       log('Sharing PDF via share sheet', { uri });

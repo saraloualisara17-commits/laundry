@@ -1,6 +1,8 @@
 package com.wash.laundry_app.command.services;
 
 import com.wash.laundry_app.auth.AuthService;
+import com.wash.laundry_app.clients.ClientPhone;
+import com.wash.laundry_app.clients.ClientPhoneRepository;
 import com.wash.laundry_app.command.*;
 import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.employe.CommandDetails;
@@ -29,6 +31,7 @@ public class CommandeQueryService {
     private final CommandeMapper commandeMapper;
     private final HistoriqueStatutMapper historiqueStatutMapper;
     private final AuthService authService;
+    private final ClientPhoneRepository clientPhoneRepository;
 
     @Transactional(readOnly = true)
     public List<CommandeDTO> getPendingPickupOrdersForPickupDriver() {
@@ -108,8 +111,8 @@ public class CommandeQueryService {
         User user = authService.currentUser();
         Long uid = user.getId();
         java.time.LocalDateTime endOfToday = java.time.LocalDate.now().atTime(23, 59, 59);
-        long ready = commandeRepository.findReadyForDeliveryDueForDriver(uid, endOfToday).size();
-        long pending = commandeRepository.findPendingPickupsDueForDriver(uid, endOfToday).size();
+        long ready = commandeRepository.countReadyForDeliveryDueForDriver(uid, endOfToday);
+        long pending = commandeRepository.countPendingPickupsDueForDriver(uid, endOfToday);
         long cancelled = commandeRepository.countByLivreurIdAndStatus(uid, CommandeStatus.CANCELLED);
         return LivreurDashboardStatsDTO.builder()
                 .readyOrdersCount(ready)
@@ -247,9 +250,12 @@ public class CommandeQueryService {
         Page<Commande> pageResult = commandeRepository.findFiltered(
                 statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId, pageable);
 
-        java.math.BigDecimal totalValue  = commandeRepository.findFilteredTotalValue(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
-        java.math.BigDecimal totalUnpaid = commandeRepository.findFilteredTotalUnpaid(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
-        Long totalVolumes = commandeRepository.findFilteredTotalVolume(statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
+        java.math.BigDecimal totalValue  = commandeRepository.findFilteredTotalValue(
+                statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
+        java.math.BigDecimal totalUnpaid = commandeRepository.findFilteredTotalUnpaid(
+                statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
+        Long totalVolumes = commandeRepository.findFilteredTotalVolume(
+                statusEnum, modeEnum, activeOnly, paidDebts, selfSubmitted, dateTimeDebut, dateTimeFin, search, livreurId);
 
         return AdminOrdersResponseDTO.builder()
                 .content(pageResult.getContent().stream().map(commandeMapper::toDto).toList())
@@ -267,9 +273,9 @@ public class CommandeQueryService {
 
     @Transactional(readOnly = true)
     public byte[] exportCommandesToCsv() {
-        List<Commande> commandes = commandeRepository.findAll().stream()
-                .sorted(java.util.Comparator.comparing(Commande::getDateCreation).reversed())
-                .toList();
+        List<Commande> commandes = commandeRepository.findAll(
+                PageRequest.of(0, 2000, Sort.by(Sort.Direction.DESC, "dateCreation"))
+        ).getContent();
 
         StringBuilder sb = new StringBuilder();
         sb.append("ID,Numero Commande,Client,Telephone,Date Creation,Status,Montant Total,Type Paiement\n");
@@ -290,17 +296,24 @@ public class CommandeQueryService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getOrdersForMap(Long livreurId) {
-        return commandeRepository.findAll().stream()
-                .filter(c -> livreurId == null || (c.getLivreur() != null && c.getLivreur().getId().equals(livreurId)))
-                .filter(c -> {
-                    // Prefer the order's own delivery coords; fall back to client's first address
-                    if (c.getDeliveryLatitude() != null && c.getDeliveryLongitude() != null) return true;
-                    if (c.getClient() == null || c.getClient().getAddresses() == null || c.getClient().getAddresses().isEmpty()) return false;
-                    var addr = c.getClient().getAddresses().get(0);
-                    return addr.getLatitude() != null && addr.getLongitude() != null;
-                })
+        List<Commande> orders = commandeRepository.findAllForMapView(livreurId);
+        if (orders.isEmpty()) return List.of();
+
+        // Batch-fetch first phone per client in one query — avoids N lazy loads.
+        List<Long> clientIds = orders.stream()
+                .filter(c -> c.getClient() != null)
+                .map(c -> c.getClient().getId())
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, String> phoneByClientId = clientPhoneRepository.findAllByClientIdIn(clientIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        p -> p.getClient().getId(),
+                        ClientPhone::getPhoneNumber,
+                        (a, b) -> a)); // keep first if duplicates
+
+        return orders.stream()
                 .map(c -> {
-                    // Resolve coords: order snapshot first, then client profile
                     java.math.BigDecimal lat, lng;
                     String addressText;
                     if (c.getDeliveryLatitude() != null && c.getDeliveryLongitude() != null) {
@@ -308,10 +321,11 @@ public class CommandeQueryService {
                         lng = c.getDeliveryLongitude();
                         addressText = c.getDeliveryAddress();
                     } else {
-                        var addr = c.getClient().getAddresses().get(0);
-                        lat = addr.getLatitude();
-                        lng = addr.getLongitude();
-                        addressText = addr.getAddress();
+                        var addrs = c.getClient().getAddresses();
+                        var addr = addrs != null && !addrs.isEmpty() ? addrs.get(0) : null;
+                        lat = addr != null ? addr.getLatitude() : null;
+                        lng = addr != null ? addr.getLongitude() : null;
+                        addressText = addr != null ? addr.getAddress() : null;
                     }
 
                     Map<String, Object> map = new HashMap<>();
@@ -325,8 +339,8 @@ public class CommandeQueryService {
                     map.put("deliveryLatitude", lat);
                     map.put("deliveryLongitude", lng);
                     map.put("deliveryAddress", addressText != null ? addressText : "");
-                    map.put("clientPhone", c.getClient() != null && c.getClient().getPhones() != null && !c.getClient().getPhones().isEmpty()
-                            ? c.getClient().getPhones().get(0).getPhoneNumber() : "");
+                    map.put("clientPhone", c.getClient() != null
+                            ? phoneByClientId.getOrDefault(c.getClient().getId(), "") : "");
 
                     double total = c.getMontantTotal() != null ? c.getMontantTotal().doubleValue() : 0.0;
                     double paye  = c.getMontantPaye()  != null ? c.getMontantPaye().doubleValue()  : 0.0;

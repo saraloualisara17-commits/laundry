@@ -29,16 +29,20 @@ const progressListeners = new Map<string, ProgressListener>();
 
 class UploadManager {
   private activeCount = 0;
-  // Track when each task started uploading — for stall detection
   private uploadStartTimes = new Map<string, number>();
+  private unsubscribeConnectivity: (() => void) | null = null;
 
   constructor() {
-    // Drain queue whenever connectivity is restored
-    connectivity.subscribe((state) => {
+    this.unsubscribeConnectivity = connectivity.subscribe((state) => {
       if (state.isConnected && state.isInternetReachable) {
         this.recoverStalledTasks().then(() => this.processQueue());
       }
     });
+  }
+
+  public destroy() {
+    this.unsubscribeConnectivity?.();
+    this.unsubscribeConnectivity = null;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────

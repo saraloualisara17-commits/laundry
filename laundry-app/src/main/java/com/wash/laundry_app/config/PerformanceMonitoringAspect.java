@@ -21,7 +21,11 @@ public class PerformanceMonitoringAspect {
             long executionTime = System.currentTimeMillis() - startTime;
             String className = joinPoint.getSignature().getDeclaringTypeName();
             String methodName = joinPoint.getSignature().getName();
-            log.info("SERVICE_PERFORMANCE | {}.{} executed in {} ms", className, methodName, executionTime);
+            if (executionTime >= 1000) {
+                log.warn("SLOW_SERVICE | {}.{} exceeded SLA ({} ms)", className, methodName, executionTime);
+            } else {
+                log.info("SERVICE_PERFORMANCE | {}.{} executed in {} ms", className, methodName, executionTime);
+            }
         }
     }
 }

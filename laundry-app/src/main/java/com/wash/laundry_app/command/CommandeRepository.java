@@ -18,51 +18,20 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     @Query("SELECT c FROM Commande c LEFT JOIN FETCH c.client WHERE c.id = :id")
     Optional<Commande> findWithClientDetailsById(@Param("id") Long id);
 
-    // Receipt loading — split across 6 queries to avoid Hibernate "cannot fetch multiple bags" error.
-    // Hibernate forbids JOIN FETCH on more than one @OneToMany List<> (bag) per query.
-    // Client.phones and Client.addresses are both bags, so they must be fetched separately.
-    //
-    // Query 1: Commande scalars + ManyToOne associations only (no bags at all).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.client cl " +
-           "LEFT JOIN FETCH c.livreur " +
-           "LEFT JOIN FETCH c.deliveryDriver " +
-           "WHERE c.id = :id")
-    Optional<Commande> findForReceiptById(@Param("id") Long id);
+    /**
+     * Returns status counts for orders created in [start, end].
+     * Each element is Object[]{CommandeStatus, Long}.
+     * Replaces 7 separate in-memory stream filters in StatisticsService.
+     */
+    @Query("SELECT c.status, COUNT(c) FROM Commande c WHERE c.dateCreation BETWEEN :start AND :end GROUP BY c.status")
+    List<Object[]> countByStatusBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    // Query 1b: client phones bag (one bag — safe to fetch alone).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.client cl " +
-           "LEFT JOIN FETCH cl.phones " +
-           "WHERE c.id = :id")
-    Optional<Commande> findWithClientPhonesById(@Param("id") Long id);
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'DELIVERED' AND c.dateCreation BETWEEN :start AND :end " +
+           "AND c.montantTotal > 0 AND c.montantPaye IS NOT NULL AND c.montantPaye >= c.montantTotal")
+    long countFullyPaidDeliveredBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    // Query 1c: client addresses bag (one bag — safe to fetch alone).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.client cl " +
-           "LEFT JOIN FETCH cl.addresses " +
-           "WHERE c.id = :id")
-    Optional<Commande> findWithClientAddressesById(@Param("id") Long id);
-
-    // Query 2: order items + product (one bag).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.commandeTapis ct " +
-           "LEFT JOIN FETCH ct.product " +
-           "WHERE c.id = :id")
-    Optional<Commande> findWithItemsById(@Param("id") Long id);
-
-    // Query 3: payments (one bag).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.paiements " +
-           "WHERE c.id = :id")
-    Optional<Commande> findWithPaiementsById(@Param("id") Long id);
-
-    // Query 4: attempts + attempt driver (one bag).
-    @Query("SELECT DISTINCT c FROM Commande c " +
-           "LEFT JOIN FETCH c.attempts att " +
-           "LEFT JOIN FETCH att.driver " +
-           "WHERE c.id = :id")
-    Optional<Commande> findWithAttemptsById(@Param("id") Long id);
+    @Query("SELECT COUNT(DISTINCT c.client.id) FROM Commande c WHERE c.dateCreation BETWEEN :start AND :end AND c.client IS NOT NULL")
+    long countDistinctClientsBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = :status")
     long countByStatus(@Param("status") CommandeStatus status);
@@ -117,10 +86,26 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("now") LocalDateTime now
     );
 
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'READY_FOR_DELIVERY' " +
+           "AND c.deliveryDriver.id = :driverId " +
+           "AND (c.scheduledDeliveryDate IS NULL OR c.scheduledDeliveryDate <= :now)")
+    long countReadyForDeliveryDueForDriver(
+            @Param("driverId") Long driverId,
+            @Param("now") LocalDateTime now
+    );
+
     @Query("SELECT c FROM Commande c WHERE c.status = 'PENDING_PICKUP' " +
            "AND c.livreur.id = :driverId " +
            "AND (c.scheduledPickupDate IS NULL OR c.scheduledPickupDate <= :now)")
     List<Commande> findPendingPickupsDueForDriver(
+            @Param("driverId") Long driverId,
+            @Param("now") LocalDateTime now
+    );
+
+    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'PENDING_PICKUP' " +
+           "AND c.livreur.id = :driverId " +
+           "AND (c.scheduledPickupDate IS NULL OR c.scheduledPickupDate <= :now)")
+    long countPendingPickupsDueForDriver(
             @Param("driverId") Long driverId,
             @Param("now") LocalDateTime now
     );
@@ -276,16 +261,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     @Query("SELECT COALESCE(SUM(c.montantTotal), 0) FROM Commande c WHERE c.mode = 'IMMEDIATE' AND c.status NOT IN ('DELIVERED', 'CANCELLED')")
     BigDecimal sumActiveImmediateOrders();
 
-    /** @deprecated use countRecentlyFullyPaidDelivered instead */
-    @Deprecated
-    @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'DELIVERED' AND c.montantPaye >= c.montantTotal AND c.montantTotal > 0 AND c.datePaiement >= :thirtyDaysAgo")
-    long countRecentlyPaidDebts(@Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo);
-
-    /** @deprecated use sumRecentlyFullyPaidDelivered instead */
-    @Deprecated
-    @Query("SELECT COALESCE(SUM(c.montantTotal), 0) FROM Commande c WHERE c.status = 'DELIVERED' AND c.montantPaye >= c.montantTotal AND c.montantTotal > 0 AND c.datePaiement >= :thirtyDaysAgo")
-    BigDecimal sumRecentlyPaidDebts(@Param("thirtyDaysAgo") LocalDateTime thirtyDaysAgo);
-
     // Correct versions: use dateCreation (always set) instead of datePaiement (often null)
     @Query("SELECT COUNT(c) FROM Commande c WHERE c.status = 'DELIVERED' AND c.montantTotal > 0 AND c.montantPaye >= c.montantTotal AND c.dateCreation >= :since")
     long countRecentlyFullyPaidDelivered(@Param("since") LocalDateTime since);
@@ -348,14 +323,26 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     long countCommandesInPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     // ── Map view queries ──────────────────────────────────────────────────────
+    // Fetches orders that have GPS coords, either from their own delivery snapshot
+    // or from the client's first address. Eagerly fetches client + phones + addresses
+    // to avoid N+1 lazy-load hits when building the map response.
+    // Fetches addresses only — cannot JOIN FETCH both phones and addresses in the
+    // same query (Hibernate MultipleBagFetchException). Phones are lazy-loaded on
+    // demand in getOrdersForMap(); the map view only needs the first phone number
+    // so the extra round-trip is one query, not N.
     @Query("SELECT DISTINCT c FROM Commande c " +
-            "JOIN c.client cl " +
-            "JOIN cl.addresses a " +
-            "WHERE a.latitude IS NOT NULL " +
-            "AND a.longitude IS NOT NULL " +
-            "AND c.status != 'CANCELLED' " +
+            "JOIN FETCH c.client cl " +
+            "LEFT JOIN FETCH cl.addresses a " +
+            "LEFT JOIN c.livreur ld " +
+            "LEFT JOIN c.deliveryDriver dd " +
+            "WHERE c.status != 'CANCELLED' " +
+            "AND (:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) " +
+            "AND (" +
+            "  (c.deliveryLatitude IS NOT NULL AND c.deliveryLongitude IS NOT NULL) " +
+            "  OR (a.latitude IS NOT NULL AND a.longitude IS NOT NULL)" +
+            ") " +
             "ORDER BY c.dateCreation DESC")
-    List<Commande> findAllWithGpsCoordinates();
+    List<Commande> findAllForMapView(@Param("livreurId") Long livreurId);
 
     // ── Delivered orders scoped by date_livraison ─────────────────────────────
     @Query("SELECT c FROM Commande c WHERE c.status = 'DELIVERED' " +

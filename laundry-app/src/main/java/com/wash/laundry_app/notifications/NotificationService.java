@@ -5,7 +5,9 @@ import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +80,7 @@ public class NotificationService {
         );
     }
 
+    @Async
     @Transactional
     public void notifyRole(Role role, String title, String message, String type, String referenceId) {
         List<User> users = userRepository.findByRole(role);
@@ -86,9 +89,12 @@ public class NotificationService {
         }
     }
 
+    private static final int NOTIFICATION_PAGE_SIZE = 50;
+
     @Transactional(readOnly = true)
     public List<Notification> getNotificationsForUser(Long userId) {
-        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(userId);
+        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(
+                userId, PageRequest.of(0, NOTIFICATION_PAGE_SIZE));
     }
 
     @Transactional(readOnly = true)

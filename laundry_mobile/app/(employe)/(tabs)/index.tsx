@@ -27,7 +27,10 @@ function changeLanguage(lang: string) {
 const STATUS_CARDS = [
   { key: 'PENDING_PICKUP',     color: '#C2185B', bg: 'rgba(194, 24, 91, 0.08)' },
   { key: 'PICKED_UP',          color: '#D32F2F', bg: 'rgba(211, 47, 47, 0.08)' },
+  { key: 'IN_PROCESS',         color: '#7B1FA2', bg: 'rgba(123, 31, 162, 0.08)' },
   { key: 'READY_FOR_DELIVERY', color: '#00897B', bg: 'rgba(0, 137, 123, 0.08)' },
+  { key: 'DELIVERY_FAILED',    color: '#B71C1C', bg: 'rgba(183, 28, 28, 0.08)' },
+  { key: 'PICKUP_FAILED',      color: '#E65100', bg: 'rgba(230, 81, 0, 0.08)' },
 ];
 
 export default function EmployeDashboard() {
@@ -328,11 +331,13 @@ const styles = StyleSheet.create({
   },
   statusRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
     gap: 10,
   },
   statusCard: {
-    flex: 1,
+    width: '30%',
+    flexGrow: 1,
     borderTopWidth: 3,
     borderRadius: 12,
     padding: 14,

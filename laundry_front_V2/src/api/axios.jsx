@@ -40,18 +40,12 @@ api.interceptors.response.use(
     ) {
       if (error.response?.data?.error === "ACCOUNT_DISABLED") {
         store.dispatch(logOut())
-        localStorage.removeItem('user')
         window.location.href = '/compte-suspendu'
         return Promise.reject(error)
       }
 
-      const user = JSON.parse(localStorage.getItem('user') || 'null')
       store.dispatch(logOut())
-      if (user?.isActive === false) {
-        window.location.href = '/compte-suspendu'
-      } else {
-        window.location.href = '/interdit'
-      }
+      window.location.href = '/interdit'
       return Promise.reject(error)
     }
 
@@ -66,15 +60,12 @@ api.interceptors.response.use(
 
       try {
         if (!_refreshPromise) {
-          const refreshToken = store.getState()?.auth?.refreshToken
+          // refreshToken cookie is sent automatically via withCredentials — no header needed
           _refreshPromise = refreshApi
-            .post("/auth/refresh", null, {
-              headers: { 'X-Refresh-Token': refreshToken },
-            })
+            .post("/auth/refresh", null)
             .then((res) => {
               const newToken = res.data.accessToken || res.data.token
-              const newRefreshToken = res.data.refreshToken
-              store.dispatch(setCredentials({ token: newToken, refreshToken: newRefreshToken }))
+              store.dispatch(setCredentials({ token: newToken }))
               return newToken
             })
             .finally(() => {
@@ -88,7 +79,6 @@ api.interceptors.response.use(
       } catch (err) {
         _refreshPromise = null
         store.dispatch(logOut())
-        localStorage.removeItem('user')
         window.location.href = '/'
         return Promise.reject(err)
       }

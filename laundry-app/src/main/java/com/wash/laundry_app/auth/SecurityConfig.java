@@ -149,7 +149,6 @@ public class SecurityConfig {
                         // Shared Legacy Routes
                         .requestMatchers(HttpMethod.POST, "/api/commandes/{id}/payments").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers("/api/notifications/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
-                        .requestMatchers("/api/commandes/{id}/receipt/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
                         .requestMatchers(HttpMethod.DELETE, "/api/commandes/**").hasRole("ADMIN")
                         .requestMatchers("/api/commandes/**").hasAnyRole("ADMIN", "EMPLOYE", "LIVREUR")
 

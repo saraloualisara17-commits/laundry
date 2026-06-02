@@ -1,229 +1,320 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Users, Search, Loader2, ChevronRight, Phone, 
-  MapPin, Calendar, RefreshCw, Star, 
-  TrendingUp, ShieldAlert, ArrowUpRight,
-  ShoppingCart, SlidersHorizontal, ChevronLeft,
-  Mail, Package
-} from 'lucide-react';
-import { fetchAllClients, fetchClientStatistics } from '../../store/admin/adminThunk';
-import { selectAllClients, selectAdminLoading, selectClientStatistics } from '../../store/admin/adminSelectors';
-import { useTranslation } from 'react-i18next';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import {
+  Search, X, Plus, Users, ShoppingBag, UserPlus, TrendingUp,
+  Phone, ChevronRight, Loader2, AlertTriangle, Edit2, Check
+} from 'lucide-react'
+import { clientsApi } from '../../services/clientsApi'
+import { queryKeys } from '../../lib/queryKeys'
 
-export default function AllClients() {
-  const { t, i18n } = useTranslation();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const clients = useSelector(selectAllClients);
-  const statistics = useSelector(selectClientStatistics);
-  const loading = useSelector(selectAdminLoading);
+const fmtN = (v) => Number(v || 0).toLocaleString('fr-MA')
+const fmt  = (v) => Number(v || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })
 
-  const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
-
-  const loadData = useCallback(() => {
-    dispatch(fetchAllClients({ search: search || undefined }));
-    dispatch(fetchClientStatistics());
-  }, [dispatch, search]);
+// ── Create/Edit Client Modal ──────────────────────────────────────────────────
+function ClientFormModal({ isOpen, onClose, client = null }) {
+  const qc = useQueryClient()
+  const isEdit = !!client
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+  })
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const timer = setTimeout(() => loadData(), 500);
-    return () => clearTimeout(timer);
-  }, [loadData]);
-
-  const colorArray = [
-    'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
-    'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-    'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400',
-    'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',
-    'bg-pink-100 text-pink-700 dark:bg-pink-500/10 dark:text-pink-400',
-    'bg-teal-100 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
-  ];
-
-  const formatRelativeDate = (dateStr) => {
-    if (!dateStr) return '—';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "Aujourd'hui";
-    if (diffDays === 1) return "Hier";
-    if (diffDays < 7) return `Il y a ${diffDays} jours`;
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-  };
-
-  const paginatedClients = useMemo(() => {
-    if (!Array.isArray(clients)) return [];
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return clients.slice(startIndex, startIndex + itemsPerPage);
-  }, [clients, currentPage]);
-
-  const totalPages = Math.ceil((clients?.length || 0) / itemsPerPage);
-
-  const getClientPhone = (client) => {
-    if (!client) return '—';
-    if (client.phone) return client.phone;
-    if (client.telephone) return client.telephone;
-    if (Array.isArray(client.phones) && client.phones.length > 0) {
-      return client.phones[0].phoneNumber || client.phones[0].phone || '—';
+    if (isOpen) {
+      setForm({
+        name:    client?.name    || client?.nom  || '',
+        email:   client?.email   || '',
+        phone:   client?.phone   || client?.phones?.[0]?.phoneNumber || '',
+        address: client?.address || '',
+      })
+      setError('')
     }
-    if (Array.isArray(client.telephones) && client.telephones.length > 0) {
-      return client.telephones[0].numero || client.telephones[0].phone || '—';
-    }
-    return '—';
-  };
+  }, [isOpen, client])
+
+  const mutation = useMutation({
+    mutationFn: (data) => isEdit ? clientsApi.update(client.id, data) : clientsApi.create(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.clients.all })
+      onClose()
+    },
+    onError: (e) => setError(e?.response?.data?.message || 'Erreur lors de la sauvegarde'),
+  })
+
+  const handleSubmit = useCallback((e) => {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Le nom est requis'); return }
+    if (!form.phone.trim()) { setError('Le téléphone est requis'); return }
+    mutation.mutate({ name: form.name, email: form.email, phone: form.phone, address: form.address })
+  }, [form, mutation])
+
+  if (!isOpen) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(0,0,0,0.06)] flex items-center justify-between">
+          <h3 className="font-bold text-[var(--text)]">{isEdit ? 'Modifier le client' : 'Nouveau client'}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg)] text-[var(--text-muted)]">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {[
+            { key: 'name',    label: 'Nom complet',  type: 'text',  required: true,  placeholder: 'Ahmed Benali' },
+            { key: 'phone',   label: 'Téléphone',    type: 'tel',   required: true,  placeholder: '0612345678' },
+            { key: 'email',   label: 'Email',        type: 'email', required: false, placeholder: 'email@exemple.com' },
+            { key: 'address', label: 'Adresse',      type: 'text',  required: false, placeholder: 'Adresse de livraison…' },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+                {f.label} {f.required && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type={f.type}
+                value={form[f.key]}
+                onChange={e => { setForm(p => ({ ...p, [f.key]: e.target.value })); setError('') }}
+                placeholder={f.placeholder}
+                className="w-full px-4 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] text-sm text-[var(--text)] focus:outline-none focus:border-[var(--primary)] bg-white"
+              />
+            </div>
+          ))}
+          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className="w-full py-3 bg-[var(--primary)] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {mutation.isPending && <Loader2 size={14} className="animate-spin" />}
+            {isEdit ? 'Enregistrer' : 'Créer le client'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function AllClients() {
+  const navigate  = useNavigate()
+  const [search, setSearch]               = useState('')
+  const [debouncedSearch, setDebounced]   = useState('')
+  const [page, setPage]                   = useState(0)
+  const [showForm, setShowForm]           = useState(false)
+  const [editingClient, setEditingClient] = useState(null)
+  const PAGE_SIZE = 25
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search); setPage(0) }, 350)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const params = useMemo(() => ({
+    page,
+    size: PAGE_SIZE,
+    ...(debouncedSearch && { search: debouncedSearch }),
+  }), [page, debouncedSearch])
+
+  const { data: clientsData, isLoading } = useQuery({
+    queryKey: queryKeys.clients.list(params),
+    queryFn: () => clientsApi.getAll(params),
+    keepPreviousData: true,
+  })
+
+  const { data: stats } = useQuery({
+    queryKey: queryKeys.clients.all,
+    queryFn: clientsApi.getStatistics,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const clients = useMemo(() => {
+    if (Array.isArray(clientsData)) return clientsData
+    return clientsData?.content ?? []
+  }, [clientsData])
+
+  const totalPages = useMemo(() => {
+    if (Array.isArray(clientsData)) return 1
+    return clientsData?.totalPages ?? 1
+  }, [clientsData])
+
+  const totalElements = useMemo(() => {
+    if (Array.isArray(clientsData)) return clientsData.length
+    return clientsData?.totalElements ?? clients.length
+  }, [clientsData, clients])
+
+  const openCreate = useCallback(() => { setEditingClient(null); setShowForm(true) }, [])
+  const openEdit   = useCallback((client, e) => { e.stopPropagation(); setEditingClient(client); setShowForm(true) }, [])
 
   return (
-    <div className="space-y-6 pb-12 animate-fade-in text-start">
-      
-      {/* HEADER SECTION */}
-      <div className="flex flex-col gap-4 mb-6">
+    <div className="space-y-5 animate-fade-in">
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-[-0.02em]">
-            {t('admin.pro_ui.client_portfolio')}
-          </h1>
-          <p className="font-['Inter'] text-[13px] text-[var(--text-muted)] mt-1">
-            {t('admin.clients.subtitle')}
+          <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-tight">Clients</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            {isLoading ? '…' : `${totalElements.toLocaleString('fr-MA')} client${totalElements !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button 
-          onClick={loadData} 
-          className="w-full flex items-center justify-center gap-2 px-4 py-[10px] bg-white border border-[rgba(0,0,0,0.08)] rounded-[10px] shadow-[var(--shadow-sm)] text-[13px] font-medium text-[var(--text-secondary)] active:scale-95 transition-all"
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2.5 bg-[var(--primary)] text-white rounded-xl text-sm font-bold shadow-sm hover:opacity-90 transition-opacity"
         >
-          <RefreshCw size={16} className={`${loading ? 'animate-spin' : ''} text-[var(--primary)]`} /> 
-          {t('admin.pro_ui.refresh')}
+          <Plus size={15} />
+          <span className="hidden sm:inline">Nouveau client</span>
+          <span className="sm:hidden">Nouveau</span>
         </button>
       </div>
 
-      {/* KPI GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[
-          { label: t('admin.clients.stats.total'), value: statistics?.totalClients || clients?.length || 0, icon: Users, type: 'clients' },
-          { label: t('admin.clients.stats.orders_month'), value: statistics?.commandesCeMois || 0, icon: ShoppingCart, type: 'orders' },
-          { label: t('admin.clients.stats.new_month'), value: `+${statistics?.nouveauxCeMois || 0}`, icon: TrendingUp, type: 'new', sub: `${Math.round(statistics?.pourcentageNouveaux || 0)}% ${t('admin.pro_ui.growth')}` },
-        ].map((stat, i) => {
-          const colors = {
-            clients: { accent: '#0D7377', bg: 'rgba(13,115,119,0.1)' },
-            orders: { accent: '#C9A84C', bg: 'rgba(201,168,76,0.1)' },
-            new: { accent: '#10B981', bg: 'rgba(16,185,129,0.1)' }
-          }[stat.type] || { accent: '#0D7377', bg: 'rgba(13,115,119,0.1)' };
-
-          return (
-            <div key={i} className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: colors.accent }} />
-              <div className="w-11 h-11 rounded-[10px] flex items-center justify-center mb-4" style={{ backgroundColor: colors.bg }}>
-                <stat.icon size={22} style={{ color: colors.accent }} />
+      {/* KPI Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Total clients',       value: fmtN(stats.totalClients    ?? totalElements), icon: Users,       accent: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
+            { label: 'Commandes ce mois',   value: fmtN(stats.ordersThisMonth),                  icon: ShoppingBag, accent: '#10B981', bg: 'rgba(16,185,129,0.08)' },
+            { label: 'Nouveaux ce mois',    value: fmtN(stats.newThisMonth),                     icon: UserPlus,    accent: '#C2185B', bg: 'rgba(194,24,91,0.08)' },
+            { label: 'Panier moyen',        value: `${fmt(stats.avgBasket || 0)} DH`,            icon: TrendingUp,  accent: '#C9A84C', bg: 'rgba(201,168,76,0.08)' },
+          ].map((k, i) => (
+            <div key={i} className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: k.accent }} />
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center mb-2" style={{ backgroundColor: k.bg }}>
+                <k.icon size={17} style={{ color: k.accent }} />
               </div>
-              <p className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em] truncate">{stat.label}</p>
-              <div className="flex items-baseline gap-2 mt-1">
-                <p className="font-['Plus_Jakarta_Sans'] text-[24px] font-bold text-[var(--text)] tracking-tight">{stat.value}</p>
-                {stat.sub && <span className="font-['Inter'] text-[11px] font-bold text-[#10B981]">{stat.sub}</span>}
-              </div>
+              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">{k.label}</p>
+              <p className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[var(--text)] mt-0.5">{k.value}</p>
             </div>
-          );
-        })}
-      </div>
-
-      {/* SEARCH BAR */}
-      <div className="relative group">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-        <input 
-          type="text" 
-          placeholder={t('admin.clients.search_placeholder')} 
-          value={search} 
-          onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} 
-          className="w-full bg-[var(--bg)] border border-[rgba(0,0,0,0.08)] rounded-[12px] py-3.5 pl-11 pr-4 text-sm font-medium text-[var(--text)] outline-none focus:ring-4 focus:ring-[var(--primary-glow)] focus:border-[var(--primary)] focus:bg-white transition-all" 
-        />
-      </div>
-
-      {/* CLIENTS LIST */}
-      <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] overflow-hidden">
-        {/* MOBILE CARDS (Main view for mobile-first) */}
-        <div className="divide-y divide-[rgba(0,0,0,0.05)]">
-          {loading && paginatedClients.length === 0 ? (
-             <div className="py-20 flex flex-col items-center gap-4">
-               <Loader2 size={32} className="animate-spin text-[var(--primary)]" />
-               <p className="font-['Inter'] text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t('admin.clients.loading_db')}</p>
-             </div>
-          ) : paginatedClients.length > 0 ? (
-            paginatedClients.map((client, i) => {
-              const roleColors = ['#0D7377', '#C9A84C', '#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
-              const accentColor = roleColors[i % roleColors.length];
-              
-              return (
-                <div key={client.id} onClick={() => navigate(`/admin/clients/${client.id}`)} className="p-5 active:bg-[var(--bg)] transition-colors flex flex-col gap-4 cursor-pointer">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center font-['Plus_Jakarta_Sans'] font-bold text-lg text-white shadow-sm"
-                        style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` }}
-                      >
-                        {(client.name || client.nom || 'C')[0]}
-                      </div>
-                      <div className="text-start">
-                        <p className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold text-[var(--text)] tracking-tight leading-tight">
-                          {client.name || client.nom}
-                        </p>
-                        <p className="font-['Inter'] text-[12px] text-[var(--text-muted)] mt-0.5">
-                          {t('admin.pro_ui.last_visit')}: {formatRelativeDate(client.lastOrderDate)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-[var(--primary-surface)] text-[var(--primary)] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-[rgba(13,115,119,0.1)]">
-                      {client.totalCommandes || 0} CMD
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-[var(--text-secondary)]">
-                    <div className="flex items-center gap-1.5 font-['Inter'] text-[13px] font-medium">
-                      <Phone size={14} className="text-[#10B981]" /> 
-                      {getClientPhone(client)}
-                    </div>
-                    {client.email && (
-                      <div className="flex items-center gap-1.5 font-['Inter'] text-[13px] font-medium truncate">
-                        <Mail size={14} className="text-[var(--primary)]" /> 
-                        {client.email}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="py-20 text-center opacity-40 px-6">
-              <Users size={48} className="mx-auto mb-4 text-[var(--text-muted)]" />
-              <p className="font-['Plus_Jakarta_Sans'] text-[18px] font-bold text-[var(--text)]">{t('admin.clients.no_clients')}</p>
-            </div>
-          )}
+          ))}
         </div>
+      )}
 
-        {/* PAGINATION */}
-        {totalPages > 1 && (
-          <div className="p-5 bg-[var(--bg)] border-t border-[rgba(0,0,0,0.05)] flex flex-col gap-4">
-            <p className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider text-center">
-              {currentPage} {t('admin.pro_ui.page_of')} {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <button 
-                disabled={currentPage === 1} 
-                onClick={() => setCurrentPage(p => p - 1)} 
-                className="flex-1 py-3 rounded-[12px] bg-white border border-[rgba(0,0,0,0.08)] text-[13px] font-bold text-[var(--text-secondary)] disabled:opacity-40 active:scale-95 transition-all"
-              >
-                {t('admin.clients.pagination.prev')}
-              </button>
-              <button 
-                disabled={currentPage === totalPages} 
-                onClick={() => setCurrentPage(p => p + 1)} 
-                className="flex-1 py-3 rounded-[12px] bg-white border border-[rgba(0,0,0,0.08)] text-[13px] font-bold text-[var(--text-secondary)] disabled:opacity-40 active:scale-95 transition-all"
-              >
-                {t('admin.clients.pagination.next')}
-              </button>
-            </div>
-          </div>
+      {/* Search */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Nom, téléphone, email…"
+          className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] bg-white text-sm text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] shadow-sm"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]">
+            <X size={14} />
+          </button>
         )}
       </div>
+
+      {/* List */}
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] overflow-hidden">
+        {isLoading ? (
+          <div className="divide-y divide-[rgba(0,0,0,0.05)]">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg)] shimmer shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-36 bg-[var(--bg)] rounded shimmer" />
+                  <div className="h-3 w-24 bg-[var(--bg)] rounded shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="py-20 text-center opacity-40">
+            <Users size={40} className="mx-auto mb-3 text-[var(--text-muted)]" />
+            <p className="text-sm font-semibold text-[var(--text-secondary)]">
+              {search ? 'Aucun client trouvé' : 'Aucun client'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table header */}
+            <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_1fr_auto] gap-4 px-6 py-3 border-b border-[rgba(0,0,0,0.05)] bg-[var(--bg)]">
+              {['Nom', 'Téléphone', 'Email', 'Depuis', ''].map((h, i) => (
+                <span key={i} className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-[0.06em]">{h}</span>
+              ))}
+            </div>
+            <div className="divide-y divide-[rgba(0,0,0,0.05)]">
+              {clients.map(client => (
+                <button
+                  key={client.id}
+                  onClick={() => navigate(`/admin/clients/${client.id}`)}
+                  className="w-full text-start hover:bg-[var(--bg)] transition-colors group"
+                >
+                  {/* Desktop row */}
+                  <div className="hidden md:grid grid-cols-[2fr_1.5fr_1fr_1fr_auto] gap-4 items-center px-6 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-[var(--primary-surface)] text-[var(--primary)] flex items-center justify-center text-sm font-bold shrink-0">
+                        {(client.name || client.nom || '?')[0].toUpperCase()}
+                      </div>
+                      <span className="text-sm font-bold text-[var(--text)] truncate">{client.name || client.nom}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-[var(--text-secondary)] font-medium">
+                      <Phone size={12} className="text-[var(--text-muted)] shrink-0" />
+                      <span className="truncate">{client.phone || client.phones?.[0]?.phoneNumber || '—'}</span>
+                    </div>
+                    <span className="text-sm text-[var(--text-muted)] truncate">{client.email || '—'}</span>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {client.createdAt ? new Date(client.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                    </span>
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={e => openEdit(client, e)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg border border-[rgba(0,0,0,0.1)] text-[var(--text-muted)] hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <ChevronRight size={14} className="text-[var(--text-muted)]" />
+                    </div>
+                  </div>
+
+                  {/* Mobile card */}
+                  <div className="md:hidden flex items-center gap-3 px-4 py-3.5">
+                    <div className="w-10 h-10 rounded-full bg-[var(--primary-surface)] text-[var(--primary)] flex items-center justify-center text-sm font-bold shrink-0">
+                      {(client.name || client.nom || '?')[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-[var(--text)] truncate">{client.name || client.nom}</p>
+                      <p className="text-[11px] text-[var(--text-muted)] font-medium mt-0.5">
+                        {client.phone || client.phones?.[0]?.phoneNumber || '—'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={e => openEdit(client, e)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[rgba(0,0,0,0.08)] text-[var(--text-muted)] hover:text-[var(--primary)]">
+                        <Edit2 size={13} />
+                      </button>
+                      <ChevronRight size={14} className="text-[var(--text-muted)]" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-[rgba(0,0,0,0.05)] bg-[var(--bg)]">
+                <p className="text-xs text-[var(--text-muted)] font-medium">Page {page + 1} / {totalPages}</p>
+                <div className="flex items-center gap-1.5">
+                  <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
+                    className="px-3 py-1.5 rounded-lg border border-[rgba(0,0,0,0.1)] text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-40 hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
+                    Préc.
+                  </button>
+                  <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}
+                    className="px-3 py-1.5 rounded-lg border border-[rgba(0,0,0,0.1)] text-xs font-semibold text-[var(--text-secondary)] disabled:opacity-40 hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
+                    Suiv.
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <ClientFormModal
+        isOpen={showForm}
+        onClose={() => { setShowForm(false); setEditingClient(null) }}
+        client={editingClient}
+      />
     </div>
-  );
+  )
 }

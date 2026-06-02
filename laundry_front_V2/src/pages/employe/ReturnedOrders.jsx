@@ -1,155 +1,127 @@
-import React, { useEffect, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { RefreshCw, ChevronRight, CalendarDays, AlertCircle, PackageCheck, Package, LayoutList } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { fetchReturnedOrders } from '../../store/employe/employeThunk';
-import { selectCommandes, selectLoading } from '../../store/employe/employeSelectors';
-import { COMMANDE_STATUS } from '../../store/employe/employeSlice';
-import { StatusBadge } from '../../components/StatusBadge';
+import React, { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { Search, X, Package, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ordersApi } from '../../services/ordersApi'
+import { queryKeys } from '../../lib/queryKeys'
+import { StatusBadge } from '../../components/StatusBadge'
+
+const fmt     = (v) => Number(v || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 
 export default function ReturnedOrders() {
-  const { t, i18n } = useTranslation();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const allCommandes = useSelector(selectCommandes);
-  const loading = useSelector(selectLoading);
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    dispatch(fetchReturnedOrders());
-  }, [dispatch]);
+  const { data: rawData = [], isLoading } = useQuery({
+    queryKey: queryKeys.employe ? queryKeys.employe.returned : ['employe', 'returned'],
+    queryFn: () => ordersApi.getAll({ status: 'DELIVERY_FAILED', size: 100 }),
+  })
 
-  const returnedOrders = useMemo(() =>
-    allCommandes
-      .filter(c => c.status === COMMANDE_STATUS.RETOURNEE)
-      .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)),
-    [allCommandes]
-  );
-
-  if (loading.commandes && returnedOrders.length === 0) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-surface rounded-2xl animate-pulse border border-border/50" />)}
-      </div>
-    );
-  }
+  const orders = useMemo(() => {
+    const list = Array.isArray(rawData) ? rawData : rawData?.content ?? []
+    if (!search.trim()) return list
+    const q = search.toLowerCase()
+    return list.filter(o =>
+      (o.client?.name || o.client?.nom || '').toLowerCase().includes(q) ||
+      (o.numeroCommande || '').toLowerCase().includes(q)
+    )
+  }, [rawData, search])
 
   return (
-    <div className="pb-8">
-      <div className="flex items-center justify-between mb-5 text-start">
-        <div>
-          <h1 className="text-lg font-black text-text-primary uppercase tracking-tight flex items-center gap-2">
-            {t('workshop.returns.title')}
-            {returnedOrders.length > 0 && (
-              <span className="bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-black px-2.5 py-0.5 rounded-full border border-red-500/20">{returnedOrders.length}</span>
-            )}
-          </h1>
-          <p className="text-xs text-text-muted font-bold uppercase tracking-widest mt-1">{t('workshop.returns.subtitle')}</p>
-        </div>
-        <button
-          onClick={() => dispatch(fetchReturnedOrders())}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface border border-border/50 text-text-muted hover:bg-background transition-all active:scale-95 shadow-sm"
-        >
-          <RefreshCw size={18} className={loading?.commandes ? 'animate-spin text-primary-500' : ''} />
-        </button>
+    <div className="space-y-4 animate-fade-in">
+      <div>
+        <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-tight">Retours</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Commandes avec échec de livraison</p>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 flex gap-3 mb-5 text-start animate-in fade-in duration-500">
-        <RefreshCw size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
-        <p className="text-sm text-amber-800 dark:text-amber-400/90 font-medium">
-          {t('workshop.returns.banner')}
-        </p>
+      {/* Alert banner */}
+      {!isLoading && orders.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+            <AlertTriangle size={16} className="text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-purple-800">{orders.length} retour{orders.length !== 1 ? 's' : ''} en attente</p>
+            <p className="text-xs text-purple-600 mt-0.5">Ces commandes doivent être replanifiées</p>
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
+          className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] bg-white text-sm text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] shadow-sm" />
+        {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><X size={14} /></button>}
       </div>
 
-      {returnedOrders.length === 0 ? (
-        <div className="bg-surface rounded-3xl border border-dashed border-border py-16 flex flex-col items-center text-center px-6 shadow-card">
-          <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-500/10 flex items-center justify-center mb-4 border border-green-100 dark:border-green-500/20">
-            <PackageCheck size={28} className="text-green-500" />
-          </div>
-          <h3 className="text-sm font-black text-text-primary uppercase tracking-tight mb-1">{t('workshop.returns.empty_title')}</h3>
-          <p className="text-xs text-text-muted font-bold uppercase tracking-widest max-w-xs mb-6">{t('workshop.returns.empty_body')}</p>
-          <button onClick={() => navigate('/employe/dashboard')} className="bg-primary-500 hover:bg-primary-600 text-white rounded-xl px-6 py-2.5 text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 transition-all active:scale-95">
-            {t('workshop.detail.back')}
-          </button>
+      {/* Table (desktop) / Cards (mobile) */}
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-sm overflow-hidden">
+        {/* Desktop header */}
+        <div className="hidden md:grid grid-cols-[2fr_2fr_1.5fr_1fr_1fr] gap-4 px-6 py-3 border-b border-[rgba(0,0,0,0.05)] bg-[var(--bg)]">
+          {['N° Commande', 'Client', 'Statut', 'Montant', 'Date'].map(h => (
+            <span key={h} className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-[0.06em]">{h}</span>
+          ))}
         </div>
-      ) : (
-        <>
-          <div className="hidden lg:block rounded-3xl overflow-hidden bg-surface shadow-card border border-border/50">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-background/50 border-b border-border/50">
-                  <th className="px-6 py-3 sm:py-4 text-start text-xs font-black text-text-muted uppercase tracking-[0.2em]">{t('workshop.returns.table.headers.order')}</th>
-                  <th className="px-6 py-3 sm:py-4 text-start text-xs font-black text-text-muted uppercase tracking-[0.2em]">{t('workshop.returns.table.headers.details')}</th>
-                  <th className="px-6 py-3 sm:py-4 text-start text-xs font-black text-text-muted uppercase tracking-[0.2em]">{t('workshop.returns.table.headers.status')}</th>
-                  <th className="px-6 py-3 sm:py-4 text-start text-xs font-black text-text-muted uppercase tracking-[0.2em]">{t('workshop.returns.table.headers.updated')}</th>
-                  <th className="px-6 py-3 sm:py-4 text-end text-xs font-black text-text-muted uppercase tracking-[0.2em]">{t('workshop.returns.table.headers.action')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {returnedOrders.map(order => (
-                  <tr key={order.id} className="hover:bg-background/40 transition-colors group">
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-3 text-start">
-                        <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center text-red-500 shadow-sm border border-red-100 dark:border-red-500/20">
-                          <AlertCircle size={20} />
-                        </div>
-                        <span className="text-sm font-black text-text-primary tracking-tight">#{order.numeroCommande}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-start">
-                      <p className="text-xs font-bold text-text-secondary uppercase tracking-tight">{order.commandeTapis?.length || 0} {t('workshop.returns.table.articles')}</p>
-                    </td>
-                    <td className="px-6 py-5 text-start"><StatusBadge status={order.status} /></td>
-                    <td className="px-6 py-5 text-start">
-                      <span className="text-xs font-bold text-text-primary">{new Date(order.updatedAt || order.createdAt).toLocaleDateString(i18n.language === 'ar' ? 'ar-MA' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                    </td>
-                    <td className="px-6 py-5 text-end">
-                      <button onClick={() => navigate(`/employe/commandes/${order.id}`)} className="inline-flex items-center gap-2 bg-primary-500 text-white rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg active:scale-95">
-                        {t('workshop.returns.table.process_btn')} <ChevronRight size={14} className="rtl:rotate-180" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
 
-          <div className="lg:hidden space-y-4">
-            {returnedOrders.map(order => (
-              <div
-                key={order.id}
-                onClick={() => navigate(`/employe/commandes/${order.id}`)}
-                className="bg-surface rounded-2xl shadow-card p-5 border border-border/40 active:bg-background transition-all"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex flex-col text-start">
-                    <span className="text-xs font-black text-primary-500 uppercase tracking-widest mb-0.5">{t('workshop.detail.labels.order')}</span>
-                    <p className="text-lg font-black text-text-primary tracking-tight">#{order.numeroCommande}</p>
-                  </div>
-                  <StatusBadge status={order.status} />
+        {isLoading ? (
+          <div className="divide-y divide-[rgba(0,0,0,0.05)]">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <div className="w-9 h-9 rounded-xl bg-[var(--bg)] shimmer shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-4 w-32 bg-[var(--bg)] rounded shimmer" />
+                  <div className="h-3 w-20 bg-[var(--bg)] rounded shimmer" />
                 </div>
-                <div className="bg-background rounded-2xl p-4 mb-4 border border-border/50 text-start">
-                  <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-text-muted mb-2">
-                    <span>{order.commandeTapis?.length || 0} {t('workshop.returns.table.headers.details')}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-text-muted">
-                    <CalendarDays size={12} />
-                    <span className="text-xs font-bold uppercase tracking-widest">
-                      {new Date(order.updatedAt || order.createdAt).toLocaleDateString(i18n.language === 'ar' ? 'ar-MA' : 'fr-FR', { day: '2-digit', month: 'short' })}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-primary-500 text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 active:bg-primary-600 transition-all"
-                >
-                  {t('workshop.returns.table.process_return_btn')} <ChevronRight size={14} className="rtl:rotate-180" />
-                </button>
               </div>
             ))}
           </div>
-        </>
-      )}
+        ) : orders.length === 0 ? (
+          <div className="py-16 text-center">
+            <Package size={36} className="mx-auto mb-3 text-[var(--text-muted)] opacity-40" />
+            <p className="text-sm font-semibold text-[var(--text-secondary)] opacity-40">
+              {search ? 'Aucun résultat' : 'Aucun retour en cours'}
+            </p>
+            {!search && (
+              <p className="text-xs text-green-600 font-bold mt-2 opacity-70">✓ Tout est livré !</p>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-[rgba(0,0,0,0.05)]">
+            {orders.map(order => (
+              <button key={order.id} onClick={() => navigate(`/employe/commandes/${order.id}`)}
+                className="w-full text-start hover:bg-[var(--bg)] transition-colors group">
+                {/* Desktop */}
+                <div className="hidden md:grid grid-cols-[2fr_2fr_1.5fr_1fr_1fr] gap-4 items-center px-6 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                      #{(order.numeroCommande || '').slice(-3)}
+                    </div>
+                    <span className="text-sm font-bold text-[var(--text)] font-mono truncate">{order.numeroCommande || `#${order.id}`}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-[var(--text)] truncate">{order.client?.name || order.client?.nom || '—'}</span>
+                  <StatusBadge status={order.status} />
+                  <span className="text-sm font-bold text-[var(--text)]">{fmt(order.montantTotal)} DH</span>
+                  <span className="text-xs text-[var(--text-muted)]">{fmtDate(order.createdAt)}</span>
+                </div>
+                {/* Mobile */}
+                <div className="md:hidden flex items-center gap-3 px-4 py-3.5">
+                  <div className="w-9 h-9 rounded-[10px] bg-purple-50 text-purple-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                    #{(order.numeroCommande || '').slice(-3)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-[var(--text)] truncate">{order.client?.name || order.client?.nom || '—'}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{fmtDate(order.createdAt)} · {fmt(order.montantTotal)} DH</p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                  <ChevronRight size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }

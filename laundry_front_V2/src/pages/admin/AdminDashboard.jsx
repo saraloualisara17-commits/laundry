@@ -1,478 +1,241 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import {
-  TrendingUp, ShoppingCart, 
-  DollarSign, ClipboardList, Clock, 
-  RefreshCw, Loader2, AlertCircle, 
-  ArrowUpRight, ArrowDownRight,
-  ChevronRight, Calendar, Package, Users
-} from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  AreaChart, Area, 
-  PieChart, Pie, Cell, 
-  Tooltip, XAxis, YAxis, CartesianGrid 
-} from 'recharts';
-import { useTranslation } from 'react-i18next';
-import { 
-  fetchTodayStatistics, 
-  fetchOverallStatistics, 
-  fetchLastNDaysStatistics,
-  fetchStatisticsByDateRange
-} from '../../store/statistics/statisticsThunks';
-import { fetchAllCommandes } from '../../store/admin/adminThunk';
-import {
-  selectTodayStats, selectOverallStats, selectLastNDays,
-  selectStatisticsLoading, selectStatisticsError,
-  selectDateRangeStats
-} from '../../store/statistics/statisticsSelectors';
-import { selectAllCommandes } from '../../store/admin/adminSelectors';
-import { useNavigate } from 'react-router-dom';
-import { StatusBadge } from '../../components/StatusBadge';
+  Clock, Package, Wrench, CheckCircle2, Truck, XCircle,
+  AlertTriangle, TrendingUp, DollarSign, Users, RefreshCw,
+  ChevronRight, Loader2, ArrowUpRight
+} from 'lucide-react'
+import { statisticsApi } from '../../services/statisticsApi'
+import { unpaidApi } from '../../services/unpaidApi'
+import { ordersApi } from '../../services/ordersApi'
+import { queryKeys } from '../../lib/queryKeys'
+import { StatusBadge } from '../../components/StatusBadge'
+import { STATUS_BADGE_STYLES, STATUS_LABELS } from '../../constants/statusColors'
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+const fmt = (v) => Number(v || 0).toLocaleString('fr-MA', { minimumFractionDigits: 2 })
+const fmtN = (v) => Number(v || 0).toLocaleString('fr-MA')
 
-const fmt = (n, lang = 'fr') => (n ?? 0).toLocaleString(lang === 'ar' ? 'ar-MA' : 'fr-MA');
-
-const formatDate = (dateStr, lang = 'fr') => {
-  if (!dateStr) return lang === 'ar' ? 'تاريخ غير معروف' : 'Date inconnue';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return lang === 'ar' ? 'تاريخ غير معروف' : 'Date inconnue';
-  return d.toLocaleDateString(lang === 'ar' ? 'ar-MA' : 'fr-FR', {
-    day: '2-digit',
-    month: 'short'
-  }) + ' ' + d.toLocaleTimeString(lang === 'ar' ? 'ar-MA' : 'fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-const calculateTrend = (current, previous) => {
-  if (!previous || previous === 0) return null;
-  const diff = ((current - previous) / previous) * 100;
-  return Math.round(diff * 10) / 10;
-};
-
-const getClientPhone = (client) => {
-  if (!client) return '—';
-  if (client.phone) return client.phone;
-  if (client.telephone) return client.telephone;
-  if (Array.isArray(client.phones) && client.phones.length > 0) {
-    return client.phones[0].phoneNumber || client.phones[0].phone || '—';
-  }
-  return '—';
-};
-
-const getClientDisplayName = (order) => {
-  return order.client?.name || order.clientNom || 'Client #' + (order.client?.id || order.clientId || '?');
-};
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function KpiCard({ icon: Icon, label, value, trendValue, type }) {
-  const isUp = trendValue > 0;
-  const isDown = trendValue < 0;
-
-  const getAccentColor = () => {
-    switch (type) {
-      case 'commandes': return '#0D7377';
-      case 'revenus': return '#C9A84C';
-      case 'attente': return '#F59E0B';
-      case 'traitement': return '#3B82F6';
-      default: return '#0D7377';
-    }
-  };
-
-  const getBgColor = () => {
-    switch (type) {
-      case 'commandes': return 'rgba(13,115,119,0.1)';
-      case 'revenus': return 'rgba(201,168,76,0.1)';
-      case 'attente': return 'rgba(245,158,11,0.1)';
-      case 'traitement': return 'rgba(59,130,246,0.1)';
-      default: return 'rgba(13,115,119,0.1)';
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-4 relative overflow-hidden text-start">
-      <div 
-        className="absolute top-0 left-0 right-0 h-[3px]" 
-        style={{ backgroundColor: getAccentColor() }}
-      />
-      
-      <div className="flex justify-between items-start">
-        <div 
-          className="w-10 h-10 rounded-[10px] flex items-center justify-center"
-          style={{ backgroundColor: getBgColor() }}
-        >
-          <Icon size={20} style={{ color: getAccentColor() }} />
-        </div>
-
-        {trendValue !== null && (
-          <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-            isUp ? 'bg-[#ECFDF5] text-[#10B981]' : isDown ? 'bg-[#FEF2F2] text-[#EF4444]' : 'bg-gray-100 text-gray-500'
-          }`}>
-            {isUp ? '+' : ''}{trendValue}%
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3">
-        <p className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">
-          {label}
-        </p>
-        <p className="font-['Plus_Jakarta_Sans'] text-[28px] font-bold text-[var(--text)] tracking-[-0.02em] mt-1 leading-none truncate">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
+const STATUS_CONFIG = [
+  { key: 'PENDING_PICKUP',     icon: Clock,        label: STATUS_LABELS.PENDING_PICKUP,     accent: '#C2185B' },
+  { key: 'PICKED_UP',          icon: Package,      label: STATUS_LABELS.PICKED_UP,          accent: '#F59E0B' },
+  { key: 'IN_PROCESS',         icon: Wrench,       label: STATUS_LABELS.IN_PROCESS,         accent: '#3B82F6' },
+  { key: 'READY_FOR_DELIVERY', icon: CheckCircle2, label: STATUS_LABELS.READY_FOR_DELIVERY, accent: '#10B981' },
+]
+const STATUS_SECONDARY = [
+  { key: 'DELIVERED',       icon: Truck,         label: STATUS_LABELS.DELIVERED,       accent: '#0D7377' },
+  { key: 'CANCELLED',       icon: XCircle,       label: STATUS_LABELS.CANCELLED,       accent: '#EF4444' },
+  { key: 'PICKUP_FAILED',   icon: AlertTriangle, label: STATUS_LABELS.PICKUP_FAILED,   accent: '#EA580C' },
+  { key: 'DELIVERY_FAILED', icon: AlertTriangle, label: STATUS_LABELS.DELIVERY_FAILED, accent: '#7C3AED' },
+]
 
 export default function AdminDashboard() {
-  const { t, i18n } = useTranslation();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  
-  const todayStats = useSelector(selectTodayStats);
-  const overall = useSelector(selectOverallStats);
-  const lastNDays = useSelector(selectLastNDays);
-  const dateRangeStats = useSelector(selectDateRangeStats);
-  const loading = useSelector(selectStatisticsLoading);
-  const error = useSelector(selectStatisticsError);
-  
-  const allCommandes = useSelector(selectAllCommandes);
+  const navigate = useNavigate()
+  const user     = useSelector(s => s.auth.user)
+
+  const { data: todayStats, isLoading: loadingToday, refetch: refetchToday } = useQuery({
+    queryKey: queryKeys.statistics.today,
+    queryFn: statisticsApi.getToday,
+  })
+
+  const { data: statusOverview = {}, isLoading: loadingStatus, refetch: refetchStatus } = useQuery({
+    queryKey: queryKeys.statistics.statusOverview,
+    queryFn: statisticsApi.getStatusOverview,
+  })
+
+  const { data: unpaidOverview } = useQuery({
+    queryKey: queryKeys.unpaid.overview,
+    queryFn: unpaidApi.getOverview,
+  })
+
+  const { data: recentRaw = [] } = useQuery({
+    queryKey: queryKeys.orders.list({ page: 0, size: 5 }),
+    queryFn: () => ordersApi.getAll({ page: 0, size: 5 }),
+  })
+
   const recentOrders = useMemo(() => {
-    return Array.isArray(allCommandes) ? [...allCommandes].sort((a, b) => new Date(b.dateCreation) - new Date(a.dateCreation)).slice(0, 8) : [];
-  }, [allCommandes]);
+    if (Array.isArray(recentRaw)) return recentRaw.slice(0, 5)
+    return recentRaw?.content?.slice(0, 5) ?? []
+  }, [recentRaw])
 
-  const [statutPeriod, setStatutPeriod] = useState('today');
-  const [revenuPeriod, setRevenuPeriod] = useState('7j');
-  const [yesterdayData, setYesterdayData] = useState(null);
+  const loading = loadingToday || loadingStatus
 
-  useEffect(() => {
-    dispatch(fetchTodayStatistics());
-    dispatch(fetchOverallStatistics());
-    dispatch(fetchAllCommandes({ limit: 20 }));
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yStr = yesterday.toISOString().split('T')[0];
-    dispatch(fetchStatisticsByDateRange({ dateDebut: yStr, dateFin: yStr }))
-      .unwrap()
-      .then(data => setYesterdayData(data))
-      .catch(() => {});
-  }, [dispatch]);
-
-  useEffect(() => {
-    const days = revenuPeriod === '7j' ? 7 : revenuPeriod === '30j' ? 30 : 365;
-    dispatch(fetchLastNDaysStatistics(days));
-  }, [dispatch, revenuPeriod]);
-
-  const pieData = useMemo(() => {
-    let sourceStats = statutPeriod === 'today' 
-      ? {
-          'EN_ATTENTE': todayStats?.commandesEnAttente || 0,
-          'VALIDEE': todayStats?.commandesValidees || 0,
-          'EN_TRAITEMENT': todayStats?.commandesEnTraitement || 0,
-          'PRETE': todayStats?.commandesPretes || 0,
-          'LIVREE': todayStats?.commandesLivrees || 0,
-          'PAYEE': todayStats?.commandesPayees || 0,
-        }
-      : overall?.commandesByStatus || {};
-
-    return Object.entries(sourceStats).map(([key, value]) => ({
-      name: key.replace('_', ' '),
-      value: value
-    })).filter(item => item.value > 0);
-  }, [statutPeriod, todayStats, overall]);
-
-  const CHART_COLORS = ['#0D7377', '#C9A84C', '#F59E0B', '#3B82F6', '#10B981', '#EF4444'];
+  const greet = useMemo(() => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Bonjour'
+    if (h < 18) return 'Bon après-midi'
+    return 'Bonsoir'
+  }, [])
 
   return (
-    <div className="pb-12 animate-fade-in text-start">
-      
-      {/* HEADER SECTION */}
-      <div className="flex flex-col gap-4 mb-6">
+    <div className="space-y-6 animate-fade-in">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-[-0.02em]">
-            {t('admin.dashboard.title')}
+          <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-tight">
+            {greet}, {user?.name?.split(' ')[0] || 'Admin'} 👋
           </h1>
-          <p className="font-['Inter'] text-[13px] text-[var(--text-muted)] mt-1">
-            {t('admin.dashboard.overview_desc')}
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        
-        <button 
-          onClick={() => {
-            dispatch(fetchTodayStatistics());
-            dispatch(fetchOverallStatistics());
-            dispatch(fetchAllCommandes());
-          }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-[10px] bg-white border border-[rgba(0,0,0,0.08)] rounded-[10px] shadow-[var(--shadow-sm)] text-[13px] font-medium text-[var(--text-secondary)] active:scale-95 transition-all"
+        <button
+          onClick={() => { refetchToday(); refetchStatus(); }}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-[rgba(0,0,0,0.08)] shadow-sm text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors active:scale-95"
         >
-          <RefreshCw size={16} className={`${loading ? 'animate-spin' : ''} text-[var(--primary)]`} />
-          {t('admin.dashboard.last_data')}
+          <RefreshCw size={16} className={loading ? 'animate-spin text-[var(--primary)]' : ''} />
         </button>
       </div>
 
-      {/* KPI GRID */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <KpiCard 
-          icon={ShoppingCart} 
-          label={t('admin.dashboard.kpi.orders_today')} 
-          value={fmt(todayStats?.totalCommandesToday, i18n.language)} 
-          trendValue={calculateTrend(todayStats?.totalCommandesToday, yesterdayData?.totalCommandes)}
-          type="commandes"
-        />
-        <KpiCard 
-          icon={DollarSign} 
-          label={t('admin.dashboard.kpi.revenue_today')} 
-          value={<>{fmt(todayStats?.revenuesToday, i18n.language)} <span className="text-[12px] font-bold text-[var(--text-muted)]">DH</span></>} 
-          trendValue={calculateTrend(todayStats?.revenuesToday, yesterdayData?.totalRevenues)}
-          type="revenus"
-        />
-        <KpiCard 
-          icon={Clock} 
-          label={t('admin.dashboard.kpi.pending')} 
-          value={fmt(todayStats?.commandesEnAttente, i18n.language)} 
-          type="attente"
-        />
-        <KpiCard 
-          icon={RefreshCw} 
-          label={t('admin.dashboard.kpi.processing')} 
-          value={fmt(todayStats?.commandesEnTraitement || 0, i18n.language)} 
-          type="traitement"
-        />
+      {/* TODAY KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Commandes aujourd'hui", value: fmtN(todayStats?.commandesCount), icon: Package,      accent: '#0D7377', bg: 'rgba(13,115,119,0.08)' },
+          { label: 'Chiffre du jour',        value: `${fmt(todayStats?.chiffreAffaires)} DH`, icon: TrendingUp,  accent: '#10B981', bg: 'rgba(16,185,129,0.08)' },
+          { label: 'Paiements collectés',    value: `${fmt(todayStats?.paiementsCollectes)} DH`, icon: DollarSign, accent: '#C9A84C', bg: 'rgba(201,168,76,0.08)' },
+          { label: 'Clients actifs',         value: fmtN(todayStats?.clientsCount),  icon: Users,        accent: '#3B82F6', bg: 'rgba(59,130,246,0.08)' },
+        ].map((k, i) => (
+          <div key={i} className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: k.accent }} />
+            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center mb-3" style={{ backgroundColor: k.bg }}>
+              <k.icon size={18} style={{ color: k.accent }} />
+            </div>
+            <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">{k.label}</p>
+            {loading
+              ? <div className="h-7 w-20 bg-[var(--bg)] rounded-lg mt-1 shimmer" />
+              : <p className="font-['Plus_Jakarta_Sans'] text-xl font-bold text-[var(--text)] mt-0.5">{k.value}</p>
+            }
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-col gap-6 text-start">
-        {/* REVENUE CHART */}
-        <div className="bg-white rounded-[16px] p-5 shadow-[var(--shadow-sm)] border border-[rgba(0,0,0,0.06)]">
-          <div className="flex flex-col gap-4 mb-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold text-[var(--text)]">
-                  {t('admin.dashboard.revenue_evolution')}
-                </h3>
-                <div className="mt-4 flex flex-col gap-1">
-                  <p className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">
-                    {t('admin.dashboard.period_total')}
-                  </p>
-                  <p className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--primary)] leading-none">
-                    {fmt(lastNDays?.reduce((acc, curr) => acc + (curr.revenusTotal || 0), 0), i18n.language)} <span className="text-sm">DH</span>
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-[var(--bg)] p-1 rounded-[10px] flex gap-1">
-                {['7j', '30j', '1an'].map(p => (
-                  <button 
-                    key={p}
-                    onClick={() => setRevenuPeriod(p)}
-                    className={`px-3 py-1.5 rounded-[8px] text-[13px] transition-all duration-200 ${
-                      revenuPeriod === p 
-                        ? 'bg-white text-[var(--primary)] font-bold shadow-[0_1px_4px_rgba(0,0,0,0.1)]' 
-                        : 'text-[var(--text-muted)] font-medium'
-                    }`}
-                  >
-                    {p.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+      {/* UNPAID BANNER */}
+      {unpaidOverview && (
+        <button
+          onClick={() => navigate('/admin/unpaid')}
+          className={`w-full text-start rounded-2xl p-4 flex items-center justify-between gap-4 border transition-all hover:shadow-md ${
+            Number(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid) > 0
+              ? 'bg-red-50 border-red-200'
+              : 'bg-green-50 border-green-200'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${Number(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid) > 0 ? 'bg-red-100' : 'bg-green-100'}`}>
+              <DollarSign size={18} className={Number(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid) > 0 ? 'text-red-600' : 'text-green-600'} />
             </div>
-
-            <div className="flex gap-4">
-              <div>
-                <p className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">
-                  {t('admin.dashboard.daily_average')}
-                </p>
-                <p className="font-['Plus_Jakarta_Sans'] text-[18px] font-semibold text-[var(--text)]">
-                  {fmt(Math.round((lastNDays?.reduce((acc, curr) => acc + (curr.revenusTotal || 0), 0) || 0) / (lastNDays?.length || 1)), i18n.language)} <span className="text-xs">DH</span>
-                </p>
-              </div>
+            <div>
+              <p className={`font-bold text-sm ${Number(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid) > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                {Number(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid) > 0
+                  ? `${fmt(unpaidOverview.totalRemaining || unpaidOverview.totalUnpaid)} DH impayés`
+                  : 'Aucun impayé — Tout est réglé ✓'}
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {unpaidOverview.clientsWithDebt || unpaidOverview.clientCount || 0} client(s) · {unpaidOverview.totalOrders || 0} commande(s)
+              </p>
             </div>
           </div>
-          
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={lastNDays || []} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.08}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.04)" />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 11, fontWeight: 500, fill: 'var(--text-muted)', fontFamily: 'Inter'}}
-                  dy={10}
-                  tickFormatter={(str) => {
-                    const d = new Date(str);
-                    if (isNaN(d.getTime())) return '';
-                    return revenuPeriod === '1an' 
-                      ? d.toLocaleDateString('fr-FR', { month: 'short' })
-                      : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-                  }}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 11, fontWeight: 500, fill: 'var(--text-muted)', fontFamily: 'Inter'}}
-                  tickFormatter={(val) => val > 0 ? `${val}` : ''}
-                />
-                <Tooltip 
-                  cursor={{ stroke: 'var(--primary)', strokeWidth: 1 }}
-                  contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid var(--primary)', boxShadow: 'var(--shadow-md)', padding: '12px' }}
-                  labelStyle={{ fontWeight: '700', fontSize: '13px', color: 'var(--text)', fontFamily: 'Inter', marginBottom: '4px' }}
-                  itemStyle={{ fontSize: '13px', fontWeight: '600', color: 'var(--primary)', fontFamily: 'Inter' }}
-                  formatter={(value) => [`${fmt(value, i18n.language)} DH`, 'Revenu']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenusTotal" 
-                  stroke="var(--primary)" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorRev)" 
-                  activeDot={{ r: 5, strokeWidth: 0, fill: 'var(--primary)' }}
-                  animationDuration={1000}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+          <ChevronRight size={16} className="text-[var(--text-muted)] shrink-0" />
+        </button>
+      )}
 
-        {/* STATUS PIE CHART */}
-        <div className="bg-white rounded-[16px] p-5 shadow-[var(--shadow-sm)] border border-[rgba(0,0,0,0.06)]">
-          <div className="mb-6">
-            <h3 className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold text-[var(--text)]">
-              {t('admin.dashboard.order_status')}
-            </h3>
-            <div className="flex bg-[var(--bg)] p-1 rounded-[10px] mt-4">
-              <button 
-                onClick={() => setStatutPeriod('today')}
-                className={`flex-1 py-1.5 rounded-[8px] text-[13px] transition-all duration-200 ${
-                  statutPeriod === 'today' 
-                    ? 'bg-white text-[var(--primary)] font-bold shadow-[0_1px_4px_rgba(0,0,0,0.1)]' 
-                    : 'text-[var(--text-muted)] font-medium'
-                }`}
+      {/* STATUS OVERVIEW — Primary 4 */}
+      <div>
+        <h2 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3">En cours</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {STATUS_CONFIG.map(({ key, icon: Icon, label, accent }) => {
+            const cfg   = STATUS_BADGE_STYLES[key]
+            const count = statusOverview[key]?.count ?? statusOverview[key] ?? 0
+            const amt   = statusOverview[key]?.amount ?? 0
+            return (
+              <button
+                key={key}
+                onClick={() => navigate(`/admin/commandes?status=${key}`)}
+                className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-4 text-start hover:shadow-md transition-all active:scale-[0.98] relative overflow-hidden group"
               >
-                {t('admin.dashboard.periods.today')}
-              </button>
-              <button 
-                onClick={() => setStatutPeriod('all')}
-                className={`flex-1 py-1.5 rounded-[8px] text-[13px] transition-all duration-200 ${
-                  statutPeriod === 'all' 
-                    ? 'bg-white text-[var(--primary)] font-bold shadow-[0_1px_4px_rgba(0,0,0,0.1)]' 
-                    : 'text-[var(--text-muted)] font-medium'
-                }`}
-              >
-                {t('admin.dashboard.global')}
-              </button>
-            </div>
-          </div>
-          
-          <div className="h-48 relative flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                   contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: 'none', boxShadow: 'var(--shadow-md)' }}
-                 />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] leading-none">
-                {pieData.reduce((acc, curr) => acc + curr.value, 0)}
-              </span>
-              <span className="font-['Inter'] text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-[0.06em] mt-1">
-                {t('admin.dashboard.total')}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-2">
-            {pieData.map((entry, index) => (
-              <div key={entry.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
-                  <span className="font-['Inter'] text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-[80px]">{entry.name}</span>
+                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: accent }} />
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-9 h-9 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: cfg?.bg }}>
+                    <Icon size={18} style={{ color: accent }} />
+                  </div>
+                  <ArrowUpRight size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <span className="font-['Plus_Jakarta_Sans'] text-[12px] font-bold text-[var(--text)]">{entry.value}</span>
-              </div>
-            ))}
-          </div>
+                {loadingStatus
+                  ? <div className="h-8 w-12 bg-[var(--bg)] rounded-lg shimmer mb-1" />
+                  : <p className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)]">{fmtN(count)}</p>
+                }
+                <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.05em]">{label}</p>
+                {amt > 0 && <p className="text-[11px] font-bold mt-1" style={{ color: accent }}>{fmt(amt)} DH</p>}
+              </button>
+            )
+          })}
         </div>
+      </div>
+
+      {/* STATUS OVERVIEW — Secondary 4 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {STATUS_SECONDARY.map(({ key, icon: Icon, label, accent }) => {
+          const count = statusOverview[key]?.count ?? statusOverview[key] ?? 0
+          return (
+            <button
+              key={key}
+              onClick={() => navigate(`/admin/commandes?status=${key}`)}
+              className="bg-white rounded-xl border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] p-3 text-start flex items-center gap-3 hover:shadow-md transition-all active:scale-[0.98]"
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: STATUS_BADGE_STYLES[key]?.bg }}>
+                <Icon size={15} style={{ color: accent }} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-base text-[var(--text)]">{loadingStatus ? '…' : fmtN(count)}</p>
+                <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider truncate">{label}</p>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* RECENT ORDERS */}
-      <div className="bg-white rounded-[16px] shadow-[var(--shadow-sm)] border border-[rgba(0,0,0,0.06)] overflow-hidden mt-6">
-        <div className="p-5 flex items-center justify-between">
-          <div className="text-start">
-            <h3 className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold text-[var(--text)]">{t('admin.dashboard.recent_orders')}</h3>
-          </div>
-          <button 
-            onClick={() => navigate('/admin/commandes')}
-            className="text-[13px] font-bold text-[var(--primary)]"
-          >
-            {t('admin.dashboard.see_all')}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest">Dernières commandes</h2>
+          <button onClick={() => navigate('/admin/commandes')} className="text-xs font-bold text-[var(--primary)] hover:underline flex items-center gap-1">
+            Voir tout <ChevronRight size={12} />
           </button>
         </div>
-        
-        {/* MOBILE CARDS (Hidden on desktop if needed, but this app is mobile-first) */}
-        <div className="divide-y divide-[rgba(0,0,0,0.06)]">
-          {recentOrders.length > 0 ? recentOrders.map((order) => (
-            <div key={order.id} onClick={() => navigate(`/admin/commandes/${order.id}`)} className="p-4 flex flex-col gap-3 active:scale-[0.98] transition-all cursor-pointer">
-              <div className="flex justify-between items-center">
-                <span className="font-['Inter'] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                  #{order.numeroCommande}
-                </span>
-                <StatusBadge status={order.status} />
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[var(--primary-surface)] text-[var(--primary)] flex items-center justify-center font-['Plus_Jakarta_Sans'] font-bold text-sm">
-                  {(order.client?.name || order.clientNom || 'C')[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-['Plus_Jakarta_Sans'] text-[15px] font-bold text-[var(--text)] truncate">
-                    {getClientDisplayName(order)}
-                  </p>
-                  <p className="font-['Inter'] text-[12px] text-[var(--text-muted)]">
-                    {formatDate(order.dateCreation, i18n.language)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-['Plus_Jakarta_Sans'] text-[16px] font-bold text-[var(--primary)]">
-                    {fmt(order.montantTotal, i18n.language)} <span className="text-[10px]">DH</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )) : (
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[var(--shadow-sm)] overflow-hidden">
+          {recentOrders.length === 0 ? (
             <div className="py-12 text-center opacity-40">
-              <Loader2 size={24} className="animate-spin mx-auto mb-2 text-[var(--primary)]" />
-              <p className="text-[11px] font-bold uppercase tracking-wider">{t('admin.dashboard.syncing')}</p>
+              <Package size={32} className="mx-auto mb-2 text-[var(--text-muted)]" />
+              <p className="text-sm font-semibold text-[var(--text-secondary)]">Aucune commande récente</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[rgba(0,0,0,0.05)]">
+              {recentOrders.map(order => (
+                <button
+                  key={order.id}
+                  onClick={() => navigate(`/admin/commandes/${order.id}`)}
+                  className="w-full text-start flex items-center gap-4 px-5 py-4 hover:bg-[var(--bg)] transition-colors group"
+                >
+                  <div className="w-9 h-9 rounded-[10px] bg-[var(--primary-surface)] text-[var(--primary)] flex items-center justify-center text-[11px] font-bold shrink-0">
+                    #{(order.numeroCommande || '').slice(-3)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-[var(--text)] truncate">
+                      {order.client?.name || order.client?.nom || '—'}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] font-semibold mt-0.5">
+                      {order.commandeTapis?.length || 0} article(s) · {fmt(order.montantTotal)} DH
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                  <ChevronRight size={14} className="text-[var(--text-muted)] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
             </div>
           )}
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,132 +1,144 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Settings, Loader2, Upload, Image, Save } from 'lucide-react';
-import { toast } from 'react-toastify';
-import { getSettings, updateSettings, uploadFile } from '../../store/admin/adminService';
-
-const BASE_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+import React, { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Loader2, Save, Settings, Image, Phone, Globe } from 'lucide-react'
+import { settingsApi } from '../../services/settingsApi'
+import { queryKeys } from '../../lib/queryKeys'
 
 export default function SettingsPage() {
-  const [appName, setAppName] = useState('');
-  const [businessPhone, setBusinessPhone] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [newLogoFile, setNewLogoFile] = useState(null);
-  const [newLogoPreview, setNewLogoPreview] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const fileRef = useRef(null);
+  const qc = useQueryClient()
+  const [form, setForm] = useState({ appName: '', businessPhone: '', logo: '' })
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: queryKeys.settings.all,
+    queryFn: settingsApi.get,
+  })
 
   useEffect(() => {
-    getSettings()
-      .then(res => {
-        setAppName(res.data.appName || '');
-        setBusinessPhone(res.data.businessPhone || '');
-        setLogoUrl(res.data.logoUrl || '');
+    if (settings) {
+      setForm({
+        appName:       settings.appName       || settings.nom        || '',
+        businessPhone: settings.businessPhone || settings.telephone  || '',
+        logo:          settings.logo          || settings.logoUrl    || '',
       })
-      .catch(() => toast.error('Erreur lors du chargement des paramètres'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setNewLogoFile(file);
-    setNewLogoPreview(URL.createObjectURL(file));
-  };
-
-  const handleSave = async () => {
-    if (!appName.trim()) { toast.error("Le nom de l'application est requis"); return; }
-    setSaving(true);
-    try {
-      let finalLogoUrl = logoUrl;
-      if (newLogoFile) {
-        const uploadRes = await uploadFile(newLogoFile);
-        finalLogoUrl = uploadRes.data.filename || uploadRes.data;
-      }
-      await updateSettings({ appName: appName.trim(), businessPhone: businessPhone.trim(), logoUrl: finalLogoUrl });
-      setLogoUrl(finalLogoUrl);
-      setNewLogoFile(null);
-      setNewLogoPreview(null);
-      toast.success('Paramètres sauvegardés');
-    } catch {
-      toast.error('Erreur lors de la sauvegarde');
-    } finally {
-      setSaving(false);
     }
-  };
+  }, [settings])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 size={32} className="animate-spin text-[var(--primary)]" />
-      </div>
-    );
+  const mutation = useMutation({
+    mutationFn: (data) => settingsApi.update(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.settings.all })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    },
+    onError: (e) => setError(e?.response?.data?.message || 'Erreur lors de la sauvegarde'),
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    setError('')
+    mutation.mutate(form)
   }
 
-  const currentLogo = newLogoPreview || (logoUrl ? `${BASE_URL}/uploads/${logoUrl}` : null);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={28} className="animate-spin text-[var(--primary)]" />
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-5 max-w-xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-2xl">
       <div>
-        <h1 className="font-bold text-2xl text-[var(--text)] flex items-center gap-2">
-          <Settings size={24} className="text-[var(--primary)]" /> Paramètres
-        </h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-0.5">Configuration générale de l'application</p>
+        <h1 className="font-['Plus_Jakarta_Sans'] text-2xl font-bold text-[var(--text)] tracking-tight">Paramètres</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Configuration de l'application</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-sm space-y-5">
-        {/* Logo */}
-        <div>
-          <label className="block text-sm font-semibold text-[var(--text)] mb-3">Logo</label>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-[rgba(0,0,0,0.15)] flex items-center justify-center overflow-hidden bg-[var(--bg)]">
-              {currentLogo ? (
-                <img src={currentLogo} alt="Logo" className="w-full h-full object-contain" />
-              ) : (
-                <Image size={24} className="text-[var(--text-secondary)] opacity-40" />
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[rgba(0,0,0,0.1)] text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg)] transition-colors"
-            >
-              <Upload size={15} /> Changer le logo
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* App Info */}
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.07)] shadow-sm p-6 space-y-5">
+          <div className="flex items-center gap-2 pb-2 border-b border-[rgba(0,0,0,0.05)]">
+            <Globe size={15} className="text-[var(--primary)]" />
+            <h2 className="text-sm font-bold text-[var(--text)]">Informations générales</h2>
           </div>
-          {newLogoFile && <p className="text-xs text-[var(--primary)] mt-2">{newLogoFile.name} sélectionné</p>}
+
+          <div>
+            <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">Nom de l'application</label>
+            <input
+              value={form.appName}
+              onChange={e => setForm(p => ({ ...p, appName: e.target.value }))}
+              placeholder="Astra Pro Laundry"
+              className="w-full px-4 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] text-sm text-[var(--text)] focus:outline-none focus:border-[var(--primary)] bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
+              <Phone size={11} className="inline mr-1" />
+              Téléphone professionnel
+            </label>
+            <input
+              type="tel"
+              value={form.businessPhone}
+              onChange={e => setForm(p => ({ ...p, businessPhone: e.target.value }))}
+              placeholder="+212 6XX XX XX XX"
+              className="w-full px-4 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] text-sm text-[var(--text)] focus:outline-none focus:border-[var(--primary)] bg-white"
+            />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Utilisé pour les reçus et les messages WhatsApp</p>
+          </div>
         </div>
 
-        {/* App name */}
-        <div>
-          <label className="block text-sm font-semibold text-[var(--text)] mb-1">
-            Nom de l'application <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text" value={appName} onChange={e => setAppName(e.target.value)}
-            placeholder="Ex: Astra Pro"
-            className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.1)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-          />
+        {/* Logo */}
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.07)] shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-[rgba(0,0,0,0.05)]">
+            <Image size={15} className="text-[var(--primary)]" />
+            <h2 className="text-sm font-bold text-[var(--text)]">Logo</h2>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">URL du logo</label>
+            <input
+              value={form.logo}
+              onChange={e => setForm(p => ({ ...p, logo: e.target.value }))}
+              placeholder="https://… ou /uploads/logo.png"
+              className="w-full px-4 py-2.5 rounded-xl border border-[rgba(0,0,0,0.1)] text-sm text-[var(--text)] focus:outline-none focus:border-[var(--primary)] bg-white"
+            />
+          </div>
+
+          {form.logo && (
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl border border-[rgba(0,0,0,0.08)] overflow-hidden bg-[var(--bg)] flex items-center justify-center">
+                <img
+                  src={form.logo}
+                  alt="Logo preview"
+                  className="w-full h-full object-contain"
+                  onError={e => { e.target.style.display = 'none' }}
+                />
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">Aperçu du logo</p>
+            </div>
+          )}
         </div>
 
-        {/* Business phone */}
-        <div>
-          <label className="block text-sm font-semibold text-[var(--text)] mb-1">Téléphone professionnel</label>
-          <input
-            type="tel" value={businessPhone} onChange={e => setBusinessPhone(e.target.value)}
-            placeholder="Ex: +212 6XX XX XX XX"
-            className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.1)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-          />
-        </div>
+        {error && <p className="text-sm text-red-600 font-semibold">{error}</p>}
 
         <button
-          onClick={handleSave} disabled={saving}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
+          type="submit"
+          disabled={mutation.isPending}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+            saved
+              ? 'bg-green-500 text-white'
+              : 'bg-[var(--primary)] text-white hover:opacity-90'
+          } disabled:opacity-50 shadow-sm`}
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Sauvegarder
+          {mutation.isPending
+            ? <Loader2 size={15} className="animate-spin" />
+            : saved ? <span>✓</span> : <Save size={15} />}
+          {saved ? 'Enregistré !' : 'Enregistrer'}
         </button>
-      </div>
+      </form>
     </div>
-  );
+  )
 }

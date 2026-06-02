@@ -1,75 +1,67 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Home, Truck, Users, Package, Wrench, XCircle, Shield, RefreshCw, ClipboardList, Map, AlertCircle, Settings } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import React from 'react'
+import { NavLink } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+import { LayoutDashboard, ClipboardList, Users, Bell, Truck, RotateCcw, Package, AlertCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { notificationsApi } from '../../services/notificationsApi'
+import { queryKeys } from '../../lib/queryKeys'
 
-const BottomNav = ({ user }) => {
-  const { t } = useTranslation();
-  const location = useLocation();
+const NAV = {
+  admin: [
+    { to: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/admin/commandes',  icon: ClipboardList,   label: 'Commandes' },
+    { to: '/admin/clients',    icon: Users,           label: 'Clients' },
+    { to: '/notifications',    icon: Bell,            label: 'Notifs', badge: true },
+  ],
+  employe: [
+    { to: '/employe/dashboard', icon: LayoutDashboard, label: 'Atelier' },
+    { to: '/employe/commandes', icon: ClipboardList,   label: 'Commandes' },
+    { to: '/employe/clients',   icon: Users,           label: 'Clients' },
+    { to: '/notifications',     icon: Bell,            label: 'Notifs', badge: true },
+  ],
+  livreur: [
+    { to: '/livreur',          icon: LayoutDashboard, label: 'Home' },
+    { to: '/livreur/delivery', icon: Truck,           label: 'Missions' },
+    { to: '/livreur/canceled', icon: RotateCcw,       label: 'Annulées' },
+    { to: '/notifications',    icon: Bell,            label: 'Notifs', badge: true },
+  ],
+}
 
-  if (!user) return null;
+export default function BottomNav() {
+  const user  = useSelector(s => s.auth.user)
+  const role  = user?.role?.toLowerCase()
+  const items = NAV[role] || []
 
-  const adminLinks = [
-    { name: t('nav.dashboard'), path: '/admin/dashboard', icon: Home },
-    { name: t('nav.orders'), path: '/admin/commandes', icon: ClipboardList },
-    { name: t('nav.clients'), path: '/admin/clients', icon: Users },
-    { name: 'Impayés', path: '/admin/unpaid', icon: AlertCircle },
-    { name: 'Réglages', path: '/admin/settings', icon: Settings },
-  ];
-
-  const livreurLinks = [
-    { name: t('nav.dashboard'), path: '/livreur', icon: Home },
-    { name: t('nav.deliveries'), path: '/livreur/delivery', icon: Truck },
-    { name: t('nav.orders'), path: '/livreur/orders', icon: Package },
-    { name: 'Carte', path: '/livreur/map', icon: Map },
-    { name: t('nav.canceled'), path: '/livreur/canceled', icon: XCircle },
-  ];
-
-  const employeLinks = [
-    { name: t('nav.workshop'), path: '/employe/dashboard', icon: Wrench },
-    { name: 'Commandes', path: '/employe/commandes', icon: ClipboardList },
-    { name: 'Clients', path: '/employe/clients', icon: Users },
-    { name: t('nav.returns'), path: '/employe/retours', icon: RefreshCw },
-  ];
-
-  const links = user?.role === 'admin' ? adminLinks : user?.role === 'livreur' ? livreurLinks : user?.role === 'employe' ? employeLinks : [];
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: queryKeys.notifications.unreadCount,
+    queryFn: notificationsApi.getUnreadCount,
+    select: (d) => typeof d === 'number' ? d : (d?.count ?? 0),
+  })
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100] h-[calc(72px+env(safe-area-inset-bottom))] bg-white border-t border-[rgba(0,0,0,0.06)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
-      <nav className="flex items-center justify-evenly h-full px-2">
-        {links.map((link) => {
-          const Icon = link.icon;
-          const isActive = location.pathname === link.path;
-
-          return (
-            <Link
-              key={link.path}
-              to={link.path}
-              className={`relative flex flex-col items-center justify-center min-w-[60px] gap-1 px-4 py-2 rounded-xl transition-all duration-200 active:scale-[0.92] ${
-                isActive ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'
-              }`}
-            >
-              <Icon
-                size={22}
-                strokeWidth={isActive ? 2.5 : 2}
-                className="transition-transform"
-              />
-              
-              <span className={`font-['Inter'] text-[10px] uppercase tracking-[0.02em] transition-all duration-200 ${
-                isActive ? 'font-bold' : 'font-medium'
-              }`}>
-                {link.name}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[rgba(0,0,0,0.08)] flex">
+      {items.map(({ to, icon: Icon, label, badge }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={to === '/livreur'}
+          className={({ isActive }) =>
+            `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors relative ${
+              isActive ? 'text-[var(--primary)]' : 'text-[var(--text-muted)]'
+            }`
+          }
+        >
+          <div className="relative">
+            <Icon size={20} />
+            {badge && unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
-
-              {isActive && (
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--primary)]" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
-};
-
-export default BottomNav;
+            )}
+          </div>
+          {label}
+        </NavLink>
+      ))}
+    </nav>
+  )
+}

@@ -4,8 +4,6 @@ import { useDispatch, useSelector } from "react-redux"
 import { setCredentials } from "../store/auth/authSlice"
 import { refreshApi } from "../api/axios"
 import { jwtDecode } from "jwt-decode"
-import LoadingScreen from "../components/ui/LoadingScreen"
-
 const PersistLogin = () => {
   const dispatch = useDispatch()
   const { token } = useSelector(state => state.auth)

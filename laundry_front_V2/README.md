@@ -1,16 +1,79 @@
-# React + Vite
+# Astra Propre — Public Customer Site
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Static landing page + 4-step anonymous order wizard for the Astra Propre
+laundry service. This is the customer-facing surface only — staff use
+the separate mobile app for order management.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Landing page (`/`)** — marketing, category cards, "Start an order" CTA
+- **Order wizard (`/order/wizard`)** — 4 steps:
+  1. Select items from the product catalog
+  2. Enter contact info + delivery location (with Leaflet map picker)
+  3. Review the order
+  4. Confirm → success screen with order reference number
 
-## React Compiler
+No login. No accounts. No client-side state survives a page refresh
+beyond what's needed inside a single wizard session.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Backend dependency
 
-## Expanding the ESLint configuration
+Talks to the Spring Boot backend via two endpoints:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/api/public/catalog/categories` | List active categories + their products |
+| `POST` | `/api/public/orders`             | Submit a new anonymous order |
+
+Images served at `/uploads/...` are also proxied to the backend.
+
+## Tech stack
+
+- **React 19** + **Vite 7** + **Tailwind CSS 3**
+- **react-router-dom 7** (just `/` and `/order/wizard`)
+- **react-i18next** with FR + AR locales (RTL handled at `<html dir>` level)
+- **Leaflet** for the location picker (OpenStreetMap, no API key needed)
+- **Axios** for the two API calls
+
+No Redux, no React Query, no WebSocket — keeps the bundle and the
+attack surface small.
+
+## Development
+
+```bash
+# Install (one-time)
+npm install
+
+# Run dev server (proxies /api and /uploads to backend)
+npm run dev
+
+# Build for production
+npm run build
+# Output goes to dist/ — upload contents to /var/www/laundry/ on the VPS
+```
+
+Set `VITE_API_URL` to point dev/build at a non-localhost backend:
+
+```bash
+VITE_API_URL=https://api.astrapropre.ma npm run build
+```
+
+## Deployment
+
+The `dist/` folder is a fully static bundle. Drop it in Nginx's
+document root (e.g. `/var/www/laundry/`). The `deploy/nginx.conf` at
+the repository root is already configured to serve it and proxy
+`/api` + `/uploads` to the Spring Boot backend.
+
+## Project structure
+
+```
+src/
+├── api/publicApi.js         Two-function API client
+├── lib/imageUrl.js          /uploads/* URL helper
+├── pages/public/            All 7 page components
+├── i18n/                    FR + AR translation files
+├── App.jsx                  3 routes total
+├── main.jsx                 React + i18n bootstrap
+└── index.css                Tailwind directives + leaflet css
+```

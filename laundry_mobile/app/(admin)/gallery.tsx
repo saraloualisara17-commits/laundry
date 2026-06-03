@@ -15,6 +15,7 @@ import { AdminColors, AdminShadows } from '../../constants/AdminColors';
 import { StatusColors } from '../../constants/StatusColors';
 import { galleryApi, GalleryOrderItem, GalleryImageItem } from '../../src/services/api/galleryApi';
 import { BASE_URL } from '../../src/services/api/client';
+import { thumbUrl } from '../../src/utils/imageUrl';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
 
@@ -103,7 +104,7 @@ export default function GalleryScreen() {
                 activeOpacity={0.85}
               >
                 <Image
-                  source={{ uri: `${BASE_URL}${img.imageUrl}` }}
+                  source={{ uri: `${BASE_URL}${thumbUrl(img.imageUrl)}` }}
                   style={styles.thumbnail}
                   contentFit="cover"
                   transition={150}

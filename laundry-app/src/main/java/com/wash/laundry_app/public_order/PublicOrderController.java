@@ -12,7 +12,7 @@ import java.util.Map;
  * No authentication required — delegates entirely to PublicOrderService.
  */
 @RestController
-@RequestMapping("/public/orders")
+@RequestMapping("/api/public/orders")
 @RequiredArgsConstructor
 public class PublicOrderController {
 

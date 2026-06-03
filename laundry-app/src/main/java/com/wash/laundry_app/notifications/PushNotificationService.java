@@ -24,7 +24,7 @@ public class PushNotificationService {
 
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     /**
      * Sends a push notification to a single user asynchronously.

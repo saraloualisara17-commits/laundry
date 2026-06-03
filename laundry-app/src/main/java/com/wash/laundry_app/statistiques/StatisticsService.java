@@ -214,25 +214,55 @@ public class StatisticsService {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end   = date.atTime(LocalTime.MAX);
 
-        List<Commande> day = commandeRepository.findByDateCreationBetween(start, end);
-
-        // Revenue = payments collected on this specific day
+        long orderCount = commandeRepository.countCommandesByDate(date);
         BigDecimal revenue = paiementRepository.sumCollectedBetween(start, end);
 
         return DailyStatisticsDTO.builder()
                 .date(date)
-                .nombreCommandes((long) day.size())
-                .revenusTotal(revenue)
+                .nombreCommandes(orderCount)
+                .revenusTotal(revenue != null ? revenue : BigDecimal.ZERO)
                 .build();
     }
 
+    /**
+     * BEFORE: N separate calls to getDailyStatistics() — each firing 2 DB queries → 2N total.
+     *         For days=30: 60 round-trips.
+     * AFTER:  2 GROUP BY queries covering the entire window, then merge in Java.
+     *         Total: 2 round-trips regardless of N.
+     */
     @Transactional(readOnly = true)
     public List<DailyStatisticsDTO> getLastNDaysStatistics(int days) {
-        List<DailyStatisticsDTO> stats = new ArrayList<>();
-        for (int i = 0; i < days; i++) {
-            stats.add(getDailyStatistics(LocalDate.now().minusDays(i)));
+        int clampedDays = Math.min(days, 365);
+        LocalDate endDate   = LocalDate.now();
+        LocalDate startDate = endDate.minusDays(clampedDays - 1L);
+        LocalDateTime windowStart = startDate.atStartOfDay();
+        LocalDateTime windowEnd   = endDate.atTime(LocalTime.MAX);
+
+        // Single grouped query for order counts
+        Map<LocalDate, Long> orderCounts = new HashMap<>();
+        for (Object[] row : commandeRepository.countGroupedByDate(windowStart, windowEnd)) {
+            LocalDate d = ((java.sql.Date) row[0]).toLocalDate();
+            orderCounts.put(d, ((Number) row[1]).longValue());
         }
-        return stats;
+
+        // Single grouped query for revenue
+        Map<LocalDate, BigDecimal> revenues = new HashMap<>();
+        for (Object[] row : paiementRepository.sumCollectedGroupedByDate(windowStart, windowEnd)) {
+            LocalDate d = ((java.sql.Date) row[0]).toLocalDate();
+            revenues.put(d, (BigDecimal) row[1]);
+        }
+
+        // Build the full ordered list — fill zero for dates with no activity
+        List<DailyStatisticsDTO> result = new ArrayList<>(clampedDays);
+        for (int i = clampedDays - 1; i >= 0; i--) {
+            LocalDate date = endDate.minusDays(i);
+            result.add(DailyStatisticsDTO.builder()
+                    .date(date)
+                    .nombreCommandes(orderCounts.getOrDefault(date, 0L))
+                    .revenusTotal(revenues.getOrDefault(date, BigDecimal.ZERO))
+                    .build());
+        }
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -244,18 +274,16 @@ public class StatisticsService {
         LocalDateTime start = dateDebut.atStartOfDay();
         LocalDateTime end   = dateFin.atTime(LocalTime.MAX);
 
-        List<Commande> period = commandeRepository.findByLivreurIdAndDateCreationBetween(livreurId, start, end);
-
-        BigDecimal revenue = period.stream()
-                .filter(c -> c.getStatus() == CommandeStatus.DELIVERED)
-                .map(c -> c.getMontantPaye() != null ? c.getMontantPaye() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Object[] row = commandeRepository.aggregateByLivreurAndPeriod(livreurId, start, end);
+        long   total     = row[0] != null ? ((Number) row[0]).longValue()        : 0L;
+        long   delivered = row[1] != null ? ((Number) row[1]).longValue()        : 0L;
+        BigDecimal revenue = row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO;
 
         return StatisticsDTO.builder()
-                .totalCommandes((long) period.size())
+                .totalCommandes(total)
                 .totalRevenue(revenue)
                 .totalRevenues(revenue)
-                .commandesLivrees(period.stream().filter(c -> c.getStatus() == CommandeStatus.DELIVERED).count())
+                .commandesLivrees(delivered)
                 .dateDebut(dateDebut)
                 .dateFin(dateFin)
                 .build();
@@ -263,30 +291,36 @@ public class StatisticsService {
 
     // ─────────────────────────────────────────────────────────────────────────
     // STATUS OVERVIEW (dashboard cards — intentionally ALL-TIME workload)
+    //
+    // BEFORE: 8 statuses × 3 queries (count + sumTotal + sumPaid) = 24 DB round-trips.
+    // AFTER:  1 GROUP BY query returns all status aggregates in one shot.
+    //         2 additional queries for AU_LOCAL and PAID_DEBTS remain (unchanged).
+    //         Total: 3 queries instead of 24.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Map<String, Object> getStatusOverview() {
-        List<CommandeStatus> statuses = List.of(
-            CommandeStatus.PENDING_PICKUP,
-            CommandeStatus.PICKED_UP,
-            CommandeStatus.IN_PROCESS,
-            CommandeStatus.READY_FOR_DELIVERY,
-            CommandeStatus.DELIVERED,
-            CommandeStatus.PICKUP_FAILED,
-            CommandeStatus.DELIVERY_FAILED,
-            CommandeStatus.CANCELLED
-        );
-
         Map<String, Object> data = new HashMap<>();
-        for (CommandeStatus status : statuses) {
-            long count       = commandeRepository.countByStatus(status);
-            BigDecimal total = commandeRepository.sumTotalByStatus(status);
-            BigDecimal paid  = commandeRepository.sumPaidByStatus(status);
+
+        // Single GROUP BY query → all statuses in one round-trip
+        for (Object[] row : commandeRepository.aggregateByStatus()) {
+            CommandeStatus status = (CommandeStatus) row[0];
+            long      count = ((Number) row[1]).longValue();
+            BigDecimal total = (BigDecimal) row[2];
+            BigDecimal paid  = (BigDecimal) row[3];
             data.put(status.name(), Map.of(
                 "count", count,
                 "total", total != null ? total : BigDecimal.ZERO,
                 "paid",  paid  != null ? paid  : BigDecimal.ZERO
+            ));
+        }
+
+        // Ensure all statuses appear in the map even if no orders exist for them
+        for (CommandeStatus s : CommandeStatus.values()) {
+            data.computeIfAbsent(s.name(), k -> Map.of(
+                "count", 0L,
+                "total", BigDecimal.ZERO,
+                "paid",  BigDecimal.ZERO
             ));
         }
 

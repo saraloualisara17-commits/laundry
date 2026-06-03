@@ -3,11 +3,15 @@ package com.wash.laundry_app.auth;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.CacheControl;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import com.wash.laundry_app.config.LegacyEndpointInterceptor;
@@ -23,6 +27,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000}")
     private String allowedOrigins;
+
+    @Value("${file.upload-dir:./uploads}")
+    private String uploadDir;
 
     private final LegacyEndpointInterceptor legacyEndpointInterceptor;
     private final RateLimitInterceptor rateLimitInterceptor;
@@ -94,12 +101,22 @@ public class WebConfig implements WebMvcConfigurer {
     // =====================
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String uploadPath = new java.io.File("uploads").getAbsolutePath();
+        // Use the same absolute path FileStorageService writes to so the resource
+        // handler is always pointed at the right directory regardless of CWD.
+        // The /uploads/** wildcard already supports the date-partitioned layout
+        // (e.g. /uploads/2026/06/uuid.webp).
+        String uploadPath = new java.io.File(uploadDir).getAbsolutePath();
         if (!uploadPath.endsWith(java.io.File.separator)) {
             uploadPath += java.io.File.separator;
         }
-        
+
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadPath);
+                .addResourceLocations("file:" + uploadPath)
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable());
+    }
+
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
 }

@@ -597,7 +597,15 @@
   },
   "notifications": {
     "empty": "Aucune notification",
-    "mark_all_read": "Tout lire"
+    "mark_all_read": "Tout lire",
+    "order_label": "Réf.",
+    "type": {
+      "NEW_ORDER": "Nouvelle commande",
+      "ORDER_STATUS_CHANGED": "Statut modifié",
+      "ORDER_ASSIGNED": "Commande assignée",
+      "ORDER_PAYMENT_ADDED": "Paiement ajouté",
+      "UNPAID_REMINDER": "Rappel impayé"
+    }
   },
   "receipt": {
     "choose_language": "Langue du reçu / لغة الوصل"

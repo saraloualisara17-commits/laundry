@@ -95,4 +95,5 @@ export function invalidateAfterLivreurAction(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: queryKeys.livreur.deliveries() });
   qc.invalidateQueries({ queryKey: queryKeys.livreur.pickups() });
   qc.invalidateQueries({ queryKey: queryKeys.livreur.stats() });
+  qc.invalidateQueries({ queryKey: queryKeys.orders.all });
 }

@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, Alert, Linking, Modal,
 } from 'react-native';
-import { row, textAlign } from '../../src/utils/rtl';
+import { row } from '../../src/utils/rtl';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -109,7 +109,7 @@ export default function AdminMissionsScreen() {
   const isArabic = i18n.language === 'ar';
   
   const { user } = useSelector((state: RootState) => state.auth);
-  const { clearOrder, setPickupOrderId, setOrderNotes, driverLocalImages, clearDriverLocalImages } = useOrderCreation();
+  const { driverLocalImages, clearDriverLocalImages } = useOrderCreation();
 
   const [activeTab, setActiveTab] = useState<'delivery' | 'pickup'>('pickup');
 
@@ -262,10 +262,7 @@ export default function AdminMissionsScreen() {
                 onPress={() => {
                   setSelectedOrder(item);
                   if (isPickup) {
-                    clearOrder();
-                    setPickupOrderId(String(item.id));
-                    setOrderNotes(item.notes || '');
-                    router.push('/(admin)/order-items');
+                    handleStatusUpdate(item.id, 'PICKED_UP');
                   } else {
                     setCollectedAmount(String(item.montantRestant || 0));
                     setDeliveryNotes('');

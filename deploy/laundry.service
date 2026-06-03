@@ -1,0 +1,70 @@
+# systemd service unit for Laundry App (Astra Pro)
+#
+# Installation:
+#   sudo cp deploy/laundry.service /etc/systemd/system/laundry.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable laundry
+#   sudo systemctl start laundry
+#
+# Requirements:
+#   - Create a dedicated system user:  sudo useradd -r -s /bin/false laundry
+#   - Place the built JAR at:          /opt/laundry/laundry-app.jar
+#   - Place environment variables at:  /opt/laundry/laundry.env  (chmod 600, owned by laundry)
+#   - Create uploads directory:        sudo mkdir -p /app/uploads && sudo chown laundry:laundry /app/uploads
+
+[Unit]
+Description=Laundry Management App (Spring Boot)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=laundry
+Group=laundry
+WorkingDirectory=/opt/laundry
+
+# Load environment variables from the env file (no secrets in this unit file)
+EnvironmentFile=/opt/laundry/laundry.env
+
+# Activate prod profile explicitly — LaundryAppApplication.validateEnvironment()
+# only enforces required vars when SPRING_PROFILES_ACTIVE=prod
+Environment=SPRING_PROFILES_ACTIVE=prod
+
+# JVM flags:
+#   -Xms256m        initial heap — avoids slow warmup on small VPS
+#   -Xmx512m        max heap — tune upward if you have more RAM
+#   -XX:+UseG1GC    G1 garbage collector — good latency/throughput balance
+#   -Dfile.encoding ensures consistent UTF-8 for Moroccan Arabic content
+ExecStart=/usr/bin/java \
+    -Xms256m \
+    -Xmx512m \
+    -XX:+UseG1GC \
+    -Dfile.encoding=UTF-8 \
+    -Dspring.profiles.active=prod \
+    -jar /opt/laundry/laundry-app.jar
+
+# Graceful shutdown: send SIGTERM and wait up to 30s for in-flight requests
+# to complete before forcing SIGKILL
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=30
+KillMode=mixed
+
+# Restart policy: always restart unless manually stopped
+Restart=always
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/app/uploads /opt/laundry
+PrivateTmp=yes
+
+# Logging: send stdout/stderr to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=laundry-app
+
+[Install]
+WantedBy=multi-user.target

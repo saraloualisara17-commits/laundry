@@ -24,6 +24,7 @@ export default function SelfSubmittedOrdersScreen() {
 
   const filters = useMemo(() => ({
     selfSubmitted: true,
+    status: 'PENDING_PICKUP',
     search: search || undefined,
     sort: 'desc',
   }), [search]);

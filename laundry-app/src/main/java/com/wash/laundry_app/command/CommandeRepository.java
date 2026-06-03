@@ -42,6 +42,44 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     @Query("SELECT COALESCE(SUM(c.montantPaye), 0) FROM Commande c WHERE c.status = :status")
     BigDecimal sumPaidByStatus(@Param("status") CommandeStatus status);
 
+    /**
+     * Single GROUP BY query replacing 24 separate countByStatus/sumTotalByStatus/sumPaidByStatus calls.
+     * Returns one row per status: Object[]{status (CommandeStatus), count (Long), sumTotal (BigDecimal), sumPaid (BigDecimal)}.
+     * Used exclusively by StatisticsService.getStatusOverview().
+     */
+    @Query("SELECT c.status, COUNT(c), COALESCE(SUM(c.montantTotal), 0), COALESCE(SUM(c.montantPaye), 0) " +
+           "FROM Commande c GROUP BY c.status")
+    List<Object[]> aggregateByStatus();
+
+    /**
+     * SQL aggregates for a driver's statistics over a date range.
+     * Returns a single row: Object[]{total (Long), delivered (Long), sumPaye (BigDecimal)}.
+     * Replaces loading all Commande entities into JVM heap and streaming over them.
+     */
+    @Query("SELECT COUNT(c), " +
+           "SUM(CASE WHEN c.status = 'DELIVERED' THEN 1 ELSE 0 END), " +
+           "COALESCE(SUM(CASE WHEN c.status = 'DELIVERED' THEN c.montantPaye ELSE 0 END), 0) " +
+           "FROM Commande c " +
+           "WHERE c.livreur.id = :livreurId " +
+           "AND c.dateCreation >= :start AND c.dateCreation <= :end")
+    Object[] aggregateByLivreurAndPeriod(
+        @Param("livreurId") Long livreurId,
+        @Param("start") LocalDateTime start,
+        @Param("end")   LocalDateTime end);
+
+    /**
+     * Grouped daily order count over an N-day window — replaces N separate countCommandesByDate calls.
+     * Returns rows: Object[]{date (LocalDate), count (Long)}.
+     */
+    @Query("SELECT DATE(c.dateCreation), COUNT(c) " +
+           "FROM Commande c " +
+           "WHERE c.dateCreation >= :start AND c.dateCreation <= :end " +
+           "GROUP BY DATE(c.dateCreation) " +
+           "ORDER BY DATE(c.dateCreation) ASC")
+    List<Object[]> countGroupedByDate(
+        @Param("start") LocalDateTime start,
+        @Param("end")   LocalDateTime end);
+
     boolean existsByClientId(Long clientId);
 
     Optional<Commande> findByNumeroCommande(String numeroCommande);
@@ -119,6 +157,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     // ── Status queries ────────────────────────────────────────────────────────
     List<Commande> findByStatus(CommandeStatus status);
+
+    org.springframework.data.domain.Page<Commande> findByStatus(CommandeStatus status, org.springframework.data.domain.Pageable pageable);
 
     List<Commande> findByStatusIn(List<CommandeStatus> statuses);
 

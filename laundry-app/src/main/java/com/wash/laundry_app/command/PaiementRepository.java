@@ -35,4 +35,18 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long> {
     long countOrdersWithPaymentBetween(
         @Param("start") LocalDateTime start,
         @Param("end")   LocalDateTime end);
+
+    /**
+     * Revenue grouped by date — replaces getLastNDaysStatistics() N-query loop.
+     * Returns one row per day: Object[]{date (LocalDate), sumMontant (BigDecimal)}.
+     * The caller builds the full N-day list and fills zero for missing dates.
+     */
+    @Query("SELECT CAST(p.datePaiement AS date), COALESCE(SUM(p.montant), 0) " +
+           "FROM Paiement p " +
+           "WHERE p.datePaiement >= :start AND p.datePaiement <= :end " +
+           "GROUP BY CAST(p.datePaiement AS date) " +
+           "ORDER BY CAST(p.datePaiement AS date) ASC")
+    List<Object[]> sumCollectedGroupedByDate(
+        @Param("start") LocalDateTime start,
+        @Param("end")   LocalDateTime end);
 }

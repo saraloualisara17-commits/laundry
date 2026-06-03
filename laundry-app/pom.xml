@@ -137,6 +137,18 @@
 			<artifactId>spring-boot-starter-aop</artifactId>
 		</dependency>
 
+		<!--
+		  WebP decoder for ImageIO. Required so FileStorageService can read
+		  mobile-uploaded WebP files when generating thumbnails. Pure Java
+		  (no native libs), Apache 2.0 licensed, registered automatically via
+		  Java's ServiceLoader — no extra configuration needed.
+		-->
+		<dependency>
+			<groupId>com.twelvemonkeys.imageio</groupId>
+			<artifactId>imageio-webp</artifactId>
+			<version>3.12.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -149,7 +161,7 @@
 					<url>${flyway.url}</url>
 					<user>${flyway.user}</user>
 					<password>${flyway.password}</password>
-					<cleanDisabled>false</cleanDisabled>
+					<cleanDisabled>true</cleanDisabled>
 				</configuration>
 			</plugin>
 

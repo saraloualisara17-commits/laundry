@@ -87,9 +87,13 @@ public class CommandeQueryService {
         return commandeMapper.toDto(commandeRepository.findWithClientDetailsById(id).orElseThrow(CommandeNotFoundException::new));
     }
 
+    private static final int MAX_LIST_SIZE = 500;
+
     @Transactional(readOnly = true)
     public List<CommandeDTO> getAllCommandes() {
-        return commandeRepository.findAll().stream().map(commandeMapper::toDto).toList();
+        return commandeRepository
+                .findAll(PageRequest.of(0, MAX_LIST_SIZE, Sort.by(Sort.Direction.DESC, "dateCreation")))
+                .getContent().stream().map(commandeMapper::toDto).toList();
     }
 
     @Transactional(readOnly = true)
@@ -99,7 +103,9 @@ public class CommandeQueryService {
 
     @Transactional(readOnly = true)
     public List<CommandeDTO> getCommandesByStatus(CommandeStatus status) {
-        return commandeRepository.findByStatus(status).stream().map(commandeMapper::toDto).toList();
+        return commandeRepository
+                .findByStatus(status, PageRequest.of(0, MAX_LIST_SIZE, Sort.by(Sort.Direction.DESC, "dateCreation")))
+                .getContent().stream().map(commandeMapper::toDto).toList();
     }
 
     public long getCountByStatus(CommandeStatus status) {

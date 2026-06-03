@@ -238,14 +238,11 @@ export function useOrderDetailHandlers({
   const handleAssignAndMarkReady = useCallback(async () => {
     if (!selectedDriverId) { Alert.alert(t('common.error'), t('admin.orders.filter_driver')); return; }
     try {
-      const y = deliveryDate.getFullYear();
-      const mo = String(deliveryDate.getMonth() + 1).padStart(2, '0');
-      const d = String(deliveryDate.getDate()).padStart(2, '0');
-      await assignDriverMutation.mutateAsync({ id, driverId: selectedDriverId, scheduledDeliveryDate: `${y}-${mo}-${d}T00:00:00` });
+      await assignDriverMutation.mutateAsync({ id, driverId: selectedDriverId });
       if (order?.status !== 'READY_FOR_DELIVERY') await performStatusUpdate('READY_FOR_DELIVERY', {});
       setShowDriverModal(false);
     } catch { Alert.alert(t('common.error'), t('common.error_msg')); }
-  }, [id, selectedDriverId, deliveryDate, order?.status, assignDriverMutation, performStatusUpdate, t]);
+  }, [id, selectedDriverId, order?.status, assignDriverMutation, performStatusUpdate, t]);
 
   const handleAssignPickupDriver = useCallback(async () => {
     if (!selectedPickupDriverId) { Alert.alert(t('common.error'), t('admin.orders.filter_driver')); return; }

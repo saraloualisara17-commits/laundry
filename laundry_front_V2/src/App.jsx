@@ -14,6 +14,7 @@ import Layout from './components/layout/layout'
 
 // Public
 import OrderLanding from './pages/public/OrderLanding'
+import OrderWizard  from './pages/public/OrderWizard'
 
 // Errors
 import NotFound from './pages/errors/NotFound'
@@ -57,6 +58,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/order" element={<OrderLanding />} />
+            <Route path="/order/wizard" element={<OrderWizard />} />
             <Route path="/compte-suspendu" element={<SuspendedAccount />} />
             <Route path="/404" element={<NotFound />} />
             <Route path="/interdit" element={<Forbidden />} />

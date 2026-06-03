@@ -330,8 +330,6 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
         isArabic={isArabic} t={t}
         drivers={drivers} driversLoading={driversLoading} driversError={driversError}
         selectedDriverId={h.selectedDriverId} setSelectedDriverId={h.setSelectedDriverId}
-        deliveryDate={h.deliveryDate} setDeliveryDate={h.setDeliveryDate}
-        showDatePicker={h.showDeliveryDatePicker} setShowDatePicker={h.setShowDeliveryDatePicker}
         confirming={h.assignDriverMutation.isPending || h.updateStatusMutation.isPending}
       />
 

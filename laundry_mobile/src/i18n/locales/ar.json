@@ -596,7 +596,15 @@
   },
   "notifications": {
     "empty": "لا توجد إشعارات",
-    "mark_all_read": "تحديد الكل كمقروء"
+    "mark_all_read": "تحديد الكل كمقروء",
+    "order_label": "رقم",
+    "type": {
+      "NEW_ORDER": "طلب جديد",
+      "ORDER_STATUS_CHANGED": "تغيّرت الحالة",
+      "ORDER_ASSIGNED": "تم تعيين الطلب",
+      "ORDER_PAYMENT_ADDED": "تمت إضافة دفعة",
+      "UNPAID_REMINDER": "تذكير بمبلغ غير مدفوع"
+    }
   },
   "receipt": {
     "choose_language": "لغة الوصل / Langue du reçu"

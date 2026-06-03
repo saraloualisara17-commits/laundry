@@ -20,6 +20,7 @@ import { useOrderCreation } from '../../../src/context/OrderCreationContext';
 import { useRTL, row, font, arabicSafe, pos, textAlign, alignStart, alignEnd, chevronForward, borderStart, textProps } from '../../../src/utils/rtl';
 import { ScannerModal } from '../../../components/admin/ScannerModal';
 import { useDashboardStats, useStatusOverview, useUnpaidOverview } from '../../../src/hooks/query/useDashboard';
+import { useOrders } from '../../../src/hooks/query/useOrders';
 import { useReadyDeliveries, usePendingPickups, useOverdueStats } from '../../../src/hooks/queries/useLivreur';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -61,7 +62,9 @@ export default function AdminDashboard() {
   const { data: pendingPickups = [], refetch: refetchPickups } = usePendingPickups();
   const { data: readyDeliveries = [], refetch: refetchDeliveries } = useReadyDeliveries();
   const { data: overdueData, refetch: refetchOverdue } = useOverdueStats();
+  const { data: selfSubmittedData, refetch: refetchSelfSubmitted } = useOrders({ selfSubmitted: true, status: 'PENDING_PICKUP', limit: 1 });
 
+  const selfSubmittedCount = selfSubmittedData?.totalElements ?? 0;
   const overview = overviewRes?.data ?? overviewRes ?? null;
   const unpaidOverview = unpaidOverviewData ?? null;
   const myMissionCount = pendingPickups.length + readyDeliveries.length;
@@ -82,6 +85,7 @@ export default function AdminDashboard() {
     refetchPickups();
     refetchDeliveries();
     refetchOverdue();
+    refetchSelfSubmitted();
   };
 
   const loadOverviewData = refetchOverview;
@@ -328,6 +332,46 @@ export default function AdminDashboard() {
               {renderStatusCard('DELIVERED',          t('status.DELIVERED'),          'checkmark-done',  '#388E3C')}
             </View>
 
+            {/* Self-Submitted Orders Card (web client orders) */}
+            <View style={styles.unpaidWrapper}>
+              <View style={[styles.selfSubmittedHeader, row(isArabic)]}>
+                <Text
+                  style={[styles.selfSubmittedHeaderLabel, font.semibold(isArabic)]}
+                  maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+                >
+                  {t('dashboard.self_submitted_orders')}
+                </Text>
+                <View style={styles.selfSubmittedCountBadge}>
+                  <Text
+                    style={[styles.selfSubmittedCountText, font.extrabold(isArabic)]}
+                    maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}
+                  >
+                    {selfSubmittedCount}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.unpaidCard, { borderColor: '#6366F1' }]}
+                onPress={() => router.push('/(admin)/self-submitted-orders')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.unpaidMain, row(isArabic)]}>
+                  <View style={[styles.unpaidIcon, { backgroundColor: '#EEF2FF' }]}>
+                    <Text style={{ fontSize: 24 }}>🌐</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.unpaidTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                      {t('dashboard.self_submitted_orders')}
+                    </Text>
+                    <Text style={[styles.unpaidSubtitle, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+                      {t('dashboard.self_submitted_sub')}
+                    </Text>
+                  </View>
+                  <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
             {/* 4. Unpaid Card (Middle Section) */}
             {unpaidOverview && (
               <View style={styles.unpaidWrapper}>
@@ -399,30 +443,6 @@ export default function AdminDashboard() {
                   <Text style={[styles.accountValue, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>{stats?.totalCommandes || 0}</Text>
                 </View>
                 <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            {/* 7. Self-Submitted Orders Card */}
-            <View style={styles.unpaidWrapper}>
-              <TouchableOpacity
-                style={[styles.unpaidCard, { borderColor: '#6366F1' }]}
-                onPress={() => router.push('/(admin)/self-submitted-orders')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.unpaidMain, row(isArabic)]}>
-                  <View style={[styles.unpaidIcon, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={{ fontSize: 24 }}>🌐</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.unpaidTitle, textAlign(isArabic), font.bold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                      {t('dashboard.self_submitted_orders')}
-                    </Text>
-                    <Text style={[styles.unpaidSubtitle, textAlign(isArabic), font.regular(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
-                      {t('dashboard.self_submitted_sub')}
-                    </Text>
-                  </View>
-                  <Ionicons name={chevronForward(isArabic)} size={20} color={AdminColors.textMuted} />
-                </View>
               </TouchableOpacity>
             </View>
 
@@ -532,6 +552,32 @@ const styles = StyleSheet.create({
   cardAmount: { fontSize: 13, fontWeight: '800', color: 'white' },
   attentionDot: { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: 'white' },
   unpaidWrapper: { paddingHorizontal: 20, marginBottom: 16, marginTop: 4 },
+  selfSubmittedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  selfSubmittedHeaderLabel: {
+    fontSize: 13,
+    color: AdminColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  selfSubmittedCountBadge: {
+    minWidth: 28,
+    height: 24,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: '#6366F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selfSubmittedCountText: {
+    color: 'white',
+    fontSize: 13,
+  },
   unpaidCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#FEE2E2', ...AdminShadows.shadowSmall },
   unpaidMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   unpaidIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },

@@ -1,12 +1,9 @@
 import React from 'react';
 import {
   View, Text, Modal, TouchableOpacity, ScrollView,
-  ActivityIndicator, StyleSheet, Platform,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { format } from 'date-fns';
-import { fr, arDZ as ar } from 'date-fns/locale';
 import { Colors } from '../../../constants/theme';
 import { row } from '../../../src/utils/rtl';
 
@@ -22,10 +19,6 @@ interface AssignDriverModalProps {
   driversError: boolean;
   selectedDriverId: string | null;
   setSelectedDriverId: (id: string) => void;
-  deliveryDate: Date;
-  setDeliveryDate: (d: Date) => void;
-  showDatePicker: boolean;
-  setShowDatePicker: (v: boolean) => void;
   confirming: boolean;
 }
 
@@ -33,8 +26,6 @@ export default React.memo(function AssignDriverModal({
   visible, onClose, onConfirm, numeroCommande, isArabic, t,
   drivers, driversLoading, driversError,
   selectedDriverId, setSelectedDriverId,
-  deliveryDate, setDeliveryDate,
-  showDatePicker, setShowDatePicker,
   confirming,
 }: AssignDriverModalProps) {
   return (
@@ -53,36 +44,7 @@ export default React.memo(function AssignDriverModal({
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
             <View style={styles.body}>
-              <TouchableOpacity
-                style={[styles.datePickerBtn, row(isArabic)]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[styles.inputLabel, { marginBottom: 0 }, isArabic && { textAlign: 'right' }]}>
-                  {t('admin.orders.create.delivery_date')}
-                </Text>
-                <Text style={styles.dateValue}>
-                  {format(deliveryDate, 'dd MMM yyyy', { locale: isArabic ? ar : fr })}
-                </Text>
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={deliveryDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  themeVariant="light"
-                  onChange={(e, d) => {
-                    if (Platform.OS === 'android') {
-                      setShowDatePicker(false);
-                      if (e.type === 'set' && d) setDeliveryDate(d);
-                    } else {
-                      if (d) setDeliveryDate(d);
-                    }
-                  }}
-                />
-              )}
-
-              <Text style={[styles.inputLabel, { marginTop: 24 }, isArabic && { textAlign: 'right' }]}>
+              <Text style={[styles.inputLabel, isArabic && { textAlign: 'right' }]}>
                 {t('admin.orders.filter_driver')}
               </Text>
 
@@ -155,8 +117,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary },
   subtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   body: { paddingHorizontal: 20, paddingBottom: 16 },
-  datePickerBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.primary100, borderWidth: 1, borderColor: Colors.primary },
-  dateValue: { color: Colors.primary, fontWeight: '700', fontSize: 13 },
   inputLabel: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, marginBottom: 8 },
   driverOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: '#F8FAFC', marginBottom: 8, borderWidth: 1.5, borderColor: '#E2E8F0' },
   driverOptionSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },

@@ -17,16 +17,22 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private static final int MAX_REQUESTS_PER_MINUTE = 100;
     private static final int AUTH_LOGIN_LIMIT       = 10;
     private static final int UPLOAD_LIMIT           = 20;
+    // Public order submission is unauthenticated and writes to the DB — keep
+    // it well below the generic limit. Real customers submit one order at a
+    // time; 5/min/IP leaves room for retries on flaky connections.
+    private static final int PUBLIC_ORDER_LIMIT     = 5;
     private static final long TIME_WINDOW_MS        = 60_000L;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String clientIp = getClientIP(request);
         String path = request.getRequestURI();
+        String method = request.getMethod();
 
         int limit = MAX_REQUESTS_PER_MINUTE;
         if (path.startsWith("/auth/login"))  limit = AUTH_LOGIN_LIMIT;
         else if (path.startsWith("/api/upload")) limit = UPLOAD_LIMIT;
+        else if ("POST".equals(method) && path.startsWith("/api/public/orders")) limit = PUBLIC_ORDER_LIMIT;
 
         RequestData requestData = requestCounts.compute(clientIp + ":" + path, (key, data) -> {
             long now = System.currentTimeMillis();

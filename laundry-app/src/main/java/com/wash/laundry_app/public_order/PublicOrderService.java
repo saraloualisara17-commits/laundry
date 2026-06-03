@@ -13,10 +13,15 @@ import com.wash.laundry_app.users.User;
 import com.wash.laundry_app.users.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles order creation from the public-facing web form.
@@ -38,8 +43,23 @@ public class PublicOrderService {
     private final AuditService              auditService;
     private final ApplicationEventPublisher eventPublisher;
 
+    // ── Per-phone abuse throttle ────────────────────────────────────────────
+    // A second layer of defence after the per-IP RateLimitInterceptor: stops
+    // an attacker who rotates IPs (e.g. via a residential proxy network) from
+    // hammering the form for the same phone number. Sized for normal usage —
+    // a real customer never submits more than 1–2 orders per hour.
+    private static final int  MAX_ORDERS_PER_PHONE_PER_HOUR = 3;
+    private static final long PHONE_WINDOW_MS               = 60L * 60L * 1000L; // 1 hour
+
+    private final ConcurrentHashMap<String, Deque<Long>> recentByPhone = new ConcurrentHashMap<>();
+
     @Transactional
     public String createPublicOrder(PublicOrderRequest req) {
+
+        // ── 0. Per-phone hourly throttle ──────────────────────────────────────
+        // Runs before any DB work so abusive bursts cost nothing.
+        enforcePhoneThrottle(req.getClientPhone());
+
 
         // ── 1. System user for audit logging only — not used as createdBy ────
         User systemUser = userRepository.findByRole(Role.ADMIN)
@@ -131,6 +151,58 @@ public class PublicOrderService {
         eventPublisher.publishEvent(
                 OrderSideEffectEvent.created(commande.getId(), commande.getNumeroCommande()));
 
+        // Record the timestamp only after the order is committed-ready —
+        // throwing earlier inside the transaction must NOT consume the quota.
+        recordPhoneSubmission(req.getClientPhone());
+
         return commande.getNumeroCommande();
+    }
+
+    // ── Per-phone throttle helpers ──────────────────────────────────────────
+
+    private void enforcePhoneThrottle(String phone) {
+        if (phone == null || phone.isBlank()) return;
+        long now = System.currentTimeMillis();
+        long cutoff = now - PHONE_WINDOW_MS;
+
+        Deque<Long> history = recentByPhone.get(phone);
+        if (history == null) return;
+
+        synchronized (history) {
+            // Prune timestamps that fell outside the window
+            while (!history.isEmpty() && history.peekFirst() < cutoff) {
+                history.pollFirst();
+            }
+            if (history.size() >= MAX_ORDERS_PER_PHONE_PER_HOUR) {
+                throw new TooManyPublicOrdersException(
+                        "Trop de commandes pour ce numéro. Veuillez réessayer plus tard.");
+            }
+        }
+    }
+
+    private void recordPhoneSubmission(String phone) {
+        if (phone == null || phone.isBlank()) return;
+        long now = System.currentTimeMillis();
+        recentByPhone.compute(phone, (k, history) -> {
+            Deque<Long> dq = (history != null) ? history : new ArrayDeque<>(4);
+            synchronized (dq) { dq.addLast(now); }
+            return dq;
+        });
+    }
+
+    /**
+     * Evicts phone entries with no recent submissions every 10 minutes so the
+     * map can't grow unbounded across millions of phone numbers over time.
+     */
+    @Scheduled(fixedDelay = 10L * 60L * 1000L)
+    public void evictStalePhoneHistory() {
+        long cutoff = System.currentTimeMillis() - PHONE_WINDOW_MS;
+        for (Iterator<java.util.Map.Entry<String, Deque<Long>>> it = recentByPhone.entrySet().iterator(); it.hasNext(); ) {
+            Deque<Long> dq = it.next().getValue();
+            synchronized (dq) {
+                while (!dq.isEmpty() && dq.peekFirst() < cutoff) dq.pollFirst();
+                if (dq.isEmpty()) it.remove();
+            }
+        }
     }
 }

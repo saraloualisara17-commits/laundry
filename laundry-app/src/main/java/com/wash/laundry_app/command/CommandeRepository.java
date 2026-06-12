@@ -200,7 +200,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR str(c.id) = :search OR " +
-            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))",
+            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "EXISTS (SELECT 1 FROM ClientPhone p WHERE p.client = c.client AND p.phoneNumber LIKE CONCAT('%', :search, '%')))",
            countQuery = "SELECT COUNT(c) FROM Commande c LEFT JOIN c.livreur ld LEFT JOIN c.deliveryDriver dd WHERE " +
             "(:status IS NULL OR c.status = :status) AND " +
             "(:mode IS NULL OR c.mode = :mode) AND " +
@@ -211,7 +212,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR str(c.id) = :search OR " +
-            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
+            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "EXISTS (SELECT 1 FROM ClientPhone p WHERE p.client = c.client AND p.phoneNumber LIKE CONCAT('%', :search, '%')))")
     Page<Commande> findFiltered(
             @Param("status") CommandeStatus status,
             @Param("mode") ModeCommande mode,
@@ -235,7 +237,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR str(c.id) = :search OR " +
-            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
+            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "EXISTS (SELECT 1 FROM ClientPhone p WHERE p.client = c.client AND p.phoneNumber LIKE CONCAT('%', :search, '%')))")
     BigDecimal findFilteredTotalValue(
             @Param("status") CommandeStatus status,
             @Param("mode") ModeCommande mode,
@@ -258,7 +261,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR str(c.id) = :search OR " +
-            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
+            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "EXISTS (SELECT 1 FROM ClientPhone p WHERE p.client = c.client AND p.phoneNumber LIKE CONCAT('%', :search, '%')))")
     BigDecimal findFilteredTotalUnpaid(
             @Param("status") CommandeStatus status,
             @Param("mode") ModeCommande mode,
@@ -281,7 +285,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             "(:dateFin IS NULL OR (:paidDebts = true AND c.debtSettledAt <= :dateFin) OR (:paidDebts IS NULL OR :paidDebts = false) AND c.dateCreation <= :dateFin) AND " +
             "(:livreurId IS NULL OR ld.id = :livreurId OR dd.id = :livreurId) AND " +
             "(:search IS NULL OR str(c.id) = :search OR " +
-            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')))")
+            "LOWER(c.client.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "EXISTS (SELECT 1 FROM ClientPhone p WHERE p.client = c.client AND p.phoneNumber LIKE CONCAT('%', :search, '%')))")
     Long findFilteredTotalVolume(
             @Param("status") CommandeStatus status,
             @Param("mode") ModeCommande mode,

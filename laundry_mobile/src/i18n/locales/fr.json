@@ -149,7 +149,27 @@
     "notifications": "Notifications",
     "home": "Accueil",
     "missions": "Missions",
-    "profile": "Profil"
+    "profile": "Profil",
+    "search": "Recherche"
+  },
+  "search": {
+    "placeholder": "ID, nom ou téléphone...",
+    "hint": "Saisissez un nom, numéro de téléphone ou ID de commande",
+    "no_results": "Aucune commande trouvée"
+  },
+  "call_logs": {
+    "title": "Journal des appels",
+    "empty": "Aucun appel enregistré",
+    "no_results": "Aucun résultat",
+    "btn": "Appels",
+    "search_placeholder": "Téléphone ou nom du client...",
+    "all_staff": "Tout le personnel"
+  },
+  "call_confirm": {
+    "title": "Appeler le client",
+    "msg": "Voulez-vous appeler",
+    "wa_title": "Ouvrir WhatsApp",
+    "wa_msg": "Voulez-vous contacter via WhatsApp"
   },
   "delivery": {
     "confirm_title": "Confirmer la livraison",

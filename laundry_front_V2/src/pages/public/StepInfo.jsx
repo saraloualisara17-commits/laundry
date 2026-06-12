@@ -110,10 +110,10 @@ export default function StepInfo({ info, setInfo, onNext, onBack }) {
   const handleNext = () => { if (validate()) onNext(); };
 
   return (
-    <div className="max-w-5xl mx-auto px-5 md:px-10 py-10" dir="ltr">
+    <div className="max-w-5xl mx-auto px-4 md:px-10 py-6 md:py-10" dir="ltr">
 
       {/* ── Title ── */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-8">
         <h1 className="text-3xl md:text-4xl font-extrabold text-[#1a2e44] mb-3">
           {t('public.info_title', { defaultValue: 'Delivery Details' })}
         </h1>
@@ -123,13 +123,13 @@ export default function StepInfo({ info, setInfo, onNext, onBack }) {
       </div>
 
       {/* ── Two-column ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
 
         {/* Left: form */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-5">
 
           {/* Name + Phone row */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             {/* Full Name */}
             <div>
@@ -325,7 +325,7 @@ export default function StepInfo({ info, setInfo, onNext, onBack }) {
       </div>
 
       {/* ── Footer nav ── */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+      <div className="flex items-center justify-between mt-6 md:mt-8 pt-5 border-t border-gray-100">
         <button onClick={onBack}
           className="flex items-center gap-2 text-sm font-semibold text-gray-500
                      hover:text-[#1a2e44] transition-colors cursor-pointer">

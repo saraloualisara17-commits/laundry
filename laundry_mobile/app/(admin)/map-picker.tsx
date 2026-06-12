@@ -7,9 +7,10 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
-  Platform
+  Platform,
+  Image,
 } from 'react-native';
-import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -22,91 +23,155 @@ import { logger } from '../../src/lib/logger';
 
 const log = logger.ns('map-picker');
 
+const GOOGLE_API_KEY = 'AIzaSyDBkvT5ZWrBXZVLEYwxD5igvySCKTES_3w';
+
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
 export default function MapPickerScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ returnTo?: string }>();
   const { setPendingLocation } = useOrderCreation();
   const mapRef = useRef<MapView>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
   const [searching, setSearching] = useState(false);
-  const [markerCoords, setMarkerCoords] = useState<{ latitude: number, longitude: number } | null>(null);
+  const [markerCoords, setMarkerCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState('');
   const [resolvedRegion, setResolvedRegion] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const searchAddress = async (query: string) => {
+  const fetchPredictions = async (input: string) => {
+    if (input.length < 2) {
+      setPredictions([]);
+      return;
+    }
     setSearching(true);
     try {
-      const encoded = encodeURIComponent(query + ', Morocco');
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        `format=json&q=${encoded}&limit=5&` +
-        `addressdetails=1&accept-language=fr`,
-        { headers: { 'User-Agent': 'AstraPro-LaundryApp/1.0' } }
-      );
+      const url =
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+        `?input=${encodeURIComponent(input)}` +
+        `&key=${GOOGLE_API_KEY}` +
+        `&language=${isArabic ? 'ar' : 'fr'}` +
+        `&components=country:ma`;
+      const res = await fetch(url);
       const data = await res.json();
-      setSearchResults(data);
-    } catch(e) {
-      log.warn('Search failed', { err: String(e) });
+      if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
+        setPredictions(data.predictions || []);
+      } else {
+        log.warn('Places autocomplete error', { status: data.status });
+        setPredictions([]);
+      }
+    } catch (e) {
+      log.warn('Places autocomplete failed', { err: String(e) });
+      setPredictions([]);
     } finally {
       setSearching(false);
     }
   };
 
-  const selectSearchResult = (result: any) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchPredictions(text), 300);
+  };
 
-    setMarkerCoords({ latitude: lat, longitude: lng });
-
-    // Animate map imperatively — avoids the controlled-region re-render race on Android
-    mapRef.current?.animateToRegion({
-      latitude: lat,
-      longitude: lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 400);
-
-    const addr = result.address;
-    const street = addr.road || addr.neighbourhood || addr.suburb || '';
-    const city = addr.city || addr.town || addr.village || addr.municipality || '';
-    const region = addr.state || addr.county || '';
-
-    setResolvedAddress([street, city].filter(Boolean).join(', '));
-    setResolvedRegion(region);
-    setSearchQuery(result.display_name.split(',')[0]);
-    setSearchResults([]);
+  const selectPrediction = async (prediction: PlacePrediction) => {
+    setPredictions([]);
+    setSearchQuery(prediction.structured_formatting.main_text);
+    setSearching(true);
+    try {
+      const url =
+        `https://maps.googleapis.com/maps/api/place/details/json` +
+        `?place_id=${prediction.place_id}` +
+        `&key=${GOOGLE_API_KEY}` +
+        `&fields=geometry,formatted_address,address_components` +
+        `&language=${isArabic ? 'ar' : 'fr'}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status === 'OK') {
+        const loc = data.result.geometry.location;
+        const lat = loc.lat;
+        const lng = loc.lng;
+        setMarkerCoords({ latitude: lat, longitude: lng });
+        mapRef.current?.animateToRegion(
+          { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+          400
+        );
+        const components: any[] = data.result.address_components || [];
+        const getComponent = (type: string) =>
+          components.find((c: any) => c.types.includes(type))?.long_name || '';
+        const route = getComponent('route');
+        const locality =
+          getComponent('locality') ||
+          getComponent('administrative_area_level_2') ||
+          getComponent('sublocality');
+        const region = getComponent('administrative_area_level_1');
+        setResolvedAddress(
+          data.result.formatted_address ||
+            [route, locality].filter(Boolean).join(', ')
+        );
+        setResolvedRegion(region);
+      }
+    } catch (e) {
+      log.warn('Place details failed', { err: String(e) });
+    } finally {
+      setSearching(false);
+    }
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?` +
-        `format=json&lat=${lat}&lon=${lng}&` +
-        `accept-language=fr`,
-        { headers: { 'User-Agent': 'AstraPro-LaundryApp/1.0' } }
-      );
+      const url =
+        `https://maps.googleapis.com/maps/api/geocode/json` +
+        `?latlng=${lat},${lng}` +
+        `&key=${GOOGLE_API_KEY}` +
+        `&language=${isArabic ? 'ar' : 'fr'}`;
+      const res = await fetch(url);
       const data = await res.json();
-      const addr = data.address || {};
-
-      const street = addr.road || addr.neighbourhood || addr.suburb || '';
-      const city = addr.city || addr.town || addr.village || addr.municipality || '';
-      const region = addr.state || addr.county || '';
-
-      setResolvedAddress([street, city].filter(Boolean).join(', '));
-      setResolvedRegion(region);
-      setSearchQuery(data.display_name?.split(',')[0] || '');
-    } catch(e) {
+      if (data.status === 'OK' && data.results.length > 0) {
+        const result = data.results[0];
+        const components: any[] = result.address_components || [];
+        const getComponent = (type: string) =>
+          components.find((c: any) => c.types.includes(type))?.long_name || '';
+        const region = getComponent('administrative_area_level_1');
+        setResolvedAddress(result.formatted_address || '');
+        setResolvedRegion(region);
+        setSearchQuery(result.formatted_address?.split(',')[0] || '');
+      } else {
+        setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        setResolvedRegion('');
+      }
+    } catch (e) {
       log.warn('Reverse geocode failed', { err: String(e) });
       setResolvedAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     }
   };
 
+  const handleMyLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+    const loc = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = loc.coords;
+    setMarkerCoords({ latitude, longitude });
+    mapRef.current?.animateToRegion(
+      { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+      400
+    );
+    reverseGeocode(latitude, longitude);
+  };
+
   const handleConfirm = () => {
     if (!markerCoords) return;
-
     if (params.returnTo === 'order-address') {
       pendingMapResult.set({
         address: resolvedAddress,
@@ -140,6 +205,7 @@ export default function MapPickerScreen() {
         onPress={(e) => {
           const { latitude, longitude } = e.nativeEvent.coordinate;
           setMarkerCoords({ latitude, longitude });
+          setPredictions([]);
           reverseGeocode(latitude, longitude);
         }}
       >
@@ -154,61 +220,86 @@ export default function MapPickerScreen() {
         )}
       </MapView>
 
-      {/* Absolute Overlay Header & Search */}
+      {/* Overlay Header & Search */}
       <View style={[styles.overlayTop, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={AdminColors.textPrimary} />
+            <Ionicons
+              name={isArabic ? 'arrow-forward' : 'arrow-back'}
+              size={24}
+              color={AdminColors.textPrimary}
+            />
           </TouchableOpacity>
           <View style={styles.titleBadge}>
             <Text style={styles.titleText}>{t('admin.map_picker.title')}</Text>
           </View>
-          <View style={{ width: 40 }} />
+          {/* My location button */}
+          <TouchableOpacity style={styles.backBtn} onPress={handleMyLocation}>
+            <Ionicons name="locate" size={22} color={AdminColors.primary} />
+          </TouchableOpacity>
         </View>
 
+        {/* Search bar */}
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color={AdminColors.primary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, isArabic && { textAlign: 'right' }]}
             placeholder={t('admin.map_picker.search_placeholder')}
             placeholderTextColor={AdminColors.textMuted}
             value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              if (text.length > 2) {
-                searchAddress(text);
-              } else {
-                setSearchResults([]);
-              }
-            }}
+            onChangeText={handleSearchChange}
+            returnKeyType="search"
+            onSubmitEditing={() => fetchPredictions(searchQuery)}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery('');
+                setPredictions([]);
+              }}
+            >
               <Ionicons name="close-circle" size={18} color={AdminColors.textMuted} />
             </TouchableOpacity>
           )}
-          {searching && <ActivityIndicator size="small" color={AdminColors.primary} style={{ marginLeft: 8 }} />}
+          {searching && (
+            <ActivityIndicator size="small" color={AdminColors.primary} style={{ marginLeft: 8 }} />
+          )}
         </View>
 
-        {searchResults.length > 0 && (
+        {/* Predictions dropdown */}
+        {predictions.length > 0 && (
           <View style={styles.resultsDropdown}>
             <FlatList
-              data={searchResults}
-              keyExtractor={(item, index) => index.toString()}
+              data={predictions}
+              keyExtractor={(item) => item.place_id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.resultItem}
-                  onPress={() => selectSearchResult(item)}
+                  onPress={() => selectPrediction(item)}
                 >
                   <Ionicons name="pin" size={18} color={AdminColors.primary} />
                   <View style={styles.resultTextCol}>
-                    <Text style={styles.resultName}>{item.display_name.split(',')[0]}</Text>
+                    <Text style={styles.resultName}>
+                      {item.structured_formatting.main_text}
+                    </Text>
                     <Text style={styles.resultFullAddr} numberOfLines={1}>
-                      {item.display_name.split(',').slice(1).join(',').trim()}
+                      {item.structured_formatting.secondary_text}
                     </Text>
                   </View>
                 </TouchableOpacity>
               )}
+              ListFooterComponent={
+                <View style={styles.poweredByRow}>
+                  <Text style={styles.poweredByText}>powered by </Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#4285F4' }]}>G</Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#EA4335' }]}>o</Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#FBBC05' }]}>o</Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#4285F4' }]}>g</Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#34A853' }]}>l</Text>
+                  <Text style={[styles.poweredByText, { fontWeight: '700', color: '#EA4335' }]}>e</Text>
+                </View>
+              }
             />
           </View>
         )}
@@ -219,12 +310,15 @@ export default function MapPickerScreen() {
         <View style={[styles.confirmCard, { paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.dragHandle} />
           <Text style={styles.cardLabel}>{t('admin.map_picker.selected_location')}</Text>
-          <Text style={styles.resolvedAddr}>{resolvedAddress || t('admin.map_picker.unknown_address')}</Text>
-          {resolvedRegion ? <Text style={styles.resolvedRegion}>{resolvedRegion}</Text> : null}
+          <Text style={styles.resolvedAddr}>
+            {resolvedAddress || t('admin.map_picker.unknown_address')}
+          </Text>
+          {resolvedRegion ? (
+            <Text style={styles.resolvedRegion}>{resolvedRegion}</Text>
+          ) : null}
           <Text style={styles.coordsText}>
             lat: {markerCoords.latitude.toFixed(4)}, lng: {markerCoords.longitude.toFixed(4)}
           </Text>
-          
           <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
             <Text style={styles.confirmBtnText}>{t('admin.map_picker.confirm_btn')}</Text>
           </TouchableOpacity>
@@ -235,12 +329,8 @@ export default function MapPickerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  container: { flex: 1 },
+  map: { ...StyleSheet.absoluteFillObject },
   overlayTop: {
     position: 'absolute',
     top: 0,
@@ -297,7 +387,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     marginHorizontal: 16,
-    maxHeight: 250,
+    maxHeight: 280,
     overflow: 'hidden',
     ...AdminShadows.shadowMedium,
     shadowOpacity: 0.15,
@@ -324,6 +414,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: AdminColors.textMuted,
     marginTop: 2,
+  },
+  poweredByRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  poweredByText: {
+    fontSize: 11,
+    color: AdminColors.textMuted,
   },
   markerContainer: {
     width: 44,

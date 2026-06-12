@@ -56,6 +56,15 @@ const OrderCard = React.memo(function OrderCard({ item, isArabic, t, onValidate,
         </View>
       </View>
 
+      {!!item.notes && (
+        <View style={[styles.notesBadge, row(isArabic)]}>
+          <Ionicons name="document-text-outline" size={12} color="#92400E" />
+          <Text style={[styles.notesText, font.regular(isArabic)]} numberOfLines={2} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
+            {item.notes}
+          </Text>
+        </View>
+      )}
+
       <View style={[styles.cardBottom, row(isArabic)]}>
         <View style={isArabic ? { alignItems: 'flex-end' } : {}}>
           <Text style={[styles.amountText, font.extrabold(isArabic)]} maxFontSizeMultiplier={textProps.maxFontSizeMultiplier}>
@@ -114,4 +123,6 @@ const styles = StyleSheet.create({
   settledText: { fontSize: 12, fontWeight: '600', color: '#10B981' },
   validateBtn: { backgroundColor: AdminColors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   validateBtnText: { color: 'white', fontSize: 13, fontWeight: '700' },
+  notesBadge: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FDE68A' },
+  notesText: { fontSize: 12, fontWeight: '600', color: '#92400E', flex: 1 },
 });

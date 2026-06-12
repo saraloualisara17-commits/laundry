@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 // Build the WebSocket URL from the API base URL.
 // - http:// → ws://  (local dev)
 // - https:// → wss:// (production)
-const _apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
+const _apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://astrapropre.ma';
 const WS_URL = _apiBase.replace(/^https?/, (m) => (m === 'https' ? 'wss' : 'ws')) + '/ws';
 
 const RECONNECT_BASE_MS = 2000;
@@ -128,7 +128,7 @@ class SocketClient {
       }
       // Dynamically import to avoid circular dependency with client.ts
       const axios = require('axios').default;
-      const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
+      const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://astrapropre.ma';
       const res = await axios.post(`${BASE_URL}/auth/refresh`, null, {
         headers: { 'X-Refresh-Token': refreshToken },
       });

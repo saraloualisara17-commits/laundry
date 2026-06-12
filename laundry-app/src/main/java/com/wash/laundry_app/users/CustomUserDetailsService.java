@@ -2,6 +2,7 @@ package com.wash.laundry_app.users;
 import com.wash.laundry_app.auth.AuthService;
 import lombok.AllArgsConstructor;
 
+
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -16,8 +17,6 @@ import java.util.Collections;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
-
     private final AuthService authService;
 
 

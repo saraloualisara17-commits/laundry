@@ -167,7 +167,7 @@ function RootLayoutNav() {
       //   - client-debt-detail: linked from livreur unpaid screen
       const livreurAdminScreens = ['order-items', 'order-summary', 'client-debt-detail', 'orders-by-status', 'order-client', 'map-picker'];
       const inLivreurPickupFlow = isLivreur && inAdminGroup && livreurAdminScreens.some(s => segments.includes(s));
-      const isSharedRoute = ['order', 'client', 'modal', 'notifications'].includes(rootSegment);
+      const isSharedRoute = ['order', 'client', 'modal', 'notifications', 'search', 'call-logs'].includes(rootSegment);
 
       if (!isSharedRoute) {
         if (isLivreur && !inLivreurGroup && !inLivreurPickupFlow) {
@@ -196,6 +196,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(employe)" />
       <Stack.Screen name="(livreur)" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="search" />
       <Stack.Screen name="order/[id]" />
       <Stack.Screen name="client/[id]" />
     </Stack>

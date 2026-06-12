@@ -240,6 +240,17 @@ export default function LivreurDashboard() {
               </View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/search')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.quickIcon, { backgroundColor: 'rgba(59,130,246,0.12)' }]}>
+              <Ionicons name="search-outline" size={26} color="#3B82F6" />
+            </View>
+            <Text style={styles.quickLabel}>{t('tabs.search')}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Status Cards */}

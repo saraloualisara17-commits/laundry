@@ -6,7 +6,7 @@ import { logger } from '../../lib/logger';
 import { store } from '../../store/store';
 import { setCredentials, logOut } from '../../store/authSlice';
 
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://resourceful-gratitude-production-6f76.up.railway.app';
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://astrapropre.ma';
 
 const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -15,6 +15,7 @@ const client: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
 
 /**
  * Single in-flight refresh promise shared across all concurrent 401 failures.

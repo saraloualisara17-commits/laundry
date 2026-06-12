@@ -88,6 +88,13 @@ export const queryKeys = {
     unreadCount: () => [...['notifications'], 'unread-count'] as const,
   },
 
+  // ─── CALL LOGS ─────────────────────────────────────────────────────────────
+  callLogs: {
+    all: ['callLogs'] as const,
+    list: (page?: number) => [...['callLogs'], 'list', { page }] as const,
+    byClient: (clientId: number | string) => [...['callLogs'], 'client', String(clientId)] as const,
+  },
+
   // ─── AUDIT ─────────────────────────────────────────────────────────────────
   audit: {
     all: ['audit'] as const,

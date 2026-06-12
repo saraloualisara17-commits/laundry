@@ -191,10 +191,10 @@ export default function AdminDashboard() {
         style={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AdminColors.primary} />}
       >
-        {/* Quick Actions Row */}
-        <View style={styles.quickActionsRow}>
-          <TouchableOpacity 
-            style={styles.quickActionBtn} 
+        {/* Quick Actions — row 1: Missions, Scan, Map */}
+        <View style={[styles.quickActionsRow, { marginTop: 20 }]}>
+          <TouchableOpacity
+            style={styles.quickActionBtn}
             onPress={() => router.push('/(admin)/missions')}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: AdminColors.primary }]}>
@@ -210,8 +210,8 @@ export default function AdminDashboard() {
             <Text style={styles.quickActionLabel}>{t('livreur.map_title', { defaultValue: 'Missions' })}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.quickActionBtn} 
+          <TouchableOpacity
+            style={styles.quickActionBtn}
             onPress={() => setShowScanner(true)}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: '#10B981' }]}>
@@ -229,7 +229,10 @@ export default function AdminDashboard() {
             </View>
             <Text style={styles.quickActionLabel}>{t('admin.more.map_title')}</Text>
           </TouchableOpacity>
+        </View>
 
+        {/* Quick Actions — row 2: Gallery, Search, Call Logs */}
+        <View style={styles.quickActionsRow}>
           <TouchableOpacity
             style={styles.quickActionBtn}
             onPress={() => router.push('/(admin)/gallery')}
@@ -238,6 +241,26 @@ export default function AdminDashboard() {
               <Ionicons name="images-outline" size={22} color="white" />
             </View>
             <Text style={styles.quickActionLabel}>{t('admin.gallery.title', { defaultValue: 'Galerie' })}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={() => router.push('/search')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#3B82F6' }]}>
+              <Ionicons name="search-outline" size={22} color="white" />
+            </View>
+            <Text style={styles.quickActionLabel}>{t('tabs.search')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={() => router.push('/(admin)/call-logs')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#EC4899' }]}>
+              <Ionicons name="call-outline" size={22} color="white" />
+            </View>
+            <Text style={styles.quickActionLabel}>{t('call_logs.btn')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -497,16 +520,16 @@ const styles = StyleSheet.create({
   headerAppName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   content: { flex: 1, marginTop: -20 },
   heroCard: { backgroundColor: '#0D1B2A', marginHorizontal: 20, borderRadius: 24, padding: 24, ...AdminShadows.shadowMedium, overflow: 'hidden', position: 'relative' },
-  quickActionsRow: { 
-    flexDirection: 'row', 
-    paddingHorizontal: 20, 
-    justifyContent: 'space-between', 
-    marginTop: 20, 
-    marginBottom: 10,
+  quickActionsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    justifyContent: 'flex-start',
+    marginTop: 10,
+    marginBottom: 2,
     gap: 12
   },
   quickActionBtn: {
-    flex: 1,
+    width: (screenWidth - 40 - 24) / 3,
     backgroundColor: 'white',
     borderRadius: 18,
     padding: 12,

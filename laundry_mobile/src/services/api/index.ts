@@ -11,3 +11,4 @@ export * from './statisticsApi';
 export * from './usersApi';
 export * from './auditApi';
 export * from './analyticsApi';
+export * from './callLogsApi';

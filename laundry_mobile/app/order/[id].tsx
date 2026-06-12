@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Linking, RefreshControl,
+  ActivityIndicator, Linking, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +26,7 @@ import {
   toWhatsAppNumber,
   toCallNumber,
 } from '../../src/hooks/useOrderDetailHandlers';
+import { useLogCall } from '../../src/hooks/query/useCallLogs';
 
 import PaymentModal from '../../components/orders/modals/PaymentModal';
 import DeliveryConfirmModal from '../../components/orders/modals/DeliveryConfirmModal';
@@ -90,6 +91,41 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
 
   // ── All handlers + modal state ────────────────────────────────────────────────
   const h = useOrderDetailHandlers({ id, order, currentUser, remaining, t });
+  const { mutate: logCall } = useLogCall();
+
+  const handleCall = (phone: string) => {
+    Alert.alert(
+      t('call_confirm.title'),
+      `${t('call_confirm.msg')} ${phone}?`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.call'),
+          onPress: () => {
+            logCall({ clientId: order.client.id, orderId: order.id, phoneNumber: phone, callType: 'PHONE' });
+            Linking.openURL(`tel:${toCallNumber(phone)}`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleWhatsApp = (phone: string) => {
+    Alert.alert(
+      t('call_confirm.wa_title'),
+      `${t('call_confirm.wa_msg')} ${phone}?`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'WhatsApp',
+          onPress: () => {
+            logCall({ clientId: order.client.id, orderId: order.id, phoneNumber: phone, callType: 'WHATSAPP' });
+            Linking.openURL(`https://wa.me/${toWhatsAppNumber(phone)}`);
+          },
+        },
+      ]
+    );
+  };
 
   // Driver lists are lazy — only fetched when the respective modal opens (React Query caches the result)
   const { data: drivers = [], isLoading: driversLoading, isError: driversError } = useDriversList(h.showDriverModal);
@@ -164,7 +200,7 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
             </Text>
           </View>
           {!!h.clientPhone && (
-            <TouchableOpacity style={styles.phoneChip} onPress={() => Linking.openURL(`tel:${toCallNumber(h.clientPhone)}`)}>
+            <TouchableOpacity style={styles.phoneChip} onPress={() => handleCall(h.clientPhone)}>
               <Text style={styles.phoneChipText}>{h.clientPhone}</Text>
             </TouchableOpacity>
           )}
@@ -181,6 +217,14 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
           totalAmount={totalAmount} paidAmount={paidAmount} remaining={remaining}
           progressPercentage={progressPercentage} fullyPaid={fullyPaid}
         />
+
+        {/* Order-level notes */}
+        {!!order.notes && (
+          <View style={[styles.orderNotesBadge, row(isArabic)]}>
+            <Ionicons name="document-text-outline" size={15} color="#92400E" />
+            <Text style={[styles.orderNotesText, isArabic && { textAlign: 'right', flex: 1 }]}>{order.notes}</Text>
+          </View>
+        )}
 
         {/* Workflow banners + driver info */}
         <OrderWorkflowArea
@@ -303,7 +347,7 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
         <View style={[styles.bottomBarInner, row(isArabic)]}>
           <TouchableOpacity
             style={[styles.bottomBarBtn, { backgroundColor: '#25D366' }]}
-            onPress={() => h.clientPhone && Linking.openURL(`https://wa.me/${toWhatsAppNumber(h.clientPhone)}`)}
+            onPress={() => h.clientPhone && handleWhatsApp(h.clientPhone)}
             disabled={!h.clientPhone}
           >
             <Ionicons name="logo-whatsapp" size={22} color="white" />
@@ -311,7 +355,7 @@ function OrderDetail({ order, id, currentUser }: { order: any; id: string; curre
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.bottomBarBtn, { backgroundColor: '#0F172A' }]}
-            onPress={() => h.clientPhone && Linking.openURL(`tel:${toCallNumber(h.clientPhone)}`)}
+            onPress={() => h.clientPhone && handleCall(h.clientPhone)}
             disabled={!h.clientPhone}
           >
             <Ionicons name="call-outline" size={22} color="white" />
@@ -449,6 +493,8 @@ const styles = StyleSheet.create({
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  orderNotesBadge: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: '#FEF3C7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#FDE68A' },
+  orderNotesText: { fontSize: 13, fontWeight: '600', color: '#92400E', flex: 1 },
 
   twoColRow: { flexDirection: 'row', gap: 10 },
   secondaryActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 12, backgroundColor: Colors.primary100, borderWidth: 1, borderColor: Colors.primary + '40' },

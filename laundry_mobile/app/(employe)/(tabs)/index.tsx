@@ -220,22 +220,38 @@ export default function EmployeDashboard() {
           </TouchableOpacity>
         )}
 
-        {/* Gallery */}
-        <TouchableOpacity
-          style={styles.unpaidCard}
-          onPress={() => router.push('/(employe)/gallery' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.unpaidRow, row(isArabic)]}>
-            <View style={[styles.unpaidIcon, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={{ fontSize: 22 }}>📷</Text>
+        {/* Gallery + Search Row */}
+        <View style={[{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 12 }, row(isArabic)]}>
+          <TouchableOpacity
+            style={[styles.unpaidCard, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}
+            onPress={() => router.push('/(employe)/gallery' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.unpaidRow, row(isArabic)]}>
+              <View style={[styles.unpaidIcon, { backgroundColor: '#FFF3E0' }]}>
+                <Text style={{ fontSize: 22 }}>📷</Text>
+              </View>
+              <Text style={[styles.unpaidTitle, { flex: 1 }, isArabic && { textAlign: 'right' }]}>
+                {t('admin.gallery.title', { defaultValue: 'Galerie' })}
+              </Text>
             </View>
-            <Text style={[styles.unpaidTitle, { flex: 1 }, isArabic && { textAlign: 'right' }]}>
-              {t('admin.gallery.title', { defaultValue: 'Galerie Photos' })}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={AdminColors.textMuted} />
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.unpaidCard, { flex: 1, marginHorizontal: 0, marginBottom: 0 }]}
+            onPress={() => router.push('/search')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.unpaidRow, row(isArabic)]}>
+              <View style={[styles.unpaidIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+                <Ionicons name="search-outline" size={22} color="#3B82F6" />
+              </View>
+              <Text style={[styles.unpaidTitle, { flex: 1 }, isArabic && { textAlign: 'right' }]}>
+                {t('tabs.search')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Recent Orders */}
         <Text style={[styles.sectionTitle, { marginTop: 20 }, isArabic && { textAlign: 'right' }]}>

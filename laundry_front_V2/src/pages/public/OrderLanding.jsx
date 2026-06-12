@@ -185,32 +185,24 @@ export default function OrderLanding() {
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-white" style={{ minHeight: '92vh' }}>
 
-        {/* Background image — always right half */}
-        <div className="absolute inset-y-0 left-[45%] right-0 hidden md:block">
+        {/* Background image — right half on desktop, full on mobile */}
+        <div className="absolute inset-0 md:inset-y-0 md:left-[45%] md:right-0">
           <img
             src="/hero-bg.jpg"
             alt=""
             className="w-full h-full object-cover object-center"
             onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
           />
-          {/* Left-edge fade */}
-          <div className="absolute inset-y-0 left-0 w-40 pointer-events-none"
+          {/* Desktop: left-edge fade */}
+          <div className="hidden md:block absolute inset-y-0 left-0 w-40 pointer-events-none"
             style={{ background: 'linear-gradient(to right, white, transparent)' }} />
-        </div>
-
-        {/* Mobile image — top strip */}
-        <div className="md:hidden absolute inset-x-0 top-0 h-[45vh]">
-          <img
-            src="/hero-bg-mobile.jpg"
-            alt=""
-            className="w-full h-full object-cover object-top"
-            onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
-          />
-          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white to-transparent" />
+          {/* Mobile: bottom fade so text is readable */}
+          <div className="md:hidden absolute inset-0 pointer-events-none"
+            style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.55) 40%, rgba(255,255,255,0.92) 70%, white 100%)' }} />
         </div>
 
         {/* Content column — always left */}
-        <div className="relative z-10 px-5 md:px-10 pt-[48vh] pb-16
+        <div className="relative z-10 px-5 md:px-10 pt-20 pb-16
                         md:pt-0 md:min-h-[92vh] md:flex md:flex-col md:justify-center
                         md:w-[48%] md:max-w-[560px]">
           {/* Trust badges */}

@@ -16,8 +16,10 @@
         "NSCameraUsageDescription": "Used to take photos of orders for delivery and pickup proof.",
         "NSPhotoLibraryUsageDescription": "Used to attach photos from your gallery to orders.",
         "NSLocationWhenInUseUsageDescription": "Used to show your position on the delivery map.",
-        "NSMicrophoneUsageDescription": "Required by the camera system on iOS."
-      }
+        "NSMicrophoneUsageDescription": "Required by the camera system on iOS.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.smlouali.laundrymobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -94,7 +96,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5cec7013-c82d-4a69-aebc-01172bfd7633"
+        "projectId": "9e50500a-ba84-4ea9-b5a9-48d60d9b3688"
       }
     },
     "owner": "samad_i"
